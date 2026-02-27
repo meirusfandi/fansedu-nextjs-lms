@@ -9,14 +9,16 @@ export function middleware(request: NextRequest) {
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
   const isAuthenticated = request.cookies.get("auth")?.value === "1";
 
+  if (isAuthenticated && pathname === "/") {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
   if (!isAuthenticated && !isPublicRoute) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   if (isAuthenticated && isPublicRoute) {
-    const redirectUrl = new URL("/", request.url);
+    const redirectUrl = new URL("/admin", request.url);
     return NextResponse.redirect(redirectUrl);
   }
 

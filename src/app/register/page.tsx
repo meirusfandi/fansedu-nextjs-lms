@@ -43,9 +43,9 @@ export default function RegisterPage() {
         password: form.password,
       });
 
-      // Simple demo auth: set a cookie and redirect
-      document.cookie = "auth=1; path=/; max-age=604800";
-      router.push("/");
+      // No backend: set cookie and go straight to admin dashboard
+      document.cookie = "auth=1; path=/; max-age=604800; SameSite=Strict";
+      router.push("/admin");
     } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");
@@ -82,6 +82,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="name"
+              name="name"
               type="text"
               required
               autoComplete="name"
@@ -101,6 +102,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               required
               autoComplete="email"
@@ -120,6 +122,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="password"
+              name="password"
               type="password"
               required
               autoComplete="new-password"
@@ -139,6 +142,7 @@ export default function RegisterPage() {
             </label>
             <input
               id="confirmPassword"
+              name="confirmPassword"
               type="password"
               required
               autoComplete="new-password"

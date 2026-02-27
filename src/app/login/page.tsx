@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 type LoginFormState = {
@@ -12,9 +12,6 @@ type LoginFormState = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectFrom = searchParams.get("from") || "/";
-
   const [form, setForm] = useState<LoginFormState>({
     email: "",
     password: "",
@@ -32,9 +29,9 @@ export default function LoginPage() {
       await new Promise((resolve) => setTimeout(resolve, 800));
       console.log("Login submitted", form);
 
-      // Simple demo auth: set a cookie and redirect
-      document.cookie = "auth=1; path=/; max-age=604800";
-      router.push(redirectFrom);
+      // No backend: set cookie and go straight to admin dashboard
+      document.cookie = "auth=1; path=/; max-age=604800; SameSite=Strict";
+      router.push("/admin");
     } catch (err) {
       console.error(err);
       setError("Something went wrong. Please try again.");
@@ -83,6 +80,7 @@ export default function LoginPage() {
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               required
               autoComplete="email"
@@ -110,6 +108,7 @@ export default function LoginPage() {
             </div>
             <input
               id="password"
+              name="password"
               type="password"
               required
               autoComplete="current-password"

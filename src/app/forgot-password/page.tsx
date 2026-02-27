@@ -67,6 +67,7 @@ export default function ForgotPasswordPage() {
             </label>
             <input
               id="email"
+              name="email"
               type="email"
               required
               autoComplete="email"
