@@ -1,0 +1,234 @@
+// FansEdu LMS - Prisma Schema
+// Jalankan: npx prisma generate && npx prisma db push (atau migrate)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  student
+}
+
+enum TryoutLevel {
+  easy
+  medium
+  hard
+}
+
+enum TryoutStatus {
+  draft
+  open
+  closed
+}
+
+enum QuestionType {
+  short
+  multiple_choice
+  true_false
+}
+
+enum AttemptStatus {
+  in_progress
+  submitted
+  expired
+}
+
+enum EnrollmentStatus {
+  enrolled
+  in_progress
+  completed
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  name              String
+  role              UserRole  @default(student)
+  avatarUrl         String?   @map("avatar_url")
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  passwordResetTokens   PasswordResetToken[]
+  attempts              Attempt[]
+  courseEnrollments     CourseEnrollment[]
+  certificates          Certificate[]
+  createdTryoutSessions TryoutSession[] @relation("CreatedBy")
+  createdCourses        Course[]        @relation("CreatedBy")
+
+  @@map("users")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model TryoutSession {
+  id               String       @id @default(uuid())
+  title            String
+  shortTitle       String?       @map("short_title")
+  description      String?
+  durationMinutes  Int          @map("duration_minutes")
+  questionsCount   Int          @map("questions_count")
+  level            TryoutLevel  @default(medium)
+  opensAt          DateTime     @map("opens_at")
+  closesAt         DateTime     @map("closes_at")
+  maxParticipants  Int?         @map("max_participants")
+  status           TryoutStatus @default(open)
+  createdById      String?      @map("created_by")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  createdBy   User?      @relation("CreatedBy", fields: [createdById], references: [id])
+  questions   Question[]
+  attempts    Attempt[]
+  certificates Certificate[]
+
+  @@index([status])
+  @@index([opensAt, closesAt])
+  @@map("tryout_sessions")
+}
+
+model Question {
+  id               String       @id @default(uuid())
+  tryoutSessionId  String       @map("tryout_session_id")
+  sortOrder        Int          @map("sort_order")
+  type             QuestionType
+  body             String
+  options          Json?
+  maxScore         Decimal      @default(1) @map("max_score")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  tryoutSession  TryoutSession   @relation(fields: [tryoutSessionId], references: [id], onDelete: Cascade)
+  attemptAnswers AttemptAnswer[]
+
+  @@index([tryoutSessionId])
+  @@map("questions")
+}
+
+model Attempt {
+  id                 String        @id @default(uuid())
+  userId             String        @map("user_id")
+  tryoutSessionId    String        @map("tryout_session_id")
+  startedAt          DateTime      @default(now()) @map("started_at")
+  submittedAt        DateTime?     @map("submitted_at")
+  status             AttemptStatus @default(in_progress)
+  score              Decimal?
+  maxScore           Decimal?      @map("max_score")
+  percentile         Decimal?
+  timeSecondsSpent   Int?          @map("time_seconds_spent")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tryoutSession  TryoutSession    @relation(fields: [tryoutSessionId], references: [id], onDelete: Cascade)
+  attemptAnswers AttemptAnswer[]
+  feedback       AttemptFeedback?
+
+  @@unique([userId, tryoutSessionId])
+  @@index([userId])
+  @@index([tryoutSessionId])
+  @@index([status])
+  @@map("attempts")
+}
+
+model AttemptAnswer {
+  id              String   @id @default(uuid())
+  attemptId       String   @map("attempt_id")
+  questionId      String   @map("question_id")
+  answerText      String?  @map("answer_text")
+  selectedOption  String?  @map("selected_option")
+  isMarked        Boolean  @default(false) @map("is_marked")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  attempt  Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@map("attempt_answers")
+}
+
+model AttemptFeedback {
+  id                String   @id @default(uuid())
+  attemptId         String   @unique @map("attempt_id")
+  summary           String?
+  recap             String?
+  strengthAreas     Json?    @map("strength_areas")
+  improvementAreas Json?    @map("improvement_areas")
+  recommendationText String? @map("recommendation_text")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@map("attempt_feedback")
+}
+
+model Course {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  createdById String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy  User?               @relation("CreatedBy", fields: [createdById], references: [id])
+  enrollments CourseEnrollment[]
+  certificates Certificate[]
+
+  @@map("courses")
+}
+
+model CourseEnrollment {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  courseId    String           @map("course_id")
+  status      EnrollmentStatus @default(enrolled)
+  enrolledAt  DateTime         @default(now()) @map("enrolled_at")
+  completedAt DateTime?        @map("completed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@map("course_enrollments")
+}
+
+model Certificate {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  tryoutSessionId    String?  @map("tryout_session_id")
+  courseId           String?  @map("course_id")
+  issuedAt           DateTime @default(now()) @map("issued_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tryoutSession TryoutSession? @relation(fields: [tryoutSessionId], references: [id], onDelete: SetNull)
+  course        Course?        @relation(fields: [courseId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("certificates")
+}
