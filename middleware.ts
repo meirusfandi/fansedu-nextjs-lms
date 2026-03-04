@@ -7,10 +7,13 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
-  const isAuthenticated = request.cookies.get("auth")?.value === "1";
+  const token = request.cookies.get("auth_token")?.value;
+  const role = request.cookies.get("auth_role")?.value;
+  const isAuthenticated = Boolean(token);
 
   if (isAuthenticated && pathname === "/") {
-    return NextResponse.redirect(new URL("/admin", request.url));
+    const dest = role === "admin" ? "/admin" : "/student";
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   if (!isAuthenticated && !isPublicRoute) {
@@ -18,8 +21,8 @@ export function middleware(request: NextRequest) {
   }
 
   if (isAuthenticated && isPublicRoute) {
-    const redirectUrl = new URL("/admin", request.url);
-    return NextResponse.redirect(redirectUrl);
+    const dest = role === "admin" ? "/admin" : "/student";
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return NextResponse.next();

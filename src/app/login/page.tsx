@@ -25,16 +25,20 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // TODO: Integrate with real login API
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      console.log("Login submitted", form);
-
-      // No backend: set cookie and go straight to admin dashboard
-      document.cookie = "auth=1; path=/; max-age=604800; SameSite=Strict";
-      router.push("/admin");
+      const res = await import("@/lib/api").then((m) =>
+        m.login({ email: form.email, password: form.password })
+      );
+      const { token, user } = res;
+      const { setAuthToken } = await import("@/lib/api");
+      setAuthToken(token, 604800, user.role);
+      const dest = user.role === "admin" ? "/admin" : "/student";
+      router.push(dest);
     } catch (err) {
-      console.error(err);
-      setError("Something went wrong. Please try again.");
+      const message =
+        (err as { status?: number }).status === 401
+          ? "Email atau password salah."
+          : "Gagal masuk. Periksa koneksi atau coba lagi.";
+      setError(message);
     } finally {
       setLoading(false);
     }

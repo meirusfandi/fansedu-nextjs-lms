@@ -1,9 +1,8 @@
-const stats = [
-  { label: "Total siswa terdaftar", value: "1.284", change: "+120 bulan ini" },
-  { label: "Event aktif bulan ini", value: "12", change: "+3 event baru" },
-  { label: "Rata-rata skor TO", value: "703", change: "+28 poin" },
-  { label: "Sertifikat diterbitkan", value: "326", change: "+18 minggu ini" },
-];
+"use client";
+
+import { useEffect, useState } from "react";
+import { getAdminOverview } from "@/lib/api";
+import type { AdminOverviewResponse } from "@/lib/api-types";
 
 const recentEnrollments = [
   {
@@ -51,6 +50,60 @@ const topCourses = [
 ];
 
 export default function AdminDashboardPage() {
+  const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getAdminOverview()
+      .then(setOverview)
+      .catch((e) => setError((e as Error).message ?? "Gagal memuat data"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const stats = overview
+    ? [
+        {
+          label: "Total siswa terdaftar",
+          value: String(overview.total_students),
+          change: "Dari API",
+        },
+        {
+          label: "Event tryout aktif",
+          value: String(overview.active_tryouts),
+          change: "Dari API",
+        },
+        {
+          label: "Rata-rata skor",
+          value: String(overview.avg_score),
+          change: "Dari API",
+        },
+        {
+          label: "Sertifikat diterbitkan",
+          value: String(overview.total_certificates),
+          change: "Dari API",
+        },
+      ]
+    : [
+        { label: "Total siswa terdaftar", value: "–", change: "" },
+        { label: "Event tryout aktif", value: "–", change: "" },
+        { label: "Rata-rata skor", value: "–", change: "" },
+        { label: "Sertifikat diterbitkan", value: "–", change: "" },
+      ];
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
+        <div className="rounded-2xl border border-red-200 bg-white p-6 text-center dark:border-red-900/50 dark:bg-zinc-950">
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-2 text-xs text-zinc-500">
+            Pastikan backend API berjalan dan token admin valid.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
       {/* Sidebar */}
@@ -143,11 +196,13 @@ export default function AdminDashboardPage() {
                 {item.label}
               </p>
               <p className="mt-2 text-xl font-semibold tracking-tight">
-                {item.value}
+                {loading ? "..." : item.value}
               </p>
-              <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                {item.change}
-              </p>
+              {item.change ? (
+                <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  {item.change}
+                </p>
+              ) : null}
             </div>
           ))}
         </section>

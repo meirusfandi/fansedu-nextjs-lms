@@ -21,9 +21,8 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      // TODO: Integrate with real forgot-password API
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      console.log("Forgot password submitted", form);
+      const { forgotPassword } = await import("@/lib/api");
+      await forgotPassword({ email: form.email });
       setSent(true);
     } catch (err) {
       console.error(err);

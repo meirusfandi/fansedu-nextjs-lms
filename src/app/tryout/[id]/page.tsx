@@ -9,43 +9,17 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  getTryout,
+  startTryout,
+  getAttemptQuestions,
+  putAttemptAnswer,
+  submitAttempt,
+} from "@/lib/api";
+import type { Question as ApiQuestion, TryoutSession } from "@/lib/api-types";
+import type { AttemptFeedback } from "@/lib/api-types";
 
-const tryoutConfigs = [
-  {
-    id: "to-1",
-    title: "Simulasi OSN Informatika - Tingkat Kabupaten",
-    level: "Menengah",
-    duration: "90 menit",
-    durationMinutes: 90,
-    questions: 20,
-    description:
-      "Simulasi komprehensif untuk mengukur kesiapan dasar mengikuti OSN Informatika tingkat kabupaten.",
-  },
-  {
-    id: "to-2",
-    title: "Simulasi OSN Informatika - Tingkat Provinsi",
-    level: "Sulit",
-    duration: "120 menit",
-    durationMinutes: 120,
-    questions: 25,
-    description:
-      "Simulasi dengan soal-soal algoritma dan struktur data tingkat lanjut sebagai persiapan OSN tingkat provinsi.",
-  },
-  {
-    id: "to-3",
-    title: "Latihan Cepat OSN Informatika - Pemanasan",
-    level: "Mudah",
-    duration: "45 menit",
-    durationMinutes: 45,
-    questions: 10,
-    description:
-      "Latihan singkat untuk pemanasan dan membiasakan diri dengan format soal OSN Informatika.",
-  },
-];
-
-type TryoutStatus = "intro" | "in_progress" | "submitted";
-
-type QuestionType = "short" | "multiple_choice" | "true_false";
+type TryoutStatus = "loading" | "intro" | "in_progress" | "submitted";
 
 type AnswerState = {
   text: string;
@@ -59,74 +33,96 @@ function formatTime(seconds: number): string {
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-// Tipe soal bergantian: isian singkat, pilihan ganda, benar/salah
-const QUESTION_TYPES: QuestionType[] = ["short", "multiple_choice", "true_false"];
-
-// Placeholder soal per nomor (bisa diganti dari API nanti)
-function getPlaceholderQuestion(index: number, total: number): {
-  title: string;
-  body: string;
-  type: QuestionType;
-  options?: string[];
-} {
-  const topics = [
-    "Algoritma & kompleksitas waktu",
-    "Struktur data (array, stack, queue)",
-    "Pencarian & pengurutan",
-    "Rekursi & divide-conquer",
-    "Dynamic programming dasar",
-    "Graf & traversal",
-    "Matematika diskret",
-    "String & pattern matching",
-  ];
-  const topic = topics[index % topics.length];
-  const type = QUESTION_TYPES[index % QUESTION_TYPES.length];
-
-  if (type === "short") {
-    return {
-      type: "short",
-      title: `Soal #${index + 1} — ${topic} (Isian singkat)`,
-      body: `Berapa kompleksitas waktu algoritma yang menggunakan satu loop dari 1 sampai N dan di dalamnya ada operasi O(1)? Tuliskan jawaban dalam notasi Big-O (contoh: O(N)).`,
-    };
-  }
-  if (type === "multiple_choice") {
-    return {
-      type: "multiple_choice",
-      title: `Soal #${index + 1} — ${topic} (Pilihan ganda)`,
-      body: `Untuk mencari elemen maksimum dalam array tak terurut berukuran N, kompleksitas waktu terbaik yang dapat dicapai adalah:`,
-      options: [
-        "O(1)",
-        "O(log N)",
-        "O(N)",
-        "O(N log N)",
-      ],
-    };
-  }
-  return {
-    type: "true_false",
-    title: `Soal #${index + 1} — ${topic} (Benar/Salah)`,
-    body: `Pernyataan: "Algoritma binary search hanya dapat diterapkan pada array yang sudah terurut secara ascending atau descending."`,
-    options: ["Benar", "Salah"],
+function levelLabel(level: string): string {
+  const map: Record<string, string> = {
+    easy: "Mudah",
+    medium: "Menengah",
+    hard: "Sulit",
   };
+  return map[level] ?? level;
 }
 
 export default function TryoutDetailPage() {
   const params = useParams<{ id: string }>();
-  const tryout = tryoutConfigs.find((t) => t.id === params.id);
-  const [status, setStatus] = useState<TryoutStatus>("intro");
+  const tryoutId = params.id as string;
+
+  const [tryout, setTryout] = useState<TryoutSession | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [status, setStatus] = useState<TryoutStatus>("loading");
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<ApiQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, AnswerState>>({});
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(0);
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+  const [submitResult, setSubmitResult] = useState<{
+    score: number;
+    percentile: number;
+    feedback: AttemptFeedback;
+  } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const totalQuestions = tryout?.questions ?? 0;
-  const durationMinutes = tryout?.durationMinutes ?? 90;
+  useEffect(() => {
+    getTryout(tryoutId)
+      .then(setTryout)
+      .catch(() => setLoadError("Tryout tidak ditemukan"))
+      .finally(() => setStatus((s) => (s === "loading" ? "intro" : s)));
+  }, [tryoutId]);
 
-  const startTryout = useCallback(() => {
-    setStatus("in_progress");
-    setTimeLeftSeconds(durationMinutes * 60);
-  }, [durationMinutes]);
+  const totalQuestions = questions.length;
+  const question = questions[currentIndex];
+  const currentAnswer = question
+    ? answers[question.id] ?? { text: "", marked: false }
+    : { text: "", marked: false };
+
+  const isAnswered = useCallback(
+    (a: AnswerState) =>
+      (a.text?.trim() ?? "") !== "" || (a.selectedOption ?? "") !== "",
+    []
+  );
+  const answeredCount = useMemo(
+    () =>
+      questions.filter((q) =>
+        isAnswered(answers[q.id] ?? { text: "", marked: false })
+      ).length,
+    [questions, answers, isAnswered]
+  );
+  const markedCount = useMemo(
+    () => Object.values(answers).filter((a) => a.marked).length,
+    [answers]
+  );
+
+  const saveCurrentAnswer = useCallback(
+    (updates: Partial<AnswerState>) => {
+      if (!question) return;
+      const next = {
+        ...currentAnswer,
+        ...updates,
+      };
+      setAnswers((prev) => ({ ...prev, [question.id]: next }));
+      putAttemptAnswer(attemptId!, question.id, {
+        answer_text: next.text || undefined,
+        selected_option: next.selectedOption || undefined,
+        is_marked: next.marked,
+      }).catch(() => {});
+    },
+    [attemptId, question, currentAnswer]
+  );
+
+  const startTryoutFlow = useCallback(async () => {
+    if (!tryout) return;
+    try {
+      const { attempt_id, time_left_seconds } = await startTryout(tryout.id);
+      const qs = await getAttemptQuestions(attempt_id);
+      setAttemptId(attempt_id);
+      setQuestions(qs);
+      setTimeLeftSeconds(time_left_seconds);
+      setCurrentIndex(0);
+      setStatus("in_progress");
+    } catch (e) {
+      setLoadError((e as Error).message ?? "Gagal memulai simulasi");
+    }
+  }, [tryout]);
 
   useEffect(() => {
     if (status !== "in_progress" || timeLeftSeconds <= 0) return;
@@ -134,6 +130,17 @@ export default function TryoutDetailPage() {
       setTimeLeftSeconds((prev) => {
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current);
+          if (attemptId) {
+            submitAttempt(attemptId)
+              .then((res) =>
+                setSubmitResult({
+                  score: res.score,
+                  percentile: res.percentile,
+                  feedback: res.feedback ?? {},
+                })
+              )
+              .catch(() => setLoadError("Gagal mengirim jawaban"));
+          }
           setStatus("submitted");
           return 0;
         }
@@ -143,40 +150,7 @@ export default function TryoutDetailPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [status]);
-
-  const currentAnswer = answers[currentIndex] ?? {
-    text: "",
-    selectedOption: undefined,
-    marked: false,
-  };
-  const isAnswered = useCallback(
-    (a: AnswerState) =>
-      (a.text?.trim() ?? "") !== "" || (a.selectedOption ?? "") !== "",
-    []
-  );
-  const answeredCount = useMemo(
-    () => Object.values(answers).filter(isAnswered).length,
-    [answers, isAnswered]
-  );
-  const markedCount = useMemo(
-    () => Object.values(answers).filter((a) => a.marked).length,
-    [answers]
-  );
-
-  const saveCurrentAnswer = useCallback(
-    (updates: Partial<AnswerState>) => {
-      setAnswers((prev) => ({
-        ...prev,
-        [currentIndex]: { ...currentAnswer, ...updates },
-      }));
-    },
-    [currentIndex, currentAnswer]
-  );
-
-  const toggleMarked = useCallback(() => {
-    saveCurrentAnswer({ marked: !currentAnswer.marked });
-  }, [currentAnswer.marked, saveCurrentAnswer]);
+  }, [status, attemptId]);
 
   const goPrev = useCallback(() => {
     if (currentIndex > 0) setCurrentIndex((i) => i - 1);
@@ -186,22 +160,55 @@ export default function TryoutDetailPage() {
     if (currentIndex < totalQuestions - 1) setCurrentIndex((i) => i + 1);
   }, [currentIndex, totalQuestions]);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     setShowConfirmSubmit(false);
-    setStatus("submitted");
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
+    if (!attemptId) return;
+    try {
+      const res = await submitAttempt(attemptId);
+      setSubmitResult({
+        score: res.score,
+        percentile: res.percentile,
+        feedback: res.feedback ?? {},
+      });
+      setStatus("submitted");
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    } catch {
+      setLoadError("Gagal mengirim jawaban");
     }
-  }, []);
+  }, [attemptId]);
 
-  if (!tryout) {
+  if (loadError || (!tryout && status !== "loading")) {
+    if (loadError) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-950">
+            <p className="text-sm text-zinc-700 dark:text-zinc-200">
+              {loadError}
+            </p>
+            <Link
+              href="/student"
+              className="mt-4 inline-block text-sm font-medium text-zinc-600 underline dark:text-zinc-400"
+            >
+              Kembali ke dashboard
+            </Link>
+          </div>
+        </div>
+      );
+    }
     notFound();
   }
 
-  const question = getPlaceholderQuestion(currentIndex, totalQuestions);
+  if (status === "loading" || !tryout) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+        <p className="text-sm text-zinc-500">Memuat...</p>
+      </div>
+    );
+  }
 
-  // ---------- Intro: sebelum mulai ----------
   if (status === "intro") {
     return (
       <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
@@ -219,53 +226,50 @@ export default function TryoutDetailPage() {
             {tryout.title}
           </h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {tryout.description}
+            {tryout.description ?? ""}
           </p>
-
           <section className="mt-6 grid gap-3 text-sm sm:grid-cols-3">
             <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
               <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
                 Durasi
               </p>
-              <p className="mt-1 font-semibold">{tryout.duration}</p>
+              <p className="mt-1 font-semibold">{tryout.duration_minutes} menit</p>
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
               <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
                 Jumlah soal
               </p>
-              <p className="mt-1 font-semibold">{tryout.questions} soal</p>
+              <p className="mt-1 font-semibold">{tryout.questions_count} soal</p>
             </div>
             <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
               <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
                 Tingkat
               </p>
-              <p className="mt-1 font-semibold">{tryout.level}</p>
+              <p className="mt-1 font-semibold">
+                {levelLabel(tryout.level)}
+              </p>
             </div>
           </section>
-
           <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/30">
             <h2 className="font-semibold text-amber-900 dark:text-amber-100">
               Tata tertib simulasi
             </h2>
             <ul className="mt-2 list-inside list-disc space-y-1 text-amber-800 dark:text-amber-200">
-              <li>Timer akan berjalan terus setelah kamu klik &quot;Mulai simulasi&quot;.</li>
-              <li>Jawaban dapat disimpan sementara kapan saja.</li>
-              <li>Gunakan &quot;Tandai untuk ditinjau&quot; untuk soal yang ingin kamu periksa lagi.</li>
-              <li>Waktu habis atau kirim jawaban akan mengakhiri simulasi; jawaban tidak dapat diubah setelah itu.</li>
-              <li>Pastikan koneksi internet stabil selama pengerjaan.</li>
+              <li>Timer berjalan setelah kamu klik &quot;Mulai simulasi&quot;.</li>
+              <li>Jawaban disimpan otomatis.</li>
+              <li>Waktu habis atau kirim jawaban akan mengakhiri simulasi.</li>
             </ul>
           </div>
-
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
             <Link
               href="/student"
               className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
             >
-              Batal, kembali ke dashboard
+              Batal
             </Link>
             <button
               type="button"
-              onClick={startTryout}
+              onClick={startTryoutFlow}
               className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               Mulai simulasi
@@ -276,12 +280,8 @@ export default function TryoutDetailPage() {
     );
   }
 
-  // ---------- Hasil setelah submit / waktu habis ----------
-  if (status === "submitted") {
-    const mockScore = Math.min(
-      100,
-      Math.round((answeredCount / totalQuestions) * 85 + Math.random() * 15)
-    );
+  if (status === "submitted" && submitResult) {
+    const { score, percentile, feedback } = submitResult;
     return (
       <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
         <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 md:px-8">
@@ -291,17 +291,22 @@ export default function TryoutDetailPage() {
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             {tryout.title}
           </p>
-
           <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
               <div className="text-center">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Skor (contoh)
+                  Skor
                 </p>
                 <p className="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-                  {mockScore}
+                  {score}
                 </p>
                 <p className="text-xs text-zinc-500">/ 100</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Persentil
+                </p>
+                <p className="mt-1 text-2xl font-semibold">{percentile}%</p>
               </div>
               <div className="text-center">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -311,20 +316,18 @@ export default function TryoutDetailPage() {
                   {answeredCount} / {totalQuestions}
                 </p>
               </div>
-              <div className="text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Ditandai untuk ditinjau
-                </p>
-                <p className="mt-1 text-2xl font-semibold">{markedCount}</p>
-              </div>
             </div>
-            <p className="mt-6 text-center text-xs text-zinc-600 dark:text-zinc-400">
-              Hasil dan rekomendasi belajar akan tersedia di dashboard siswa
-              setelah diproses. (Integrasi backend untuk skor nyata dapat
-              ditambahkan nanti.)
-            </p>
+            {feedback.summary && (
+              <p className="mt-4 text-center text-xs text-zinc-600 dark:text-zinc-400">
+                {feedback.summary}
+              </p>
+            )}
+            {feedback.recommendation_text && (
+              <p className="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">
+                {feedback.recommendation_text}
+              </p>
+            )}
           </section>
-
           <div className="mt-8 flex justify-center">
             <Link
               href="/student"
@@ -338,7 +341,25 @@ export default function TryoutDetailPage() {
     );
   }
 
-  // ---------- Sedang mengerjakan ----------
+  if (status === "submitted" && !submitResult) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+        <p className="text-sm text-zinc-500">Mengirim jawaban...</p>
+      </div>
+    );
+  }
+
+  if (!question) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+        <p className="text-sm text-zinc-500">Memuat soal...</p>
+      </div>
+    );
+  }
+
+  const options = question.options ?? [];
+  const optionKeys = ["A", "B", "C", "D"].slice(0, options.length);
+
   return (
     <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
       <main className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 md:px-8 md:py-6">
@@ -365,20 +386,19 @@ export default function TryoutDetailPage() {
         </div>
 
         <section className="grid gap-4 md:grid-cols-[minmax(0,180px)_1fr]">
-          {/* Daftar nomor soal */}
           <aside className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Soal
             </p>
             <div className="grid grid-cols-4 gap-2">
-              {Array.from({ length: totalQuestions }).map((_, i) => {
-                const a = answers[i];
+              {questions.map((q, i) => {
+                const a = answers[q.id];
                 const answered = isAnswered(a ?? { text: "", marked: false });
                 const marked = a?.marked;
                 const isCurrent = i === currentIndex;
                 return (
                   <button
-                    key={i}
+                    key={q.id}
                     type="button"
                     onClick={() => setCurrentIndex(i)}
                     className={`flex h-11 w-full min-w-[2.25rem] items-center justify-center rounded-lg text-sm font-medium transition ${
@@ -396,31 +416,17 @@ export default function TryoutDetailPage() {
                 );
               })}
             </div>
-            <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-zinc-500 dark:text-zinc-400">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Terjawab
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
-                Ditandai
-              </span>
-            </div>
           </aside>
 
-          {/* Soal + jawaban */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">
-                {question.title}
-              </p>
-            </div>
-
-            <p className="mb-4 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">
+            <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+              Soal #{currentIndex + 1} — {question.type === "short" ? "Isian singkat" : question.type === "multiple_choice" ? "Pilihan ganda" : "Benar/Salah"}
+            </p>
+            <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">
               {question.body}
             </p>
 
-            <div className="space-y-2">
+            <div className="mt-4 space-y-2">
               {question.type === "short" && (
                 <>
                   <label
@@ -437,20 +443,19 @@ export default function TryoutDetailPage() {
                       saveCurrentAnswer({ text: e.target.value })
                     }
                     className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:text-zinc-900 focus:ring-2 focus:ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:border-zinc-200 dark:focus:bg-zinc-800 dark:focus:text-zinc-50"
-                    placeholder="Ketik jawaban singkat di sini..."
+                    placeholder="Ketik jawaban..."
                   />
                 </>
               )}
               {question.type === "multiple_choice" && (
                 <>
                   <p className="text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
-                    Pilihan ganda — pilih satu jawaban:
+                    Pilihan ganda
                   </p>
                   <div className="mt-2 space-y-2">
-                    {(question.options ?? []).map((opt, idx) => {
-                      const optionKey = ["A", "B", "C", "D"][idx] ?? String(idx);
-                      const isSelected =
-                        currentAnswer.selectedOption === optionKey;
+                    {options.map((opt, idx) => {
+                      const key = optionKeys[idx];
+                      const isSelected = currentAnswer.selectedOption === key;
                       return (
                         <label
                           key={opt}
@@ -462,21 +467,15 @@ export default function TryoutDetailPage() {
                         >
                           <input
                             type="radio"
-                            name={`soal-${currentIndex}`}
+                            name={`q-${question.id}`}
                             checked={isSelected}
                             onChange={() =>
-                              saveCurrentAnswer({
-                                selectedOption: optionKey,
-                              })
+                              saveCurrentAnswer({ selectedOption: key })
                             }
-                            className="h-4 w-4 border-zinc-300 text-zinc-900 focus:ring-zinc-900 dark:border-zinc-600 dark:bg-zinc-900"
+                            className="h-4 w-4"
                           />
-                          <span className="font-medium text-zinc-700 dark:text-zinc-200">
-                            {optionKey}.
-                          </span>
-                          <span className="text-zinc-700 dark:text-zinc-200">
-                            {opt}
-                          </span>
+                          <span className="font-medium">{key}.</span>
+                          <span>{opt}</span>
                         </label>
                       );
                     })}
@@ -486,12 +485,11 @@ export default function TryoutDetailPage() {
               {question.type === "true_false" && (
                 <>
                   <p className="text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
-                    Benar / Salah — pilih satu:
+                    Benar / Salah
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-3">
+                  <div className="mt-2 flex gap-3">
                     {(["Benar", "Salah"] as const).map((opt) => {
-                      const isSelected =
-                        currentAnswer.selectedOption === opt;
+                      const isSelected = currentAnswer.selectedOption === opt;
                       return (
                         <label
                           key={opt}
@@ -503,12 +501,12 @@ export default function TryoutDetailPage() {
                         >
                           <input
                             type="radio"
-                            name={`soal-tf-${currentIndex}`}
+                            name={`tf-${question.id}`}
                             checked={isSelected}
                             onChange={() =>
                               saveCurrentAnswer({ selectedOption: opt })
                             }
-                            className="h-4 w-4 border-zinc-300 text-zinc-900 focus:ring-zinc-900 dark:border-zinc-600 dark:bg-zinc-900"
+                            className="h-4 w-4"
                           />
                           {opt}
                         </label>
@@ -520,19 +518,19 @@ export default function TryoutDetailPage() {
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={toggleMarked}
-                  className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
-                    currentAnswer.marked
-                      ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-200"
-                      : "border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                  }`}
-                >
-                  {currentAnswer.marked ? "✓ Ditandai" : "Tandai untuk ditinjau"}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  saveCurrentAnswer({ marked: !currentAnswer.marked })
+                }
+                className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
+                  currentAnswer.marked
+                    ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-200"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {currentAnswer.marked ? "✓ Ditandai" : "Tandai untuk ditinjau"}
+              </button>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -564,7 +562,6 @@ export default function TryoutDetailPage() {
           </div>
         </section>
 
-        {/* Bar bawah: kirim */}
         <div className="mt-4 flex justify-end border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <button
             type="button"
@@ -576,7 +573,6 @@ export default function TryoutDetailPage() {
         </div>
       </main>
 
-      {/* Modal konfirmasi kirim */}
       {showConfirmSubmit && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
@@ -584,8 +580,7 @@ export default function TryoutDetailPage() {
               Kirim jawaban?
             </h3>
             <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
-              Setelah dikirim, kamu tidak dapat mengubah jawaban. Yakin ingin
-              mengakhiri simulasi?
+              Setelah dikirim, jawaban tidak dapat diubah.
             </p>
             <div className="mt-4 flex gap-2">
               <button

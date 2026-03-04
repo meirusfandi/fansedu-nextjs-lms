@@ -35,20 +35,21 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // TODO: Integrate with real registration API
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      console.log("Register submitted", {
+      const { register: apiRegister, setAuthToken } = await import(
+        "@/lib/api"
+      );
+      const res = await apiRegister({
         name: form.name,
         email: form.email,
         password: form.password,
       });
-
-      // No backend: set cookie and go straight to admin dashboard
-      document.cookie = "auth=1; path=/; max-age=604800; SameSite=Strict";
-      router.push("/admin");
+      setAuthToken(res.token, 604800, res.user.role);
+      const dest = res.user.role === "admin" ? "/admin" : "/student";
+      router.push(dest);
     } catch (err) {
-      console.error(err);
-      setError("Something went wrong. Please try again.");
+      setError(
+        (err as Error).message || "Gagal mendaftar. Coba lagi atau gunakan email lain."
+      );
     } finally {
       setLoading(false);
     }
