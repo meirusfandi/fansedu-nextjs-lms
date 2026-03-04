@@ -5,17 +5,21 @@
 
 import type {
   AdminCreateCourseRequest,
+  AdminCreateLevelRequest,
   AdminCreateQuestionRequest,
   AdminCreateSubjectRequest,
   AdminCreateTryoutRequest,
   AdminCreateUserRequest,
   AdminIssueCertificateRequest,
   AdminOverviewResponse,
+  AdminUpdateLevelRequest,
+  AdminUpdateUserRequest,
   Attempt,
   Certificate,
   Course,
   CourseEnrollment,
   ForgotPasswordRequest,
+  Level,
   LoginRequest,
   LoginResponse,
   PutAnswerRequest,
@@ -23,6 +27,7 @@ import type {
   RegisterRequest,
   RegisterResponse,
   ResetPasswordRequest,
+  Role,
   StudentDashboardResponse,
   Subject,
   SubmitAttemptResponse,
@@ -42,7 +47,7 @@ function getBaseUrl(): string {
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.BASE_URL ||
     "http://localhost:8080";
-  return url.replace(/\/$/, "") + "/v1";
+  return url.replace(/\/$/, "") + "/api/v1";
 }
 
 function getToken(): string | null {
@@ -109,6 +114,12 @@ async function request<T>(
   return data as T;
 }
 
+/** Untuk GET list: 404 atau 405 dianggap sebagai daftar kosong, tidak throw. */
+function isNotFoundOrMethodNotAllowed(e: unknown): boolean {
+  const status = (e as { status?: number })?.status;
+  return status === 404 || status === 405;
+}
+
 // --- Health ---
 export async function healthCheck(): Promise<{ status: string; time: string }> {
   return request("/health", { method: "GET", auth: false });
@@ -151,8 +162,18 @@ export async function resetPassword(
 }
 
 // --- Tryouts ---
+/** Daftar tryout yang buka. 404 = daftar kosong. */
 export async function listOpenTryouts(): Promise<TryoutSession[]> {
-  return request("/tryouts/open", { method: "GET", auth: false });
+  try {
+    const raw = await request<TryoutSession[] | { tryouts?: TryoutSession[]; data?: TryoutSession[] }>("/tryouts/open", { method: "GET", auth: false });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function getTryout(tryoutId: string): Promise<TryoutSession> {
@@ -166,10 +187,20 @@ export async function startTryout(
 }
 
 // --- Attempts ---
+/** Soal untuk attempt. 404 = daftar kosong. */
 export async function getAttemptQuestions(
   attemptId: string
 ): Promise<Question[]> {
-  return request(`/attempts/${attemptId}/questions`, { method: "GET" });
+  try {
+    const raw = await request<Question[] | { questions?: Question[]; data?: Question[] }>(`/attempts/${attemptId}/questions`, { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.questions && Array.isArray(raw.questions)) return raw.questions;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function putAttemptAnswer(
@@ -194,8 +225,18 @@ export async function getStudentDashboard(): Promise<StudentDashboardResponse> {
   return request("/student/dashboard", { method: "GET" });
 }
 
+/** Daftar attempt siswa. 404 = daftar kosong. */
 export async function getStudentAttempts(): Promise<Attempt[]> {
-  return request("/student/attempts", { method: "GET" });
+  try {
+    const raw = await request<Attempt[] | { attempts?: Attempt[]; data?: Attempt[] }>("/student/attempts", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.attempts && Array.isArray(raw.attempts)) return raw.attempts;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function getStudentAttemptDetail(
@@ -204,13 +245,33 @@ export async function getStudentAttemptDetail(
   return request(`/student/attempts/${attemptId}`, { method: "GET" });
 }
 
+/** Daftar sertifikat siswa. 404 = daftar kosong. */
 export async function getStudentCertificates(): Promise<Certificate[]> {
-  return request("/student/certificates", { method: "GET" });
+  try {
+    const raw = await request<Certificate[] | { certificates?: Certificate[]; data?: Certificate[] }>("/student/certificates", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.certificates && Array.isArray(raw.certificates)) return raw.certificates;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 // --- Courses ---
+/** Daftar course. 404 = daftar kosong. */
 export async function listCourses(): Promise<Course[]> {
-  return request("/courses/", { method: "GET", auth: false });
+  try {
+    const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>("/courses/", { method: "GET", auth: false });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.courses && Array.isArray(raw.courses)) return raw.courses;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function enrollCourse(
@@ -225,7 +286,16 @@ export async function getAdminOverview(): Promise<AdminOverviewResponse> {
 }
 
 export async function adminListTryouts(): Promise<TryoutSession[]> {
-  return request("/admin/tryouts", { method: "GET" });
+  try {
+    const raw = await request<TryoutSession[] | { tryouts?: TryoutSession[]; data?: TryoutSession[] }>("/admin/tryouts", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function adminGetTryout(tryoutId: string): Promise<TryoutSession> {
@@ -280,10 +350,20 @@ export async function adminCreateCourse(
   return request("/admin/courses", { method: "POST", body });
 }
 
+/** Daftar enrollment per course. 404 = daftar kosong. */
 export async function adminGetCourseEnrollments(
   courseId: string
 ): Promise<CourseEnrollment[]> {
-  return request(`/admin/courses/${courseId}/enrollments`, { method: "GET" });
+  try {
+    const raw = await request<CourseEnrollment[] | { enrollments?: CourseEnrollment[]; data?: CourseEnrollment[] }>(`/admin/courses/${courseId}/enrollments`, { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.enrollments && Array.isArray(raw.enrollments)) return raw.enrollments;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function adminIssueCertificate(
@@ -292,9 +372,91 @@ export async function adminIssueCertificate(
   return request("/admin/certificates", { method: "POST", body });
 }
 
+// --- Admin Roles ---
+/** Daftar role dari GET /admin/roles. 404 = daftar kosong. */
+export async function adminListRoles(): Promise<Role[]> {
+  try {
+    const raw = await request<
+      Role[] | { roles?: Role[]; data?: Role[] }
+    >("/admin/roles", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.roles && Array.isArray(raw.roles)) return raw.roles;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+// --- Admin Levels (Jenjang Pendidikan) ---
+/** Daftar levels. 404 = daftar kosong. */
+export async function adminListLevels(): Promise<Level[]> {
+  try {
+    const raw = await request<
+      Level[] | { levels?: Level[]; data?: Level[] }
+    >("/admin/levels", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.levels && Array.isArray(raw.levels)) return raw.levels;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+export async function adminCreateLevel(
+  body: AdminCreateLevelRequest
+): Promise<Level> {
+  return request("/admin/levels", { method: "POST", body });
+}
+
+export async function adminGetLevel(levelId: string): Promise<Level> {
+  return request(`/admin/levels/${levelId}`, { method: "GET" });
+}
+
+export async function adminUpdateLevel(
+  levelId: string,
+  body: AdminUpdateLevelRequest
+): Promise<Level> {
+  return request(`/admin/levels/${levelId}`, { method: "PUT", body });
+}
+
+/** Subject per level. 404 = daftar kosong. */
+export async function adminGetLevelSubjects(
+  levelId: string
+): Promise<Subject[]> {
+  try {
+    const raw = await request<
+      Subject[] | { subjects?: Subject[]; data?: Subject[] }
+    >(`/admin/levels/${levelId}/subjects`, { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.subjects && Array.isArray(raw.subjects)) return raw.subjects;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
 // --- Admin Users ---
+/** Daftar semua user. 404 = daftar kosong. */
 export async function adminListUsers(): Promise<User[]> {
-  return request("/admin/users", { method: "GET" });
+  try {
+    const raw = await request<User[] | { users?: User[]; data?: User[] }>(
+      "/admin/users",
+      { method: "GET" }
+    );
+    if (Array.isArray(raw)) return raw;
+    if (raw?.users && Array.isArray(raw.users)) return raw.users;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function adminCreateUser(
@@ -303,9 +465,30 @@ export async function adminCreateUser(
   return request("/admin/users", { method: "POST", body });
 }
 
+export async function adminGetUser(userId: string): Promise<User> {
+  return request(`/admin/users/${userId}`, { method: "GET" });
+}
+
+export async function adminUpdateUser(
+  userId: string,
+  body: AdminUpdateUserRequest
+): Promise<User> {
+  return request(`/admin/users/${userId}`, { method: "PUT", body });
+}
+
 // --- Admin Subjects (Bidang) ---
+/** Daftar subject. 404 = daftar kosong. */
 export async function adminListSubjects(): Promise<Subject[]> {
-  return request("/admin/subjects", { method: "GET" });
+  try {
+    const raw = await request<Subject[] | { subjects?: Subject[]; data?: Subject[] }>("/admin/subjects", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.subjects && Array.isArray(raw.subjects)) return raw.subjects;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function adminCreateSubject(
@@ -326,10 +509,20 @@ export async function adminDeleteSubject(subjectId: string): Promise<void> {
 }
 
 // --- Admin Courses by Subject ---
+/** Daftar course per subject. 404 = daftar kosong. */
 export async function adminListCoursesBySubject(
   subjectId: string
 ): Promise<Course[]> {
-  return request(`/admin/subjects/${subjectId}/courses`, { method: "GET" });
+  try {
+    const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>(`/admin/subjects/${subjectId}/courses`, { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.courses && Array.isArray(raw.courses)) return raw.courses;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 export async function adminCreateCourseUnderSubject(

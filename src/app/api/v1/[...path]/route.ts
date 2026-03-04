@@ -7,7 +7,7 @@ const API_BASE =
 
 async function forward(request: NextRequest, pathSegments: string[]) {
   const path = pathSegments.join("/");
-  const url = `${API_BASE.replace(/\/$/, "")}/v1/${path}`;
+  const url = `${API_BASE.replace(/\/$/, "")}/api/v1/${path}`;
   const method = request.method;
 
   const headers: Record<string, string> = {

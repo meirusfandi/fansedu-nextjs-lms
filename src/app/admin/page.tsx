@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminSidebar } from "@/components/AdminSidebar";
@@ -125,11 +126,14 @@ export default function AdminDashboardPage() {
         <div className="mb-6 flex items-center justify-between md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">
-              Admin
+              Overview
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
-              Dashboard overview
+              Dashboard
             </h1>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Ringkasan kebutuhan platform: user, kelas, tryout, payment, dan report.
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -144,6 +148,46 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Quick links */}
+        <section className="mb-6 flex flex-wrap gap-2">
+          <Link
+            href="/admin/master-data"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Master Data
+          </Link>
+          <Link
+            href="/admin/users"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Management User
+          </Link>
+          <Link
+            href="/admin/kelas"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Management Kelas
+          </Link>
+          <Link
+            href="/admin/tryouts"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Tryout
+          </Link>
+          <Link
+            href="/admin/payment"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Payment
+          </Link>
+          <Link
+            href="/admin/report"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Report
+          </Link>
+        </section>
 
         {/* Stats grid */}
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

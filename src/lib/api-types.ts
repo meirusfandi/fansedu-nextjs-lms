@@ -2,6 +2,39 @@
 
 export type UserRole = "admin" | "student" | "trainer";
 
+/** Role dari GET /admin/roles */
+export interface Role {
+  id: string;
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+}
+
+/** Level (jenjang pendidikan) dari GET/POST /admin/levels */
+export interface Level {
+  id: string;
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  sort_order?: number | null;
+  icon_url?: string | null;
+}
+
+export interface AdminCreateLevelRequest {
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  sort_order?: number | null;
+  icon_url?: string | null;
+}
+
+export interface AdminUpdateLevelRequest {
+  name?: string;
+  slug?: string | null;
+  description?: string | null;
+  sort_order?: number | null;
+}
+
 /** Sesuai response backend: { id, name, email, role }. avatar_url opsional. */
 export interface User {
   id: string;
@@ -210,6 +243,13 @@ export interface AdminCreateUserRequest {
   email: string;
   password: string;
   role: "student" | "trainer";
+}
+
+export interface AdminUpdateUserRequest {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: "student" | "trainer";
 }
 
 export interface AdminCreateSubjectRequest {

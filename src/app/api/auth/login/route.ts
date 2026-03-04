@@ -8,7 +8,7 @@ const API_BASE =
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const url = `${API_BASE.replace(/\/$/, "")}/v1/auth/login`;
+    const url = `${API_BASE.replace(/\/$/, "")}/api/v1/auth/login`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
