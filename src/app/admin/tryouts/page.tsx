@@ -8,15 +8,18 @@ import {
   logout,
   clearAuthToken,
 } from "@/lib/api";
+import Link from "next/link";
 import type {
   AdminCreateTryoutRequest,
   TryoutSession,
 } from "@/lib/api-types";
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { usePathname, useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -29,6 +32,11 @@ const STATUS_LABEL: Record<string, string> = {
   draft: "Draft",
   open: "Dibuka",
   closed: "Ditutup",
+};
+const EVENT_CATEGORY_LABEL: Record<string, string> = {
+  tryout: "Tryout",
+  free_class: "Free Class",
+  paid_class: "Paid Class",
 };
 
 function formatDate(iso: string) {
@@ -53,6 +61,7 @@ const emptyForm: AdminCreateTryoutRequest = {
   closes_at: "",
   max_participants: 200,
   status: "draft",
+  event_category: "tryout",
 };
 
 export default function AdminTryoutsPage() {
@@ -67,6 +76,17 @@ export default function AdminTryoutsPage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  const paginatedList = useMemo(
+    () => list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [list, page]
+  );
+  useEffect(() => {
+    if (list.length > 0 && (page - 1) * PAGE_SIZE >= list.length) {
+      setPage(1);
+    }
+  }, [list.length, page]);
 
   const handleLogout = useCallback(() => {
     logout().catch(() => {});
@@ -80,7 +100,7 @@ export default function AdminTryoutsPage() {
     adminListTryouts()
       .then(setList)
       .catch((e) => {
-        setError((e as Error).message ?? "Gagal memuat daftar tryout");
+        setError((e as Error).message ?? "Gagal memuat daftar event");
         setList([]);
       })
       .finally(() => setLoading(false));
@@ -115,6 +135,7 @@ export default function AdminTryoutsPage() {
       closes_at: t.closes_at.slice(0, 16),
       max_participants: t.max_participants ?? undefined,
       status: t.status,
+      event_category: (t.event_category as "tryout" | "free_class" | "paid_class") ?? "tryout",
     });
     setEditingId(t.id);
     setSubmitError(null);
@@ -153,6 +174,9 @@ export default function AdminTryoutsPage() {
       if (form.max_participants != null && form.max_participants > 0) {
         payload.max_participants = Number(form.max_participants);
       }
+      if (form.event_category) {
+        payload.event_category = form.event_category;
+      }
       if (modalOpen === "add") {
         await adminCreateTryout(payload);
       } else if (editingId) {
@@ -190,15 +214,18 @@ export default function AdminTryoutsPage() {
               Manage
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
-              Kelola Tryout
+              Event
             </h1>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              Daftar event (tryout, free class, paid class). Kelola soal via Kelola Soal.
+            </p>
           </div>
           <button
             type="button"
             onClick={openAdd}
             className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 shadow-sm hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            + Tambah Tryout
+            + Tambah Event
           </button>
         </div>
 
@@ -215,7 +242,7 @@ export default function AdminTryoutsPage() {
             </div>
           ) : list.length === 0 ? (
             <div className="p-8 text-center text-sm text-zinc-500">
-              Belum ada tryout. Klik &quot;Tambah Tryout&quot; untuk membuat.
+              Belum ada event. Klik &quot;Tambah Event&quot; untuk membuat.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -224,6 +251,9 @@ export default function AdminTryoutsPage() {
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-zinc-500">
                       Judul
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Kategori
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-500">
                       Short
@@ -249,13 +279,18 @@ export default function AdminTryoutsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {list.map((t) => (
+                  {paginatedList.map((t) => (
                     <tr
                       key={t.id}
                       className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
                     >
                       <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
                         {t.title}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                          {EVENT_CATEGORY_LABEL[t.event_category ?? "tryout"] ?? t.event_category ?? "Tryout"}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                         {t.short_title ?? "–"}
@@ -274,6 +309,12 @@ export default function AdminTryoutsPage() {
                         {formatDate(t.opens_at)} – {formatDate(t.closes_at)}
                       </td>
                       <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/admin/tryouts/${t.id}/soal`}
+                          className="mr-2 text-zinc-600 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                        >
+                          Kelola Soal
+                        </Link>
                         <button
                           type="button"
                           onClick={() => openEdit(t)}
@@ -315,6 +356,14 @@ export default function AdminTryoutsPage() {
               </table>
             </div>
           )}
+          {!loading && list.length > 0 && (
+            <Pagination
+              currentPage={page}
+              totalItems={list.length}
+              onPageChange={setPage}
+              label="event"
+            />
+          )}
         </div>
       </main>
 
@@ -323,7 +372,7 @@ export default function AdminTryoutsPage() {
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              {modalOpen === "add" ? "Tambah Tryout" : "Edit Tryout"}
+              {modalOpen === "add" ? "Tambah Event" : "Edit Event"}
             </h2>
             {submitError && (
               <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
@@ -342,6 +391,25 @@ export default function AdminTryoutsPage() {
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Kategori Event *
+                </label>
+                <select
+                  value={form.event_category ?? "tryout"}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      event_category: e.target.value as "tryout" | "free_class" | "paid_class",
+                    })
+                  }
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                >
+                  <option value="tryout">Tryout</option>
+                  <option value="free_class">Free Class</option>
+                  <option value="paid_class">Paid Class</option>
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">

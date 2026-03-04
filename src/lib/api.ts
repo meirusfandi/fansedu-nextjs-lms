@@ -28,6 +28,7 @@ import type {
   RegisterResponse,
   ResetPasswordRequest,
   Role,
+  Sekolah,
   StudentDashboardResponse,
   Subject,
   SubmitAttemptResponse,
@@ -36,9 +37,7 @@ import type {
   User,
 } from "./api-types";
 
-const BASE = typeof window !== "undefined" ? getBaseUrl() : "";
-
-/** Di browser panggil same-origin /api/v1/... (forward ke backend). Di server pakai URL backend langsung. */
+/** Di browser: same-origin /api/v1 (proxy). Di server: backend URL + /api/v1. */
 function getBaseUrl(): string {
   if (typeof window !== "undefined") {
     return window.location.origin + "/api/v1";
@@ -49,6 +48,8 @@ function getBaseUrl(): string {
     "http://localhost:8080";
   return url.replace(/\/$/, "") + "/api/v1";
 }
+
+const BASE = typeof window !== "undefined" ? getBaseUrl() : getBaseUrl();
 
 function getToken(): string | null {
   if (typeof document === "undefined") return null;
@@ -302,6 +303,110 @@ export async function adminGetTryout(tryoutId: string): Promise<TryoutSession> {
   return request(`/admin/tryouts/${tryoutId}`, { method: "GET" });
 }
 
+/** Ambil respons mentah dari path (untuk debug). Gagal = return null. */
+export async function getRawJson(path: string): Promise<unknown> {
+  try {
+    return await request<unknown>(path, { method: "GET" });
+  } catch {
+    return null;
+  }
+}
+
+/** Normalisasi objek dari API ke bentuk Sekolah (field nama bisa beda). */
+function normalizeToSekolah(item: Record<string, unknown>): Sekolah {
+  const id = String(item.id ?? item.school_id ?? "");
+  const nama_sekolah =
+    String(
+      item.nama_sekolah ??
+        item.nama ??
+        item.name ??
+        item.school_name ??
+        ""
+    ).trim() || "—";
+  return {
+    id: id || crypto.randomUUID(),
+    nama_sekolah,
+    npsn: item.npsn != null ? String(item.npsn) : null,
+    kabupaten_kota:
+      item.kabupaten_kota != null
+        ? String(item.kabupaten_kota)
+        : item.kabupaten != null
+          ? String(item.kabupaten)
+          : item.kota != null
+            ? String(item.kota)
+            : null,
+    telepon: item.telepon != null ? String(item.telepon) : item.phone != null ? String(item.phone) : null,
+    alamat: item.alamat != null ? String(item.alamat) : item.address != null ? String(item.address) : null,
+  };
+}
+
+/** Daftar sekolah (GET api/v1/admin/master-data/sekolah). 404/405 = daftar kosong. */
+export async function adminListSekolah(): Promise<Sekolah[]> {
+  try {
+    const raw = await request<unknown>("/admin/master-data/sekolah", {
+      method: "GET",
+    });
+    if (Array.isArray(raw)) {
+      return raw.map((x) => normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {}));
+    }
+    const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const arr =
+      Array.isArray(obj.schools)
+        ? obj.schools
+        : Array.isArray(obj.sekolah)
+          ? obj.sekolah
+          : Array.isArray(obj.data)
+            ? obj.data
+            : Array.isArray(obj.list)
+              ? obj.list
+              : Array.isArray(obj.results)
+                ? obj.results
+                : Array.isArray(obj.items)
+                  ? obj.items
+                  : null;
+    if (arr && arr.length > 0) {
+      return arr.map((x) =>
+        normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {})
+      );
+    }
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Daftar dari API hasil kelas (GET api/v1/admin/kelas atau path lain). Untuk tampil di master sekolah jika backend mengembalikan data kelas/sekolah di sini. */
+export async function adminListHasilKelas(): Promise<Sekolah[]> {
+  try {
+    const raw = await request<unknown>("/admin/kelas", { method: "GET" });
+    if (Array.isArray(raw)) {
+      return raw.map((x) => normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {}));
+    }
+    const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const arr = Array.isArray(obj.data)
+      ? obj.data
+      : Array.isArray(obj.kelas)
+        ? obj.kelas
+        : Array.isArray(obj.list)
+          ? obj.list
+          : Array.isArray(obj.results)
+            ? obj.results
+            : Array.isArray(obj.items)
+              ? obj.items
+              : null;
+    if (arr && arr.length > 0) {
+      return arr.map((x) =>
+        normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {})
+      );
+    }
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
 export async function adminCreateTryout(
   body: AdminCreateTryoutRequest
 ): Promise<TryoutSession> {
@@ -321,6 +426,34 @@ export async function adminDeleteTryout(
   return request(`/admin/tryouts/${tryoutId}`, { method: "DELETE" });
 }
 
+/** Daftar soal tryout. 404/405 = daftar kosong. */
+export async function adminListTryoutQuestions(
+  tryoutId: string
+): Promise<Question[]> {
+  try {
+    const raw = await request<
+      Question[] | { questions?: Question[]; data?: Question[] }
+    >(`/admin/tryouts/${tryoutId}/questions`, { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.questions && Array.isArray(raw.questions)) return raw.questions;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Satu soal by id (GET /admin/tryouts/{tryoutId}/questions/{questionId}). */
+export async function adminGetQuestion(
+  tryoutId: string,
+  questionId: string
+): Promise<Question> {
+  return request(`/admin/tryouts/${tryoutId}/questions/${questionId}`, {
+    method: "GET",
+  });
+}
+
 export async function adminCreateQuestion(
   tryoutId: string,
   body: AdminCreateQuestionRequest
@@ -331,17 +464,26 @@ export async function adminCreateQuestion(
   });
 }
 
+/** Update question (PUT /admin/tryouts/{tryoutId}/questions/{questionId}). */
 export async function adminUpdateQuestion(
+  tryoutId: string,
   questionId: string,
   body: Partial<AdminCreateQuestionRequest>
-): Promise<Record<string, never>> {
-  return request(`/admin/questions/${questionId}`, { method: "PUT", body });
+): Promise<Question> {
+  return request(`/admin/tryouts/${tryoutId}/questions/${questionId}`, {
+    method: "PUT",
+    body,
+  });
 }
 
+/** Delete question (DELETE /admin/tryouts/{tryoutId}/questions/{questionId}). */
 export async function adminDeleteQuestion(
+  tryoutId: string,
   questionId: string
 ): Promise<void> {
-  return request(`/admin/questions/${questionId}`, { method: "DELETE" });
+  return request(`/admin/tryouts/${tryoutId}/questions/${questionId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function adminCreateCourse(
@@ -441,8 +583,8 @@ export async function adminGetLevelSubjects(
   }
 }
 
-// --- Admin Users ---
-/** Daftar semua user. 404 = daftar kosong. */
+// --- Admin Users (GET/POST/PUT api/v1/admin/users) ---
+/** Daftar semua user. GET api/v1/admin/users. 404 = daftar kosong. */
 export async function adminListUsers(): Promise<User[]> {
   try {
     const raw = await request<User[] | { users?: User[]; data?: User[] }>(

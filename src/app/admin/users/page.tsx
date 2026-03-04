@@ -1,17 +1,20 @@
 "use client";
 
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminCreateUser,
   adminGetUser,
   adminListUsers,
+  adminListSekolah,
+  adminListSubjects,
   adminUpdateUser,
   logout,
   clearAuthToken,
 } from "@/lib/api";
-import type { User } from "@/lib/api-types";
+import type { Sekolah, Subject, User } from "@/lib/api-types";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
@@ -32,10 +35,25 @@ export default function AdminUsersPage() {
     email: "",
     password: "",
     role: "student" as "student" | "trainer",
+    subject_id: "",
+    school_id: "",
   });
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [schools, setSchools] = useState<Sekolah[]>([]);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const paginatedUsers = useMemo(
+    () => users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [users, page]
+  );
+  useEffect(() => {
+    if (users.length > 0 && (page - 1) * PAGE_SIZE >= users.length) {
+      setPage(1);
+    }
+  }, [users.length, page]);
 
   const handleLogout = useCallback(() => {
     logout().catch(() => {});
@@ -59,8 +77,23 @@ export default function AdminUsersPage() {
     loadUsers();
   }, [loadUsers]);
 
+  const loadOptions = useCallback(() => {
+    adminListSubjects().then(setSubjects).catch(() => setSubjects([]));
+    adminListSekolah().then(setSchools).catch(() => setSchools([]));
+  }, []);
+  useEffect(() => {
+    loadOptions();
+  }, [loadOptions]);
+
   const openAdd = () => {
-    setForm({ name: "", email: "", password: "", role: "student" });
+    setForm({
+      name: "",
+      email: "",
+      password: "",
+      role: "student",
+      subject_id: "",
+      school_id: "",
+    });
     setSelectedUser(null);
     setSubmitError(null);
     setModalMode("add");
@@ -93,6 +126,8 @@ export default function AdminUsersPage() {
         email: full.email,
         password: "",
         role: (full.role === "admin" ? "student" : full.role) as "student" | "trainer",
+        subject_id: full.subject_id ?? "",
+        school_id: full.school_id ?? "",
       });
       setSelectedUser(full);
     } catch (err) {
@@ -102,6 +137,8 @@ export default function AdminUsersPage() {
         email: u.email,
         password: "",
         role: (u.role === "admin" ? "student" : u.role) as "student" | "trainer",
+        subject_id: u.subject_id ?? "",
+        school_id: u.school_id ?? "",
       });
     } finally {
       setDetailLoading(false);
@@ -125,12 +162,23 @@ export default function AdminUsersPage() {
           email: form.email.trim(),
           password: form.password,
           role: form.role,
+          subject_id: form.subject_id.trim() || undefined,
+          school_id: form.school_id.trim() || undefined,
         });
       } else if (modalMode === "edit" && selectedUser) {
-        const body: { name?: string; email?: string; password?: string; role?: "student" | "trainer" } = {
+        const body: {
+          name?: string;
+          email?: string;
+          password?: string;
+          role?: "student" | "trainer";
+          subject_id?: string | null;
+          school_id?: string | null;
+        } = {
           name: form.name.trim(),
           email: form.email.trim(),
           role: form.role,
+          subject_id: form.subject_id.trim() || null,
+          school_id: form.school_id.trim() || null,
         };
         if (form.password.trim()) body.password = form.password;
         await adminUpdateUser(selectedUser.id, body);
@@ -208,7 +256,7 @@ export default function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {users.map((u) => (
+                  {paginatedUsers.map((u) => (
                     <tr
                       key={u.id}
                       className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
@@ -250,6 +298,14 @@ export default function AdminUsersPage() {
               </table>
             </div>
           )}
+          {!loading && users.length > 0 && (
+            <Pagination
+              currentPage={page}
+              totalItems={users.length}
+              onPageChange={setPage}
+              label="user"
+            />
+          )}
         </div>
       </main>
 
@@ -289,6 +345,22 @@ export default function AdminUsersPage() {
                         {ROLE_LABEL[selectedUser.role] ?? selectedUser.role}
                       </p>
                     </div>
+                    {(selectedUser.subject_id || selectedUser.subject_name) && (
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Bidang / Subject</p>
+                        <p className="text-zinc-900 dark:text-zinc-50">
+                          {selectedUser.subject_name ?? subjects.find((s) => s.id === selectedUser.subject_id)?.name ?? selectedUser.subject_id}
+                        </p>
+                      </div>
+                    )}
+                    {(selectedUser.school_id || selectedUser.school_name) && (
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Sekolah</p>
+                        <p className="text-zinc-900 dark:text-zinc-50">
+                          {selectedUser.school_name ?? schools.find((s) => s.id === selectedUser.school_id)?.nama_sekolah ?? selectedUser.school_id}
+                        </p>
+                      </div>
+                    )}
                     {selectedUser.avatar_url && (
                       <div>
                         <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Avatar</p>
@@ -384,6 +456,40 @@ export default function AdminUsersPage() {
                       >
                         <option value="student">Siswa</option>
                         <option value="trainer">Pengajar</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                        Bidang / Subject
+                      </label>
+                      <select
+                        value={form.subject_id}
+                        onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                      >
+                        <option value="">— Pilih subject (opsional)</option>
+                        {subjects.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                        Sekolah
+                      </label>
+                      <select
+                        value={form.school_id}
+                        onChange={(e) => setForm({ ...form, school_id: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                      >
+                        <option value="">— Pilih sekolah (opsional)</option>
+                        {schools.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.nama_sekolah}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div className="flex justify-end gap-2 pt-4">

@@ -79,7 +79,7 @@ export default function AdminDashboardPage() {
           change: "Dari API",
         },
         {
-          label: "Event tryout aktif",
+          label: "Event aktif",
           value: String(overview.active_tryouts),
           change: "Dari API",
         },
@@ -96,7 +96,7 @@ export default function AdminDashboardPage() {
       ]
     : [
         { label: "Total siswa terdaftar", value: "–", change: "" },
-        { label: "Event tryout aktif", value: "–", change: "" },
+        { label: "Event aktif", value: "–", change: "" },
         { label: "Rata-rata skor", value: "–", change: "" },
         { label: "Sertifikat diterbitkan", value: "–", change: "" },
       ];
@@ -132,7 +132,7 @@ export default function AdminDashboardPage() {
               Dashboard
             </h1>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              Ringkasan kebutuhan platform: user, kelas, tryout, payment, dan report.
+              Ringkasan kebutuhan platform: user, kelas, event, payment, dan report.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -173,7 +173,7 @@ export default function AdminDashboardPage() {
             href="/admin/tryouts"
             className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
           >
-            Tryout
+            Event
           </Link>
           <Link
             href="/admin/payment"

@@ -1,11 +1,12 @@
 "use client";
 
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { adminListLevels, logout, clearAuthToken } from "@/lib/api";
 import type { Level } from "@/lib/api-types";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export default function MasterDataJenjangPage() {
   const router = useRouter();
@@ -13,6 +14,17 @@ export default function MasterDataJenjangPage() {
   const [list, setList] = useState<Level[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  const paginatedList = useMemo(
+    () => list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [list, page]
+  );
+  useEffect(() => {
+    if (list.length > 0 && (page - 1) * PAGE_SIZE >= list.length) {
+      setPage(1);
+    }
+  }, [list.length, page]);
 
   const handleLogout = useCallback(() => {
     logout().catch(() => {});
@@ -107,7 +119,7 @@ export default function MasterDataJenjangPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {list.map((j) => (
+                  {paginatedList.map((j) => (
                     <tr
                       key={j.id}
                       className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
@@ -137,6 +149,14 @@ export default function MasterDataJenjangPage() {
                 </tbody>
               </table>
             </div>
+          )}
+          {!loading && list.length > 0 && (
+            <Pagination
+              currentPage={page}
+              totalItems={list.length}
+              onPageChange={setPage}
+              label="jenjang"
+            />
           )}
         </div>
       </main>

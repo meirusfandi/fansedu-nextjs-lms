@@ -42,6 +42,12 @@ export interface User {
   email: string;
   role: UserRole;
   avatar_url?: string | null;
+  subject_id?: string | null;
+  school_id?: string | null;
+  /** Nama subject/bidang (dari API atau lookup) */
+  subject_name?: string | null;
+  /** Nama sekolah (dari API atau lookup) */
+  school_name?: string | null;
 }
 
 // --- Auth ---
@@ -80,6 +86,8 @@ export interface ResetPasswordRequest {
 export type TryoutLevel = "easy" | "medium" | "hard";
 export type TryoutStatus = "draft" | "open" | "closed";
 
+export type EventCategorySlug = "tryout" | "free_class" | "paid_class";
+
 export interface TryoutSession {
   id: string;
   title: string;
@@ -92,6 +100,8 @@ export interface TryoutSession {
   closes_at: string;
   max_participants?: number | null;
   status: TryoutStatus;
+  /** Kategori event: tryout, free_class, paid_class. Dari Master Data Event. */
+  event_category?: EventCategorySlug | string | null;
 }
 
 export interface StartTryoutResponse {
@@ -202,6 +212,16 @@ export interface CourseEnrollment {
   completed_at: string | null;
 }
 
+// --- Master Data Sekolah ---
+export interface Sekolah {
+  id: string;
+  nama_sekolah: string;
+  npsn?: string | null;
+  kabupaten_kota?: string | null;
+  telepon?: string | null;
+  alamat?: string | null;
+}
+
 // --- Admin ---
 export interface AdminOverviewResponse {
   total_students: number;
@@ -221,6 +241,8 @@ export interface AdminCreateTryoutRequest {
   closes_at: string;
   max_participants?: number | null;
   status?: TryoutStatus;
+  /** Kategori event: tryout, free_class, paid_class. */
+  event_category?: EventCategorySlug | string | null;
 }
 
 export interface AdminCreateQuestionRequest {
@@ -243,6 +265,8 @@ export interface AdminCreateUserRequest {
   email: string;
   password: string;
   role: "student" | "trainer";
+  subject_id?: string | null;
+  school_id?: string | null;
 }
 
 export interface AdminUpdateUserRequest {
@@ -250,6 +274,8 @@ export interface AdminUpdateUserRequest {
   email?: string;
   password?: string;
   role?: "student" | "trainer";
+  subject_id?: string | null;
+  school_id?: string | null;
 }
 
 export interface AdminCreateSubjectRequest {
@@ -257,6 +283,7 @@ export interface AdminCreateSubjectRequest {
   slug?: string | null;
   description?: string | null;
   sort_order?: number | null;
+  level_id?: string | null;
 }
 
 export interface AdminIssueCertificateRequest {

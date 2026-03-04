@@ -1,10 +1,11 @@
 "use client";
 
 import { AdminSidebar } from "@/components/AdminSidebar";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { adminListRoles, logout, clearAuthToken } from "@/lib/api";
 import type { Role } from "@/lib/api-types";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export default function MasterDataRolePage() {
   const router = useRouter();
@@ -12,6 +13,17 @@ export default function MasterDataRolePage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+
+  const paginatedRoles = useMemo(
+    () => roles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [roles, page]
+  );
+  useEffect(() => {
+    if (roles.length > 0 && (page - 1) * PAGE_SIZE >= roles.length) {
+      setPage(1);
+    }
+  }, [roles.length, page]);
 
   const handleLogout = useCallback(() => {
     logout().catch(() => {});
@@ -86,7 +98,7 @@ export default function MasterDataRolePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {roles.map((r) => (
+                  {paginatedRoles.map((r) => (
                     <tr
                       key={r.id}
                       className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
@@ -105,6 +117,14 @@ export default function MasterDataRolePage() {
                 </tbody>
               </table>
             </div>
+          )}
+          {!loading && roles.length > 0 && (
+            <Pagination
+              currentPage={page}
+              totalItems={roles.length}
+              onPageChange={setPage}
+              label="role"
+            />
           )}
         </div>
       </main>

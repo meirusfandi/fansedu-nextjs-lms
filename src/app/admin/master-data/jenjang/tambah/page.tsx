@@ -50,7 +50,14 @@ export default function TambahJenjangPendidikanPage() {
       await adminCreateLevel(body);
       router.push("/admin/master-data/jenjang");
     } catch (err) {
-      setSubmitError((err as Error).message ?? "Gagal menyimpan jenjang.");
+      const e = err as Error & { status?: number };
+      if (e?.status === 409) {
+        const conflictMsg =
+          "Konflik: Nama atau slug jenjang sudah dipakai. Gunakan nama/slug lain atau edit jenjang yang sudah ada.";
+        setSubmitError(e?.message && e.message !== "Conflict" ? e.message : conflictMsg);
+      } else {
+        setSubmitError(e?.message ?? "Gagal menyimpan jenjang.");
+      }
     } finally {
       setSaving(false);
     }

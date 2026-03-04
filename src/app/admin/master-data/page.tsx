@@ -9,10 +9,10 @@ import { useCallback } from "react";
 const MASTER_LINKS = [
   { href: "/admin/master-data/setting", title: "Setting", description: "Pengaturan umum platform dan konfigurasi." },
   { href: "/admin/master-data/role", title: "Role", description: "Kelola role user: admin, pengajar, siswa." },
-  { href: "/admin/master-data/subject", title: "Subject", description: "Data mata pelajaran atau bidang." },
+  { href: "/admin/master-data/subject", title: "Subject (Kelas yang dibuka)", description: "Kelas/bidang yang saat ini dibuka per level SD, SMP, SMA." },
   { href: "/admin/master-data/sekolah", title: "Sekolah", description: "Info sekolah: nama, alamat, kontak, dll." },
   { href: "/admin/master-data/jenjang", title: "Jenjang Pendidikan", description: "SD, SMP, SMA, dan jenjang lainnya." },
-  { href: "/admin/master-data/event", title: "Event / Tryout", description: "Kelola event dan sesi tryout." },
+  { href: "/admin/master-data/event", title: "Event", description: "Kategori event: tryout, free class, paid class, dll." },
 ];
 
 export default function AdminMasterDataPage() {
@@ -38,7 +38,7 @@ export default function AdminMasterDataPage() {
             Master Data
           </h1>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Sub menu: Setting, Role, Subject, Sekolah, Jenjang Pendidikan, Event/Tryout.
+            Sub menu: Setting, Role, Subject, Sekolah, Jenjang Pendidikan, Event.
           </p>
         </div>
 
