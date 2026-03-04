@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getStudentDashboard } from "@/lib/api";
+import { getStudentDashboard, logout, clearAuthToken } from "@/lib/api";
 import type { StudentDashboardResponse, TryoutSession } from "@/lib/api-types";
 
 function formatDate(iso: string): string {
@@ -29,10 +30,17 @@ function formatDateRange(opens: string, closes: string): string {
 }
 
 export default function StudentDashboardPage() {
+  const router = useRouter();
   const [data, setData] = useState<StudentDashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
+
+  const handleLogout = () => {
+    logout().catch(() => {});
+    clearAuthToken();
+    router.push("/login");
+  };
 
   useEffect(() => {
     getStudentDashboard()
@@ -86,9 +94,18 @@ export default function StudentDashboardPage() {
               Pantau simulasi dan rekomendasi belajar.
             </p>
           </div>
-          <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900">
-            Target OSN 2026
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900">
+              Target OSN 2026
+            </span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Keluar
+            </button>
+          </div>
         </header>
 
         <section className="mb-6">

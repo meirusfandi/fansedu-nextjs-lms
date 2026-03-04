@@ -1,7 +1,9 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getAdminOverview } from "@/lib/api";
+import { AdminSidebar } from "@/components/AdminSidebar";
+import { getAdminOverview, logout, clearAuthToken } from "@/lib/api";
 import type { AdminOverviewResponse } from "@/lib/api-types";
 
 const recentEnrollments = [
@@ -50,9 +52,16 @@ const topCourses = [
 ];
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleLogout = () => {
+    logout().catch(() => {});
+    clearAuthToken();
+    router.push("/login");
+  };
 
   useEffect(() => {
     getAdminOverview()
@@ -104,64 +113,11 @@ export default function AdminDashboardPage() {
     );
   }
 
+  const pathname = usePathname();
+
   return (
     <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
-      {/* Sidebar */}
-      <aside className="hidden w-64 flex-col border-r border-zinc-200 bg-white/80 px-5 py-6 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/80 md:flex">
-        <div className="mb-8 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-zinc-900 text-sm font-semibold text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900">
-            FE
-          </div>
-          <div>
-            <p className="text-sm font-semibold tracking-tight">FansEdu LMS</p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Admin dashboard
-            </p>
-          </div>
-        </div>
-
-        <nav className="space-y-1 text-sm">
-          <p className="px-2 text-xs font-medium uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">
-            Overview
-          </p>
-          <button className="mt-1 flex w-full items-center justify-between rounded-lg bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-50 shadow-sm dark:bg-zinc-50 dark:text-zinc-900">
-            <span>Dashboard</span>
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 dark:bg-zinc-200 dark:text-zinc-800">
-              Active
-            </span>
-          </button>
-
-          <div className="mt-4 space-y-1">
-            <p className="px-2 text-xs font-medium uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">
-              Manage
-            </p>
-            <button className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900">
-              Courses
-            </button>
-            <button className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900">
-              Students
-            </button>
-            <button className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900">
-              Instructors
-            </button>
-            <button className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900">
-              Reports
-            </button>
-          </div>
-        </nav>
-
-        <div className="mt-auto space-y-3 pt-6 text-xs">
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-            <p className="font-medium">Today</p>
-            <p className="mt-1 text-[11px]">
-              42 new enrollments · 6 certificates issued
-            </p>
-          </div>
-          <button className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900">
-            Account &amp; settings
-          </button>
-        </div>
-      </aside>
+      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
 
       {/* Main content */}
       <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
@@ -176,8 +132,12 @@ export default function AdminDashboardPage() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <button className="hidden rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900 sm:inline-flex">
-              View as learner
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              Keluar
             </button>
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-zinc-800 to-zinc-600 text-xs font-semibold text-zinc-50 dark:from-zinc-100 dark:to-zinc-300 dark:text-zinc-900">
               A

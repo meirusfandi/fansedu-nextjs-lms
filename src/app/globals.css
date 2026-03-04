@@ -43,3 +43,18 @@ input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 1000px #18181b inset;
   }
 }
+
+/* Form focus: always visible text and background (fix white-on-white) */
+input:focus,
+textarea:focus {
+  color: var(--foreground);
+  background-color: #fafafa;
+}
+
+@media (prefers-color-scheme: dark) {
+  input:focus,
+  textarea:focus {
+    color: #fafafa;
+    background-color: #27272a;
+  }
+}

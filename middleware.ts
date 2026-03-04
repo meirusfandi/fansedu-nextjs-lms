@@ -11,8 +11,13 @@ export function middleware(request: NextRequest) {
   const role = request.cookies.get("auth_role")?.value;
   const isAuthenticated = Boolean(token);
 
-  if (isAuthenticated && pathname === "/") {
-    const dest = role === "admin" ? "/admin" : "/student";
+  // Root (/) and protected routes: unauthenticated -> login; authenticated on / -> dashboard
+  if (pathname === "/") {
+    const dest = isAuthenticated
+      ? role === "admin"
+        ? "/admin"
+        : "/student"
+      : "/login";
     return NextResponse.redirect(new URL(dest, request.url));
   }
 
@@ -29,6 +34,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
+  // Ensure root (/) is always handled for redirect to /login or dashboard
+  matcher: ["/", "/((?!_next/static|_next/image|favicon.ico|api).*)"],
 };
 

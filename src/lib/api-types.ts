@@ -1,7 +1,8 @@
 /** API types for FansEdu LMS v1 (matches Go backend) */
 
-export type UserRole = "admin" | "student";
+export type UserRole = "admin" | "student" | "trainer";
 
+/** Sesuai response backend: { id, name, email, role }. avatar_url opsional. */
 export interface User {
   id: string;
   name: string;
@@ -16,6 +17,7 @@ export interface LoginRequest {
   password: string;
 }
 
+/** Format response backend: { user: { id, name, email, role }, token } */
 export interface LoginResponse {
   user: User;
   token: string;
@@ -137,12 +139,25 @@ export interface StudentDashboardResponse {
   recommendation: string;
 }
 
+// --- Subjects (Bidang) ---
+export interface Subject {
+  id: string;
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  sort_order?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
 // --- Courses ---
 export interface Course {
   id: string;
   title: string;
   description?: string | null;
   created_by: string | null;
+  subject_id?: string | null;
+  sort_order?: number | null;
 }
 
 export interface CourseEnrollment {
@@ -186,6 +201,22 @@ export interface AdminCreateQuestionRequest {
 export interface AdminCreateCourseRequest {
   title: string;
   description?: string | null;
+  subject_id?: string | null;
+  sort_order?: number | null;
+}
+
+export interface AdminCreateUserRequest {
+  name: string;
+  email: string;
+  password: string;
+  role: "student" | "trainer";
+}
+
+export interface AdminCreateSubjectRequest {
+  name: string;
+  slug?: string | null;
+  description?: string | null;
+  sort_order?: number | null;
 }
 
 export interface AdminIssueCertificateRequest {
