@@ -49,36 +49,36 @@ export default function MasterDataJenjangPage() {
   }, [loadLevels]);
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
+    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
       <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
       <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
               Master Data
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               Jenjang Pendidikan
             </h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-zinc-500">
               Daftar jenjang pendidikan (SD, SMP, SMA, dll).
             </p>
           </div>
           <Link
             href="/admin/master-data/jenjang/tambah"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800"
           >
             + Tambah Jenjang Pendidikan
           </Link>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
           {loading ? (
             <div className="p-8 text-center text-sm text-zinc-500">
               Memuat data jenjang...
@@ -91,15 +91,15 @@ export default function MasterDataJenjangPage() {
               </p>
               <Link
                 href="/admin/master-data/jenjang/tambah"
-                className="mt-4 inline-block rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="mt-4 inline-block rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
               >
                 Tambah Jenjang Pendidikan
               </Link>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/50">
+              <table className="min-w-full divide-y divide-zinc-200 text-sm">
+                <thead className="bg-zinc-50">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-zinc-500">
                       Urutan
@@ -118,28 +118,28 @@ export default function MasterDataJenjangPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                <tbody className="divide-y divide-zinc-100">
                   {paginatedList.map((j) => (
                     <tr
                       key={j.id}
-                      className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30"
+                      className="hover:bg-zinc-50"
                     >
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      <td className="px-4 py-3 text-zinc-600">
                         {j.sort_order ?? "–"}
                       </td>
-                      <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
+                      <td className="px-4 py-3 font-medium text-zinc-900">
                         {j.name}
                       </td>
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      <td className="px-4 py-3 text-zinc-600">
                         {j.slug ?? "–"}
                       </td>
-                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                      <td className="px-4 py-3 text-zinc-600">
                         {j.description ?? "–"}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Link
                           href={`/admin/master-data/jenjang/${j.id}/edit`}
-                          className="text-xs font-medium text-zinc-600 underline hover:text-zinc-900 dark:hover:text-zinc-200"
+                          className="text-xs font-medium text-zinc-600 underline hover:text-zinc-900"
                         >
                           Edit
                         </Link>

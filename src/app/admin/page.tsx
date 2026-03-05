@@ -90,7 +90,7 @@ export default function AdminDashboardPage() {
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
+    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
       <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
 
       {/* Main content */}
@@ -98,13 +98,13 @@ export default function AdminDashboardPage() {
         {/* Top bar (for mobile brand + user) */}
         <div className="mb-6 flex items-center justify-between md:mb-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
               Overview
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               Dashboard
             </h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-zinc-500">
               Ringkasan kebutuhan platform: user, kelas, event, payment, dan report.
             </p>
           </div>
@@ -112,11 +112,11 @@ export default function AdminDashboardPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              className="rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 "
             >
               Keluar
             </button>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-zinc-800 to-zinc-600 text-xs font-semibold text-zinc-50 dark:from-zinc-100 dark:to-zinc-300 dark:text-zinc-900">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-zinc-800 to-zinc-600 text-xs font-semibold text-zinc-50 ">
               A
             </div>
           </div>
@@ -126,37 +126,37 @@ export default function AdminDashboardPage() {
         <section className="mb-6 flex flex-wrap gap-2">
           <Link
             href="/admin/master-data"
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 "
           >
             Master Data
           </Link>
           <Link
             href="/admin/users"
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 "
           >
             Management User
           </Link>
           <Link
             href="/admin/kelas"
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 "
           >
             Management Kelas
           </Link>
           <Link
             href="/admin/tryouts"
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 "
           >
             Event
           </Link>
           <Link
             href="/admin/payment"
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 "
           >
             Payment
           </Link>
           <Link
             href="/admin/report"
-            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 "
           >
             Report
           </Link>
@@ -167,9 +167,9 @@ export default function AdminDashboardPage() {
           {stats.map((item) => (
             <div
               key={item.label}
-              className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-sm shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+              className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-sm shadow-sm "
             >
-              <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              <p className="text-xs font-medium text-zinc-500">
                 {item.label}
               </p>
               <p className="mt-2 text-xl font-semibold tracking-tight">
@@ -182,27 +182,27 @@ export default function AdminDashboardPage() {
         {/* Main grid */}
         <section className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)]">
           {/* User terdaftar (dari API) */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-semibold tracking-tight">
                   User terdaftar
                 </h2>
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1 text-xs text-zinc-500">
                   Daftar user dari API (siswa, pengajar, admin).
                 </p>
               </div>
               <Link
                 href="/admin/users"
-                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 "
               >
                 Lihat semua
               </Link>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-zinc-100 dark:border-zinc-800">
-              <table className="min-w-full divide-y divide-zinc-100 text-xs dark:divide-zinc-800">
-                <thead className="bg-zinc-50/80 dark:bg-zinc-950/60">
+            <div className="overflow-hidden rounded-xl border border-zinc-100 ">
+              <table className="min-w-full divide-y divide-zinc-100 text-xs ">
+                <thead className="bg-zinc-50/80 ">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium text-zinc-500">
                       Nama
@@ -215,24 +215,24 @@ export default function AdminDashboardPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 bg-white dark:divide-zinc-900 dark:bg-zinc-950">
+                <tbody className="divide-y divide-zinc-100 bg-white ">
                   {recentUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-3 py-4 text-center text-zinc-500 dark:text-zinc-400">
+                      <td colSpan={3} className="px-3 py-4 text-center text-zinc-500">
                         Belum ada user dari API.
                       </td>
                     </tr>
                   ) : (
                     recentUsers.map((u) => (
                       <tr key={u.id}>
-                        <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-50">
+                        <td className="px-3 py-2 font-medium text-zinc-900 ">
                           {u.name}
                         </td>
-                        <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">
+                        <td className="px-3 py-2 text-zinc-600">
                           {u.email}
                         </td>
                         <td className="px-3 py-2">
-                          <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold bg-zinc-100 text-zinc-700 ">
                             {u.role}
                           </span>
                         </td>
@@ -246,19 +246,19 @@ export default function AdminDashboardPage() {
 
           {/* Right column: Event terbaru + Tasks */}
           <div className="space-y-4">
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold tracking-tight">
                     Event / Tryout terbaru
                   </h2>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-1 text-xs text-zinc-500">
                     Daftar event dari API, diurutkan berdasarkan waktu tutup.
                   </p>
                 </div>
                 <Link
                   href="/admin/tryouts"
-                  className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                  className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 "
                 >
                   Kelola
                 </Link>
@@ -266,26 +266,26 @@ export default function AdminDashboardPage() {
 
               <ul className="space-y-3 text-xs">
                 {recentTryouts.length === 0 ? (
-                  <li className="rounded-xl border border-zinc-100 px-3 py-3 text-center text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+                  <li className="rounded-xl border border-zinc-100 px-3 py-3 text-center text-zinc-500  ">
                     Belum ada event dari API.
                   </li>
                 ) : (
                   recentTryouts.map((t) => (
                     <li
                       key={t.id}
-                      className="rounded-xl border border-zinc-100 px-3 py-2.5 dark:border-zinc-800"
+                      className="rounded-xl border border-zinc-100 px-3 py-2.5 "
                     >
                       <Link
                         href={`/admin/tryouts/${t.id}/soal`}
-                        className="text-[11px] font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                        className="text-[11px] font-medium text-zinc-900 hover:underline "
                       >
                         {t.title || t.short_title || "Event"}
                       </Link>
-                      <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500">
                         <span>{t.questions_count} soal</span>
                         <span className="capitalize">{t.status}</span>
                       </div>
-                      <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                      <p className="mt-1 text-[10px] text-zinc-400 0">
                         Tutup: {formatRelativeDate(t.closes_at)}
                       </p>
                     </li>
@@ -294,12 +294,12 @@ export default function AdminDashboardPage() {
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-semibold tracking-tight">
                   Admin tasks
                 </h2>
-                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                <span className="text-[11px] text-zinc-500">
                   Today
                 </span>
               </div>
@@ -309,7 +309,7 @@ export default function AdminDashboardPage() {
                   <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   <div>
                     <p className="font-medium">Review 5 new course drafts</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <p className="text-[11px] text-zinc-500">
                       Check content quality and publish schedule.
                     </p>
                   </div>
@@ -318,7 +318,7 @@ export default function AdminDashboardPage() {
                   <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500" />
                   <div>
                     <p className="font-medium">Respond to support tickets</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <p className="text-[11px] text-zinc-500">
                       7 tickets awaiting your response.
                     </p>
                   </div>
@@ -327,7 +327,7 @@ export default function AdminDashboardPage() {
                   <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
                   <div>
                     <p className="font-medium">Update certification settings</p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    <p className="text-[11px] text-zinc-500">
                       Configure new passing criteria for advanced tracks.
                     </p>
                   </div>

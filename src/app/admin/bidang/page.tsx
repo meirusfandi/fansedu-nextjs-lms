@@ -9,7 +9,7 @@ export default function AdminBidangRedirectPage() {
     router.replace("/admin/master-data/subject");
   }, [router]);
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50">
       <p className="text-sm text-zinc-500">Mengalihkan ke Subject...</p>
     </div>
   );

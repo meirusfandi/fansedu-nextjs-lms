@@ -210,14 +210,14 @@ export default function AdminTryoutSoalPage() {
 
   if (!tryoutId) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
         <p className="text-sm text-zinc-500">ID tryout tidak valid.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
+    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
       <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
 
       <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
@@ -225,33 +225,33 @@ export default function AdminTryoutSoalPage() {
           <div>
             <Link
               href="/admin/tryouts"
-              className="text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              className="text-xs font-medium text-zinc-500 hover:text-zinc-700"
             >
               ← Daftar Tryout
             </Link>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               Soal Tryout
             </h1>
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-zinc-500">
               {tryout ? tryout.title : "..."} — tambah dan kelola soal.
             </p>
           </div>
           <button
             type="button"
             onClick={openAdd}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800"
           >
             + Tambah Soal
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
           {loading ? (
             <div className="p-8 text-center text-sm text-zinc-500">
               Memuat soal...
@@ -265,7 +265,7 @@ export default function AdminTryoutSoalPage() {
             </div>
           ) : (
             <>
-            <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            <div className="divide-y divide-zinc-200">
               {paginatedQuestions.map((q) => (
                   <div
                     key={q.id}
@@ -273,10 +273,10 @@ export default function AdminTryoutSoalPage() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
+                        <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700">
                           #{q.sort_order}
                         </span>
-                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                        <span className="text-xs text-zinc-500">
                           {TYPE_LABEL[q.type] ?? q.type} · Skor: {q.max_score}
                         </span>
                       </div>
@@ -284,7 +284,7 @@ export default function AdminTryoutSoalPage() {
                         <QuestionBody html={q.body} imageUrl={q.image_url} asPreview />
                       </div>
                       {q.options && q.options.length > 0 && (
-                        <ul className="mt-1 list-inside list-disc text-xs text-zinc-500 dark:text-zinc-400">
+                        <ul className="mt-1 list-inside list-disc text-xs text-zinc-500">
                           {q.options.map((opt, i) => (
                             <li key={i}>{opt}</li>
                           ))}
@@ -295,14 +295,14 @@ export default function AdminTryoutSoalPage() {
                       <button
                         type="button"
                         onClick={() => openEdit(q)}
-                        className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                        className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(q.id)}
-                        className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:hover:bg-red-950/30"
+                        className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                       >
                         Hapus
                       </button>
@@ -325,19 +325,19 @@ export default function AdminTryoutSoalPage() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-zinc-900">
               {modalOpen === "add" ? "Tambah Soal" : "Edit Soal"}
             </h2>
             {submitError && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {submitError}
               </div>
             )}
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  <label className="block text-xs font-medium text-zinc-600">
                     Urutan *
                   </label>
                   <input
@@ -348,11 +348,11 @@ export default function AdminTryoutSoalPage() {
                     onChange={(e) =>
                       setForm({ ...form, sort_order: e.target.value })
                     }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  <label className="block text-xs font-medium text-zinc-600">
                     Tipe *
                   </label>
                   <select
@@ -363,7 +363,7 @@ export default function AdminTryoutSoalPage() {
                         type: e.target.value as AdminCreateQuestionRequest["type"],
                       })
                     }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                   >
                     <option value="short">Isian singkat</option>
                     <option value="multiple_choice">Pilihan ganda</option>
@@ -373,10 +373,10 @@ export default function AdminTryoutSoalPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <label className="block text-xs font-medium text-zinc-600">
                   Pertanyaan (body) — editor kaya *
                 </label>
-                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                <p className="mt-0.5 text-[11px] text-zinc-500">
                   Format teks, list, link, gambar, video, dan mode kode (code view).
                 </p>
                 <div className="mt-1">
@@ -388,8 +388,8 @@ export default function AdminTryoutSoalPage() {
                   />
                 </div>
                 {form.body.trim() && (
-                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/50 p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
                       Preview
                     </p>
                     <div className="mt-1.5 min-h-[2rem]">
@@ -401,7 +401,7 @@ export default function AdminTryoutSoalPage() {
 
               {(form.type === "multiple_choice" || form.type === "true_false") && (
                 <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  <label className="block text-xs font-medium text-zinc-600">
                     Opsi (satu per baris) {form.type === "true_false" ? "— mis. Benar, Salah" : ""}
                   </label>
                   <textarea
@@ -415,13 +415,13 @@ export default function AdminTryoutSoalPage() {
                         ? "Benar\nSalah"
                         : "Opsi A\nOpsi B\nOpsi C\nOpsi D"
                     }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                   />
                 </div>
               )}
 
               <div className="max-w-[6rem]">
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <label className="block text-xs font-medium text-zinc-600">
                   Skor max *
                 </label>
                 <input
@@ -429,7 +429,7 @@ export default function AdminTryoutSoalPage() {
                   min={1}
                   value={form.max_score}
                   onChange={(e) => setForm({ ...form, max_score: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
 
@@ -437,14 +437,14 @@ export default function AdminTryoutSoalPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitLoading}
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {submitLoading ? "Menyimpan..." : "Simpan"}
                 </button>

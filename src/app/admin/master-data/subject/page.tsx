@@ -226,54 +226,54 @@ export default function MasterDataSubjectPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
+    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
       <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
 
       <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 md:mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 dark:text-zinc-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Master Data
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
             Subject — Kelas yang dibuka
           </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500">
             Daftar kelas/bidang yang saat ini dibuka untuk peserta. Hanya menampilkan yang dibuka per level SD, SMP, SMA.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </div>
         )}
 
         <div className="space-y-4">
           {loading ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
               Memuat level (SD, SMP, SMA)...
             </div>
           ) : levelsSDSMPSMA.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
               Belum ada level SD, SMP, atau SMA yang dibuka. Tambah jenjang di Master Data → Jenjang Pendidikan (slug: sd, smp, sma), lalu muat ulang.
             </div>
           ) : (
             levelsSDSMPSMA.map((level) => (
               <div
                 key={level.id}
-                className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+                className="rounded-2xl border border-zinc-200 bg-white shadow-sm"
               >
-                <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800">
+                <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
                   <button
                     type="button"
                     onClick={() => toggleLevel(level.id)}
                     className="flex flex-1 items-center gap-2 text-left"
                   >
-                    <span className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+                    <span className="text-lg font-medium text-zinc-900">
                       {level.name}
                     </span>
                     {level.description && (
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className="text-xs text-zinc-500">
                         — {level.description}
                       </span>
                     )}
@@ -284,14 +284,14 @@ export default function MasterDataSubjectPage() {
                   <button
                     type="button"
                     onClick={() => openBidangAdd(level.id)}
-                    className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                    className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
                   >
                     + Tambah Bidang
                   </button>
                 </div>
 
                 {expandedLevelId === level.id && (
-                  <div className="border-t border-zinc-100 p-4 dark:border-zinc-800">
+                  <div className="border-t border-zinc-100 p-4">
                     {!subjectsByLevel[level.id] ? (
                       <p className="text-sm text-zinc-500">Memuat bidang...</p>
                     ) : subjectsByLevel[level.id].length === 0 ? (
@@ -303,7 +303,7 @@ export default function MasterDataSubjectPage() {
                         {subjectsByLevel[level.id].map((subject) => (
                           <div
                             key={subject.id}
-                            className="rounded-xl border border-zinc-100 dark:border-zinc-800"
+                            className="rounded-xl border border-zinc-100"
                           >
                             <div className="flex items-center justify-between px-3 py-2">
                               <button
@@ -311,11 +311,11 @@ export default function MasterDataSubjectPage() {
                                 onClick={() => toggleSubject(subject.id)}
                                 className="flex flex-1 items-center gap-2 text-left text-sm"
                               >
-                                <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                                <span className="font-medium text-zinc-900">
                                   {subject.name}
                                 </span>
                                 {subject.description && (
-                                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  <span className="text-xs text-zinc-500">
                                     — {subject.description}
                                   </span>
                                 )}
@@ -327,29 +327,29 @@ export default function MasterDataSubjectPage() {
                                 <button
                                   type="button"
                                   onClick={() => openBidangEdit(subject, level.id)}
-                                  className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                                  className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => openModuleAdd(subject.id)}
-                                  className="rounded bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                                  className="rounded bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
                                 >
                                   + Module
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteBidang(subject.id, level.id)}
-                                  className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
+                                  className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
                                 >
                                   Hapus
                                 </button>
                               </div>
                             </div>
                             {expandedSubjectId === subject.id && (
-                              <div className="border-t border-zinc-100 bg-zinc-50/50 p-3 dark:border-zinc-800 dark:bg-zinc-900/30">
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                              <div className="border-t border-zinc-100 bg-zinc-50/50 p-3">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
                                   Module
                                 </p>
                                 {!modulesBySubject[subject.id] ? (
@@ -363,14 +363,14 @@ export default function MasterDataSubjectPage() {
                                     {modulesBySubject[subject.id].map((c) => (
                                       <li
                                         key={c.id}
-                                        className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+                                        className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
                                       >
                                         <div>
-                                          <p className="font-medium text-zinc-900 dark:text-zinc-50">
+                                          <p className="font-medium text-zinc-900">
                                             {c.title}
                                           </p>
                                           {c.description && (
-                                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                                            <p className="text-xs text-zinc-500">
                                               {c.description}
                                             </p>
                                           )}
@@ -379,7 +379,7 @@ export default function MasterDataSubjectPage() {
                                           <button
                                             type="button"
                                             onClick={() => openModuleEdit(c, subject.id)}
-                                            className="text-xs text-zinc-600 underline hover:text-zinc-900 dark:hover:text-zinc-100"
+                                            className="text-xs text-zinc-600 underline hover:text-zinc-900"
                                           >
                                             Edit
                                           </button>
@@ -412,18 +412,18 @@ export default function MasterDataSubjectPage() {
       {/* Modal Bidang */}
       {bidangModalMode && bidangModalLevelId && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-zinc-900">
               {bidangModalMode === "add" ? "Tambah Bidang" : "Edit Bidang"}
             </h2>
             {submitError && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {submitError}
               </div>
             )}
             <form onSubmit={handleBidangSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <label className="block text-xs font-medium text-zinc-600">
                   Nama bidang *
                 </label>
                 <input
@@ -434,11 +434,11 @@ export default function MasterDataSubjectPage() {
                     setBidangForm({ ...bidangForm, name: e.target.value })
                   }
                   placeholder="Mis. Algoritma Dasar"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <label className="block text-xs font-medium text-zinc-600">
                   Slug (opsional)
                 </label>
                 <input
@@ -448,11 +448,11 @@ export default function MasterDataSubjectPage() {
                     setBidangForm({ ...bidangForm, slug: e.target.value })
                   }
                   placeholder="algoritma-dasar"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <label className="block text-xs font-medium text-zinc-600">
                   Deskripsi (opsional)
                 </label>
                 <textarea
@@ -461,7 +461,7 @@ export default function MasterDataSubjectPage() {
                   onChange={(e) =>
                     setBidangForm({ ...bidangForm, description: e.target.value })
                   }
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-4">
@@ -472,14 +472,14 @@ export default function MasterDataSubjectPage() {
                     setBidangModalMode(null);
                     setEditingSubjectId(null);
                   }}
-                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitLoading}
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {submitLoading ? "Menyimpan..." : "Simpan"}
                 </button>
@@ -492,18 +492,18 @@ export default function MasterDataSubjectPage() {
       {/* Modal Module */}
       {moduleModalSubjectId && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-zinc-900">
               {editingModuleId ? "Edit Module" : "Tambah Module"}
             </h2>
             {submitError && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {submitError}
               </div>
             )}
             <form onSubmit={handleModuleSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <label className="block text-xs font-medium text-zinc-600">
                   Judul module *
                 </label>
                 <input
@@ -514,11 +514,11 @@ export default function MasterDataSubjectPage() {
                     setModuleForm({ ...moduleForm, title: e.target.value })
                   }
                   placeholder="Mis. Minggu 1 - Pengenalan"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                <label className="block text-xs font-medium text-zinc-600">
                   Deskripsi (opsional)
                 </label>
                 <textarea
@@ -527,7 +527,7 @@ export default function MasterDataSubjectPage() {
                   onChange={(e) =>
                     setModuleForm({ ...moduleForm, description: e.target.value })
                   }
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-4">
@@ -537,14 +537,14 @@ export default function MasterDataSubjectPage() {
                     setModuleModalSubjectId(null);
                     setEditingModuleId(null);
                   }}
-                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitLoading}
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {submitLoading ? "Menyimpan..." : "Simpan"}
                 </button>
