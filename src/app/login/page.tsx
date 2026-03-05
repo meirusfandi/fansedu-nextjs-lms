@@ -60,14 +60,18 @@ export default function LoginPage() {
         email: form.email,
         password: form.password,
       });
-      // Backend: { user: { id, name, email, role }, token }
+      // Backend: { user: { id, name/nama, email, role }, token }
       const { token, user } = res;
       if (!token || !user?.role) {
         setError("Format respons login tidak valid.");
         return;
       }
+      const name = (user as { name?: string; nama?: string; full_name?: string }).name
+        ?? (user as { name?: string; nama?: string; full_name?: string }).nama
+        ?? (user as { name?: string; nama?: string; full_name?: string }).full_name
+        ?? "";
       const maxAge = rememberMe ? 2592000 : 604800; // 30 hari vs 7 hari
-      setAuthToken(token, maxAge, user.role);
+      setAuthToken(token, maxAge, user.role, name || undefined);
       if (rememberMe && form.email) {
         localStorage.setItem(REMEMBER_EMAIL_KEY, form.email);
       } else {

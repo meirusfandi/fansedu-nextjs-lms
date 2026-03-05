@@ -43,7 +43,9 @@ export default function RegisterPage() {
         email: form.email,
         password: form.password,
       });
-      setAuthToken(res.token, 604800, res.user.role);
+      const u = res.user as { name?: string; nama?: string; full_name?: string; role?: string };
+      const name = u?.name ?? u?.nama ?? u?.full_name ?? "";
+      setAuthToken(res.token, 604800, res.user.role, name || undefined);
       const dest = res.user.role === "admin" ? "/admin" : "/student";
       router.push(dest);
     } catch (err) {

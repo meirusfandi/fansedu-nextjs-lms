@@ -4,57 +4,27 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminSidebar } from "@/components/AdminSidebar";
-import { getAdminOverview, logout, clearAuthToken } from "@/lib/api";
-import type { AdminOverviewResponse } from "@/lib/api-types";
+import { getAdminDashboardData, logout, clearAuthToken } from "@/lib/api";
+import type { AdminDashboardData } from "@/lib/api";
 
-const recentEnrollments = [
-  {
-    name: "Amirullah Pratama",
-    course: "Kelas Algoritma Dasar OSN Informatika",
-    date: "Hari ini · 09.15",
-    status: "Terdaftar",
-  },
-  {
-    name: "Siti Nurhaliza",
-    course: "Pembinaan Struktur Data & Graph",
-    date: "Hari ini · 08.42",
-    status: "Berlangsung",
-  },
-  {
-    name: "Budi Santoso",
-    course: "Simulasi OSN Informatika - Kabupaten",
-    date: "Kemarin · 16.03",
-    status: "Selesai",
-  },
-  {
-    name: "Intan Maharani",
-    course: "Latihan Dynamic Programming",
-    date: "Kemarin · 10.27",
-    status: "Terdaftar",
-  },
-];
-
-const topCourses = [
-  {
-    title: "Algoritma Dasar & Pemrograman Kompetitif",
-    learners: 328,
-    completion: 82,
-  },
-  {
-    title: "Struktur Data & Graph untuk OSN",
-    learners: 291,
-    completion: 76,
-  },
-  {
-    title: "Dynamic Programming Lanjutan",
-    learners: 244,
-    completion: 69,
-  },
-];
+function formatRelativeDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    if (diffDays === 0) return `Hari ini · ${d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffDays === 1) return `Kemarin · ${d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffDays < 7) return `${diffDays} hari lalu`;
+    return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return iso;
+  }
+}
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
+  const [data, setData] = useState<AdminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,41 +35,37 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    getAdminOverview()
-      .then(setOverview)
+    getAdminDashboardData()
+      .then(setData)
       .catch((e) => setError((e as Error).message ?? "Gagal memuat data"))
       .finally(() => setLoading(false));
   }, []);
 
-  const stats = overview
+  const stats = data
     ? [
-        {
-          label: "Total siswa terdaftar",
-          value: String(overview.total_students),
-          change: "Dari API",
-        },
-        {
-          label: "Event aktif",
-          value: String(overview.active_tryouts),
-          change: "Dari API",
-        },
-        {
-          label: "Rata-rata skor",
-          value: String(overview.avg_score),
-          change: "Dari API",
-        },
-        {
-          label: "Sertifikat diterbitkan",
-          value: String(overview.total_certificates),
-          change: "Dari API",
-        },
+        { label: "Total siswa terdaftar", value: String(data.totalStudents) },
+        { label: "Event aktif", value: String(data.activeTryouts) },
+        { label: "Rata-rata skor", value: data.avgScore != null ? String(Math.round(Number(data.avgScore))) : "–" },
+        { label: "Sertifikat diterbitkan", value: String(data.totalCertificates) },
       ]
     : [
-        { label: "Total siswa terdaftar", value: "–", change: "" },
-        { label: "Event aktif", value: "–", change: "" },
-        { label: "Rata-rata skor", value: "–", change: "" },
-        { label: "Sertifikat diterbitkan", value: "–", change: "" },
+        { label: "Total siswa terdaftar", value: "–" },
+        { label: "Event aktif", value: "–" },
+        { label: "Rata-rata skor", value: "–" },
+        { label: "Sertifikat diterbitkan", value: "–" },
       ];
+
+  const recentUsers = (data?.users ?? []).slice(0, 8).map((u) => ({
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    id: u.id,
+  }));
+
+  const recentTryouts = (data?.tryouts ?? [])
+    .slice()
+    .sort((a, b) => new Date(b.closes_at).getTime() - new Date(a.closes_at).getTime())
+    .slice(0, 6);
 
   if (error) {
     return (
@@ -202,32 +168,29 @@ export default function AdminDashboardPage() {
               <p className="mt-2 text-xl font-semibold tracking-tight">
                 {loading ? "..." : item.value}
               </p>
-              {item.change ? (
-                <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                  {item.change}
-                </p>
-              ) : null}
             </div>
           ))}
         </section>
 
         {/* Main grid */}
         <section className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)]">
-          {/* Recent enrollments */}
+          {/* User terdaftar (dari API) */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
             <div className="mb-3 flex items-center justify-between">
               <div>
-              <h2 className="text-sm font-semibold tracking-tight">
-                Aktivitas terbaru peserta OSN Informatika
-              </h2>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                Pendaftaran dan progres terbaru peserta pembinaan OSN
-                Informatika.
-              </p>
+                <h2 className="text-sm font-semibold tracking-tight">
+                  User terdaftar
+                </h2>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  Daftar user dari API (siswa, pengajar, admin).
+                </p>
               </div>
-              <button className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900">
-                View all
-              </button>
+              <Link
+                href="/admin/users"
+                className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                Lihat semua
+              </Link>
             </div>
 
             <div className="overflow-hidden rounded-xl border border-zinc-100 dark:border-zinc-800">
@@ -235,88 +198,92 @@ export default function AdminDashboardPage() {
                 <thead className="bg-zinc-50/80 dark:bg-zinc-950/60">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                      Peserta
+                      Nama
                     </th>
                     <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                      Event / kelas
+                      Email
                     </th>
                     <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                      Waktu
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-zinc-500">
-                      Status
+                      Role
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 bg-white dark:divide-zinc-900 dark:bg-zinc-950">
-                  {recentEnrollments.map((item) => (
-                    <tr key={`${item.name}-${item.course}`}>
-                      <td className="px-3 py-2 align-top">
-                        <p className="font-medium text-zinc-900 dark:text-zinc-50">
-                          {item.name}
-                        </p>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <p className="text-[11px] font-medium">
-                          {item.course}
-                        </p>
-                      </td>
-                      <td className="px-3 py-2 align-top text-[11px] text-zinc-500 dark:text-zinc-400">
-                        {item.date}
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <span
-                          className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-                        >
-                          {item.status}
-                        </span>
+                  {recentUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-4 text-center text-zinc-500 dark:text-zinc-400">
+                        Belum ada user dari API.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    recentUsers.map((u) => (
+                      <tr key={u.id}>
+                        <td className="px-3 py-2 font-medium text-zinc-900 dark:text-zinc-50">
+                          {u.name}
+                        </td>
+                        <td className="px-3 py-2 text-zinc-600 dark:text-zinc-300">
+                          {u.email}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+                            {u.role}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Right column: Top courses + Tasks */}
+          {/* Right column: Event terbaru + Tasks */}
           <div className="space-y-4">
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
               <div className="mb-3 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold tracking-tight">
-                    Sesi pembinaan terpopuler
+                    Event / Tryout terbaru
                   </h2>
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    Kelas dan sesi OSN Informatika dengan keterlibatan tertinggi
-                    minggu ini.
+                    Daftar event dari API, diurutkan berdasarkan waktu tutup.
                   </p>
                 </div>
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
-                  This week
-                </span>
+                <Link
+                  href="/admin/tryouts"
+                  className="rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                >
+                  Kelola
+                </Link>
               </div>
 
               <ul className="space-y-3 text-xs">
-                {topCourses.map((course) => (
-                  <li
-                    key={course.title}
-                    className="rounded-xl border border-zinc-100 px-3 py-2.5 dark:border-zinc-800"
-                  >
-                    <p className="text-[11px] font-medium text-zinc-900 dark:text-zinc-50">
-                      {course.title}
-                    </p>
-                    <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
-                      <span>{course.learners} learners</span>
-                      <span>{course.completion}% completion</span>
-                    </div>
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-900">
-                      <div
-                        className="h-full rounded-full bg-zinc-900 dark:bg-zinc-50"
-                        style={{ width: `${course.completion}%` }}
-                      />
-                    </div>
+                {recentTryouts.length === 0 ? (
+                  <li className="rounded-xl border border-zinc-100 px-3 py-3 text-center text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+                    Belum ada event dari API.
                   </li>
-                ))}
+                ) : (
+                  recentTryouts.map((t) => (
+                    <li
+                      key={t.id}
+                      className="rounded-xl border border-zinc-100 px-3 py-2.5 dark:border-zinc-800"
+                    >
+                      <Link
+                        href={`/admin/tryouts/${t.id}/soal`}
+                        className="text-[11px] font-medium text-zinc-900 hover:underline dark:text-zinc-50"
+                      >
+                        {t.title || t.short_title || "Event"}
+                      </Link>
+                      <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                        <span>{t.questions_count} soal</span>
+                        <span className="capitalize">{t.status}</span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-zinc-400 dark:text-zinc-500">
+                        Tutup: {formatRelativeDate(t.closes_at)}
+                      </p>
+                    </li>
+                  ))
+                )}
               </ul>
             </div>
 

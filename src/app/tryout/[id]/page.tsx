@@ -11,12 +11,14 @@ import {
 } from "react";
 import {
   getTryout,
+  getTryoutLeaderboard,
+  getStudentAttempts,
   startTryout,
   getAttemptQuestions,
   putAttemptAnswer,
   submitAttempt,
 } from "@/lib/api";
-import type { Question as ApiQuestion, TryoutSession } from "@/lib/api-types";
+import type { Question as ApiQuestion, TryoutSession, LeaderboardEntry } from "@/lib/api-types";
 import type { AttemptFeedback } from "@/lib/api-types";
 
 type TryoutStatus = "loading" | "intro" | "in_progress" | "submitted";
@@ -57,9 +59,13 @@ export default function TryoutDetailPage() {
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
   const [submitResult, setSubmitResult] = useState<{
     score: number;
-    percentile: number;
+    max_score?: number;
+    percentile: number | null;
     feedback: AttemptFeedback;
   } | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [hasCompletedAttempt, setHasCompletedAttempt] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -67,6 +73,24 @@ export default function TryoutDetailPage() {
       .then(setTryout)
       .catch(() => setLoadError("Tryout tidak ditemukan"))
       .finally(() => setStatus((s) => (s === "loading" ? "intro" : s)));
+  }, [tryoutId]);
+
+  useEffect(() => {
+    getTryoutLeaderboard(tryoutId)
+      .then(setLeaderboard)
+      .catch(() => setLeaderboard([]));
+  }, [tryoutId]);
+
+  /** Cek apakah siswa sudah pernah menyelesaikan tryout ini → sembunyikan tombol Mulai simulasi */
+  useEffect(() => {
+    getStudentAttempts()
+      .then((attempts) => {
+        const done = attempts.some(
+          (a) => a.tryout_session_id === tryoutId && a.status === "submitted"
+        );
+        setHasCompletedAttempt(done);
+      })
+      .catch(() => setHasCompletedAttempt(false));
   }, [tryoutId]);
 
   const totalQuestions = questions.length;
@@ -110,7 +134,8 @@ export default function TryoutDetailPage() {
   );
 
   const startTryoutFlow = useCallback(async () => {
-    if (!tryout) return;
+    if (!tryout || starting) return;
+    setStarting(true);
     try {
       const { attempt_id, time_left_seconds } = await startTryout(tryout.id);
       const qs = await getAttemptQuestions(attempt_id);
@@ -121,8 +146,10 @@ export default function TryoutDetailPage() {
       setStatus("in_progress");
     } catch (e) {
       setLoadError((e as Error).message ?? "Gagal memulai simulasi");
+    } finally {
+      setStarting(false);
     }
-  }, [tryout]);
+  }, [tryout, starting]);
 
   useEffect(() => {
     if (status !== "in_progress" || timeLeftSeconds <= 0) return;
@@ -132,13 +159,16 @@ export default function TryoutDetailPage() {
           if (timerRef.current) clearInterval(timerRef.current);
           if (attemptId) {
             submitAttempt(attemptId)
-              .then((res) =>
+              .then((res) => {
                 setSubmitResult({
                   score: res.score,
-                  percentile: res.percentile,
+                  max_score: (res as { max_score?: number }).max_score,
+                  percentile: res.percentile != null && res.percentile > 0 ? res.percentile : null,
                   feedback: res.feedback ?? {},
-                })
-              )
+                });
+                setHasCompletedAttempt(true);
+                getTryoutLeaderboard(tryoutId).then(setLeaderboard).catch(() => {});
+              })
               .catch(() => setLoadError("Gagal mengirim jawaban"));
           }
           setStatus("submitted");
@@ -165,12 +195,16 @@ export default function TryoutDetailPage() {
     if (!attemptId) return;
     try {
       const res = await submitAttempt(attemptId);
+      const maxScore = questions.reduce((s, q) => s + (q.max_score ?? 1), 0);
       setSubmitResult({
         score: res.score,
-        percentile: res.percentile,
+        max_score: (res as { max_score?: number }).max_score ?? maxScore,
+        percentile: res.percentile != null && res.percentile > 0 ? res.percentile : null,
         feedback: res.feedback ?? {},
       });
       setStatus("submitted");
+      setHasCompletedAttempt(true);
+      getTryoutLeaderboard(tryoutId).then(setLeaderboard).catch(() => {});
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -210,6 +244,29 @@ export default function TryoutDetailPage() {
   }
 
   if (status === "intro") {
+    const now = Date.now();
+    const opensAt = new Date(tryout.opens_at).getTime();
+    const closesAt = new Date(tryout.closes_at).getTime();
+    const TEN_MIN_MS = 10 * 60 * 1000;
+    const isOpen = now >= opensAt && now <= closesAt;
+    const isPast = now > closesAt;
+    const isFuture = now < opensAt;
+    /** Tombol tampil 10 menit sebelum buka sampai waktu tutup */
+    const canShowButton = now >= opensAt - TEN_MIN_MS && now <= closesAt;
+    /** Lebih dari 10 menit sebelum buka: tampilkan pesan "dibuka pada..." */
+    const isFutureStrict = now < opensAt - TEN_MIN_MS;
+
+    const formatDateTime = (iso: string) => {
+      try {
+        return new Date(iso).toLocaleString("id-ID", {
+          dateStyle: "long",
+          timeStyle: "short",
+        });
+      } catch {
+        return iso;
+      }
+    };
+
     return (
       <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
         <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 md:px-8">
@@ -220,7 +277,7 @@ export default function TryoutDetailPage() {
             >
               Dashboard siswa
             </Link>{" "}
-            / Simulasi OSN Informatika
+            / Simulasi
           </p>
           <h1 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">
             {tryout.title}
@@ -245,35 +302,112 @@ export default function TryoutDetailPage() {
               <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
                 Tingkat
               </p>
-              <p className="mt-1 font-semibold">
-                {levelLabel(tryout.level)}
-              </p>
+              <p className="mt-1 font-semibold">{levelLabel(tryout.level)}</p>
             </div>
           </section>
-          <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/30">
-            <h2 className="font-semibold text-amber-900 dark:text-amber-100">
-              Tata tertib simulasi
+
+          {isFutureStrict && (
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-100/80 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-900/50">
+              <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                Tryout dibuka pada {formatDateTime(tryout.opens_at)}
+              </p>
+              <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                Tombol &quot;Mulai simulasi&quot; akan muncul 10 menit sebelum waktu buka.
+              </p>
+            </div>
+          )}
+          {isPast && (
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-100/80 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-900/50">
+              <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                Tryout sudah berakhir
+              </p>
+              <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+                Periode pengerjaan berakhir {formatDateTime(tryout.closes_at)}.
+              </p>
+            </div>
+          )}
+          {hasCompletedAttempt && (
+            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm dark:border-emerald-900/50 dark:bg-emerald-950/30">
+              <p className="font-medium text-emerald-800 dark:text-emerald-200">
+                Anda sudah mengerjakan tryout ini.
+              </p>
+              <p className="mt-1 text-[11px] text-emerald-700 dark:text-emerald-300">
+                Lihat leaderboard di bawah.
+              </p>
+            </div>
+          )}
+          {canShowButton && !hasCompletedAttempt && (
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/30">
+              <h2 className="font-semibold text-amber-900 dark:text-amber-100">
+                Tata tertib simulasi
+              </h2>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-amber-800 dark:text-amber-200">
+                <li>Timer berjalan setelah kamu klik &quot;Mulai simulasi&quot;.</li>
+                <li>Jawaban disimpan otomatis.</li>
+                <li>Waktu habis atau kirim jawaban akan mengakhiri simulasi.</li>
+              </ul>
+            </div>
+          )}
+
+          {/* Leaderboard tryout ini */}
+          <div className="mt-6 rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+            <h2 className="px-4 pt-3 text-sm font-semibold dark:text-zinc-50">
+              Leaderboard
             </h2>
-            <ul className="mt-2 list-inside list-disc space-y-1 text-amber-800 dark:text-amber-200">
-              <li>Timer berjalan setelah kamu klik &quot;Mulai simulasi&quot;.</li>
-              <li>Jawaban disimpan otomatis.</li>
-              <li>Waktu habis atau kirim jawaban akan mengakhiri simulasi.</li>
-            </ul>
+            <p className="px-4 pb-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+              Urutan tampilan berdasarkan abjad. Peringkat resmi menurut skor tertinggi dan waktu pengerjaan tercepat.
+            </p>
+            <div className="border-t border-zinc-100 dark:border-zinc-800" />
+            {leaderboard.length === 0 ? (
+              <p className="px-4 py-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                Belum ada data leaderboard untuk tryout ini.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-100 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/50">
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Peringkat</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Nama</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Skor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {leaderboard.map((entry, i) => {
+                      const rank = entry.rank ?? i + 1;
+                      const name = entry.user_name ?? entry.name ?? entry.nama ?? "–";
+                      const score = entry.score ?? entry.best_score ?? entry.skor ?? "–";
+                      return (
+                        <tr key={entry.user_id ?? `${rank}-${name}`} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/30">
+                          <td className="px-3 py-2 font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">#{rank}</td>
+                          <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200">{name}</td>
+                          <td className="px-3 py-2 tabular-nums text-zinc-700 dark:text-zinc-300">{score}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
+
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
             <Link
               href="/student"
               className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
             >
-              Batal
+              Kembali
             </Link>
-            <button
-              type="button"
-              onClick={startTryoutFlow}
-              className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
-              Mulai simulasi
-            </button>
+            {canShowButton && !hasCompletedAttempt && (
+              <button
+                type="button"
+                onClick={startTryoutFlow}
+                disabled={starting}
+                className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              >
+                {starting ? "Memulai..." : "Mulai simulasi"}
+              </button>
+            )}
           </div>
         </main>
       </div>
@@ -282,6 +416,17 @@ export default function TryoutDetailPage() {
 
   if (status === "submitted" && submitResult) {
     const { score, percentile, feedback } = submitResult;
+    const fromQuestions = questions.length > 0 ? questions.reduce((s, q) => s + (q.max_score ?? 1), 0) : 0;
+    const maxScore = (submitResult.max_score != null && submitResult.max_score > 0)
+      ? submitResult.max_score
+      : fromQuestions > 0
+        ? fromQuestions
+        : 100;
+    const scorePct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    const percentileDisplay = percentile != null && percentile > 0 ? `${percentile}%` : "–";
+    const strengths = feedback.strength_areas ?? [];
+    const improvements = feedback.improvement_areas ?? [];
+    const hasAnalysis = strengths.length > 0 || improvements.length > 0 || feedback.recommendation_text || feedback.summary;
     return (
       <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
         <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 md:px-8">
@@ -295,18 +440,19 @@ export default function TryoutDetailPage() {
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
               <div className="text-center">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Skor
+                  Skor (nilai)
                 </p>
                 <p className="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-50">
-                  {score}
+                  {score}<span className="text-lg font-normal text-zinc-500">/{maxScore}</span>
                 </p>
-                <p className="text-xs text-zinc-500">/ 100</p>
+                <p className="text-xs text-zinc-500">{scorePct}%</p>
               </div>
               <div className="text-center">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   Persentil
                 </p>
-                <p className="mt-1 text-2xl font-semibold">{percentile}%</p>
+                <p className="mt-1 text-2xl font-semibold">{percentileDisplay}</p>
+                <p className="text-[10px] text-zinc-500">peringkat vs peserta</p>
               </div>
               <div className="text-center">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -328,7 +474,90 @@ export default function TryoutDetailPage() {
               </p>
             )}
           </section>
-          <div className="mt-8 flex justify-center">
+
+          {/* Analisis kelemahan & kekuatan (dari backend / AI) */}
+          <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              Analisis hasil
+            </h2>
+            <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+              Kelemahan dan kekuatan berdasarkan jawaban (dari backend/AI).
+            </p>
+            {hasAnalysis ? (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                    Kekuatan
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-emerald-900 dark:text-emerald-100">
+                    {strengths.length > 0 ? strengths.map((s) => <li key={s}>• {s}</li>) : <li className="text-zinc-500">–</li>}
+                  </ul>
+                </div>
+                <div className="rounded-xl bg-amber-50 p-3 dark:bg-amber-950/30">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                    Perlu ditingkatkan
+                  </p>
+                  <ul className="mt-2 space-y-1 text-xs text-amber-900 dark:text-amber-100">
+                    {improvements.length > 0 ? improvements.map((i) => <li key={i}>• {i}</li>) : <li className="text-zinc-500">–</li>}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                Analisis kelemahan/kekuatan akan tampil di sini jika backend mengirim <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">feedback.strength_areas</code> dan <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">feedback.improvement_areas</code> (bisa dari AI).
+              </p>
+            )}
+          </section>
+
+          {/* Leaderboard tryout — setelah selesai */}
+          <div className="mt-6 rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+            <h2 className="px-4 pt-3 text-sm font-semibold dark:text-zinc-50">
+              Leaderboard
+            </h2>
+            <p className="px-4 pb-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+              Urutan tampilan berdasarkan abjad. Peringkat resmi menurut skor tertinggi dan waktu pengerjaan tercepat.
+            </p>
+            <div className="border-t border-zinc-100 dark:border-zinc-800" />
+            {leaderboard.length === 0 ? (
+              <p className="px-4 py-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                Belum ada data leaderboard untuk tryout ini.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-100 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/50">
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Peringkat</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Nama</th>
+                      <th className="px-3 py-2 text-left font-medium text-zinc-500">Skor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {leaderboard.map((entry, i) => {
+                      const rank = entry.rank ?? i + 1;
+                      const name = entry.user_name ?? entry.name ?? entry.nama ?? "–";
+                      const score = entry.score ?? entry.best_score ?? entry.skor ?? "–";
+                      return (
+                        <tr key={entry.user_id ?? `${rank}-${name}`} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/30">
+                          <td className="px-3 py-2 font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">#{rank}</td>
+                          <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200">{name}</td>
+                          <td className="px-3 py-2 tabular-nums text-zinc-700 dark:text-zinc-300">{score}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link
+              href={`/student/attempts/${attemptId}/review`}
+              className="rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            >
+              Lihat soal & jawaban
+            </Link>
             <Link
               href="/student"
               className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"

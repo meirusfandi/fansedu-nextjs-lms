@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { getStudentDashboard, logout, clearAuthToken } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { getStudentDashboard, getStudentTryouts, getAuthUserName, getStudentDisplayName, logout, clearAuthToken } from "@/lib/api";
 import type { StudentDashboardResponse, TryoutSession } from "@/lib/api-types";
 
 function formatDate(iso: string): string {
@@ -29,9 +29,33 @@ function formatDateRange(opens: string, closes: string): string {
   }
 }
 
+/** Saring tryout yang available: bukan draft. */
+function filterAvailableTryouts(tryouts: TryoutSession[]): TryoutSession[] {
+  return tryouts.filter((t) => t.status !== "draft");
+}
+
+/** Pisah berdasarkan status: masih buka (open) vs sudah selesai/tutup (closed). */
+function partitionByStatus(tryouts: TryoutSession[]): {
+  buka: TryoutSession[];
+  tutup: TryoutSession[];
+} {
+  const buka: TryoutSession[] = [];
+  const tutup: TryoutSession[] = [];
+  for (const t of tryouts) {
+    if (t.status === "open") {
+      buka.push(t);
+    } else {
+      tutup.push(t);
+    }
+  }
+  tutup.sort((a, b) => new Date(b.closes_at).getTime() - new Date(a.closes_at).getTime());
+  return { buka, tutup };
+}
+
 export default function StudentDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<StudentDashboardResponse | null>(null);
+  const [allTryouts, setAllTryouts] = useState<TryoutSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
@@ -43,16 +67,38 @@ export default function StudentDashboardPage() {
   };
 
   useEffect(() => {
-    getStudentDashboard()
-      .then(setData)
+    Promise.all([getStudentDashboard(), getStudentTryouts()])
+      .then(([dashboard, tryouts]) => {
+        setData(dashboard);
+        const openFromDashboard = dashboard?.open_tryouts ?? [];
+        const ids = new Set(tryouts.map((t) => t.id));
+        const merged = [...tryouts];
+        for (const t of openFromDashboard) {
+          if (!ids.has(t.id)) {
+            merged.push(t);
+            ids.add(t.id);
+          }
+        }
+        const available = filterAvailableTryouts(merged);
+        setAllTryouts(available);
+      })
       .catch((e) => setError((e as Error).message ?? "Gagal memuat dashboard"))
       .finally(() => setLoading(false));
   }, []);
 
-  const openTryouts = data?.open_tryouts ?? [];
+  const { buka: openTryouts, tutup: closedTryouts } = partitionByStatus(allTryouts);
   const recentAttempts = data?.recent_attempts ?? [];
   const summary = data?.summary;
   const hasCompletedTO = recentAttempts.length > 0;
+  /** Tryout yang sudah pernah diselesaikan (submitted) — tombol Mulai disembunyikan */
+  const completedTryoutIds = useMemo(
+    () => new Set(
+      recentAttempts
+        .filter((a) => a.status === "submitted")
+        .map((a) => a.tryout_session_id)
+    ),
+    [recentAttempts]
+  );
   const totalTryouts = summary?.total_attempts ?? 0;
   const avgScore = summary?.avg_score ?? 0;
   const avgPercentile = summary?.avg_percentile ?? 0;
@@ -60,6 +106,29 @@ export default function StudentDashboardPage() {
   const improvementAreas = data?.improvement_areas ?? [];
   const recommendation = data?.recommendation ?? "";
   const selectedAttempt = recentAttempts.find((a) => a.id === selectedAttemptId);
+
+  const stats = [
+    {
+      label: "Total simulasi",
+      value: totalTryouts,
+      sub: "kali mengerjakan",
+    },
+    {
+      label: "Rata-rata skor",
+      value: avgScore != null ? `${Math.round(Number(avgScore))}` : "–",
+      sub: "dari 100",
+    },
+    {
+      label: "Persentil rata-rata",
+      value: avgPercentile != null ? `${Math.round(Number(avgPercentile))}%` : "–",
+      sub: "dibanding peserta",
+    },
+    {
+      label: "Tryout dibuka",
+      value: openTryouts.length,
+      sub: "bisa dikerjakan sekarang",
+    },
+  ];
 
   if (loading) {
     return (
@@ -87,7 +156,10 @@ export default function StudentDashboardPage() {
       <main className="mx-auto max-w-4xl px-4 py-6 sm:px-6 md:py-8">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Halo, Selamat Datang, {getStudentDisplayName(data) ?? getAuthUserName() ?? "Siswa"}
+            </p>
+            <h1 className="mt-1 text-lg font-semibold tracking-tight sm:text-xl">
               Dashboard OSN Informatika
             </h1>
             <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
@@ -107,6 +179,31 @@ export default function StudentDashboardPage() {
             </button>
           </div>
         </header>
+
+        {/* Statistik — selalu tampil */}
+        <section className="mb-6">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Statistik
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {stats.map((s) => (
+              <div
+                key={s.label}
+                className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <p className="text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  {s.label}
+                </p>
+                <p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-50">
+                  {s.value}
+                </p>
+                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  {s.sub}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="mb-6">
           {hasCompletedTO ? (
@@ -183,66 +280,104 @@ export default function StudentDashboardPage() {
           )}
         </section>
 
+        {/* Semua tryout available (bukan draft), pisah: sudah dibuka vs sudah tutup */}
+
+        {/* Tryout dibuka — status open, bisa dikerjakan sekarang */}
         <section className="mb-6">
           <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-            Jadwal simulasi dibuka
+            Tryout dibuka
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <p className="mb-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+            Event dengan status dibuka. Bisa dikerjakan sekarang.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {openTryouts.length === 0 ? (
-              <p className="col-span-full text-xs text-zinc-500">
-                Tidak ada jadwal yang dibuka saat ini.
+              <p className="col-span-full rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-center text-xs text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
+                Tidak ada tryout yang dibuka saat ini.
               </p>
             ) : (
-              openTryouts.map((t: TryoutSession) => (
-                <Link
-                  key={t.id}
-                  href={`/tryout/${t.id}`}
-                  className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
-                >
-                  <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-50">
-                    {t.short_title ?? t.title}
-                  </p>
-                  <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
-                    {formatDateRange(t.opens_at, t.closes_at)}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-zinc-500">
-                    Tutup: {formatDate(t.closes_at)}
-                  </p>
-                  <span className="mt-2 inline-block text-[11px] font-medium text-zinc-700 dark:text-zinc-300">
-                    Mulai simulasi →
-                  </span>
-                </Link>
-              ))
+              openTryouts.map((t) => {
+                const alreadyDone = completedTryoutIds.has(t.id);
+                return alreadyDone ? (
+                  <Link
+                    key={t.id}
+                    href={`/tryout/${t.id}`}
+                    className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 transition hover:border-zinc-300 hover:bg-zinc-100/50 dark:border-zinc-700 dark:bg-zinc-900/50 dark:hover:border-zinc-600 dark:hover:bg-zinc-900/70"
+                  >
+                    <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                      {t.short_title ?? t.title}
+                    </p>
+                    <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                      {formatDateRange(t.opens_at, t.closes_at)}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-zinc-500">
+                      {t.duration_minutes} menit · {t.questions_count} soal · Tutup: {formatDate(t.closes_at)}
+                    </p>
+                    <span className="mt-3 inline-flex items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-[11px] font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700">
+                      Lihat leaderboard →
+                    </span>
+                  </Link>
+                ) : (
+                  <Link
+                    key={t.id}
+                    href={`/tryout/${t.id}`}
+                    className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm transition hover:border-emerald-300 dark:border-emerald-900/50 dark:bg-zinc-950 dark:hover:border-emerald-800"
+                  >
+                    <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-50">
+                      {t.short_title ?? t.title}
+                    </p>
+                    <p className="mt-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+                      {formatDateRange(t.opens_at, t.closes_at)}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-zinc-500">
+                      {t.duration_minutes} menit · {t.questions_count} soal · Tutup: {formatDate(t.closes_at)}
+                    </p>
+                    <span className="mt-3 inline-block text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                      Mulai tryout →
+                    </span>
+                  </Link>
+                );
+              })
             )}
           </div>
         </section>
 
-        {!hasCompletedTO && openTryouts.length > 0 && (
-          <section className="mb-6">
-            <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-              Pilih paket simulasi
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {openTryouts.map((t: TryoutSession) => (
-                <Link
+        {/* Tryout tutup — status closed */}
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+            Tryout sudah tutup
+          </h2>
+          <p className="mb-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+            Event yang sudah ditutup. Periode pengerjaan berakhir.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {closedTryouts.length === 0 ? (
+              <p className="col-span-full rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-4 text-center text-xs text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
+                Tidak ada tryout yang sudah tutup.
+              </p>
+            ) : (
+              closedTryouts.map((t) => (
+                <div
                   key={t.id}
-                  href={`/tryout/${t.id}`}
-                  className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm transition hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+                  className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-4 dark:border-zinc-800 dark:bg-zinc-900/30"
                 >
-                  <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-50">
-                    {t.title}
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                    {t.short_title ?? t.title}
                   </p>
                   <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {formatDateRange(t.opens_at, t.closes_at)}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-zinc-500">
                     {t.duration_minutes} menit · {t.questions_count} soal
                   </p>
-                  <span className="mt-2 inline-block text-[11px] font-medium text-zinc-700 dark:text-zinc-300">
-                    Mulai →
+                  <span className="mt-3 inline-block text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Sudah tutup
                   </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         {hasCompletedTO && (
           <section className="space-y-6">
@@ -289,19 +424,27 @@ export default function StudentDashboardPage() {
                           )}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setSelectedAttemptId(
-                                selectedAttemptId === a.id ? null : a.id
-                              )
-                            }
-                            className="text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
-                          >
-                            {selectedAttemptId === a.id
-                              ? "Sembunyikan"
-                              : "Detail"}
-                          </button>
+                          <span className="flex flex-wrap items-center justify-end gap-2">
+                            <Link
+                              href={`/student/attempts/${a.id}/review`}
+                              className="text-[11px] font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
+                            >
+                              Lihat soal & jawaban
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedAttemptId(
+                                  selectedAttemptId === a.id ? null : a.id
+                                )
+                              }
+                              className="text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
+                            >
+                              {selectedAttemptId === a.id
+                                ? "Sembunyikan"
+                                : "Detail"}
+                            </button>
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -334,10 +477,14 @@ export default function StudentDashboardPage() {
               )}
             </div>
 
+            {false && (
             <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
               <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                Rekomendasi
+                Rekomendasi berdasarkan test yang telah dikerjakan
               </h2>
+              <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                Kekuatan dan hal yang perlu ditingkatkan dari hasil tryout Anda.
+              </p>
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/30">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
@@ -346,7 +493,7 @@ export default function StudentDashboardPage() {
                   <ul className="mt-1.5 space-y-0.5 text-[11px] text-emerald-900 dark:text-emerald-100">
                     {strengthAreas.length > 0
                       ? strengthAreas.map((a) => <li key={a}>• {a}</li>)
-                      : <li>–</li>}
+                      : <li className="text-zinc-500">Belum ada data. Selesaikan tryout untuk melihat analisis.</li>}
                   </ul>
                 </div>
                 <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-950/30">
@@ -356,7 +503,7 @@ export default function StudentDashboardPage() {
                   <ul className="mt-1.5 space-y-0.5 text-[11px] text-amber-900 dark:text-amber-100">
                     {improvementAreas.length > 0
                       ? improvementAreas.map((a) => <li key={a}>• {a}</li>)
-                      : <li>–</li>}
+                      : <li className="text-zinc-500">Belum ada data. Selesaikan tryout untuk melihat rekomendasi.</li>}
                   </ul>
                 </div>
               </div>
@@ -366,6 +513,7 @@ export default function StudentDashboardPage() {
                 </p>
               )}
             </div>
+            )}
           </section>
         )}
       </main>
