@@ -39,6 +39,7 @@ import type {
   StartTryoutResponse,
   TryoutSession,
   User,
+  UserRole,
 } from "./api-types";
 
 /**
@@ -96,7 +97,7 @@ const AUTH_NAME_KEY = "auth_user_name";
 export function setAuthToken(
   token: string,
   maxAgeSeconds = 604800,
-  role?: "admin" | "student",
+  role?: UserRole,
   name?: string
 ): void {
   if (typeof document === "undefined") return;
