@@ -72,15 +72,12 @@ export function getFriendlyApiErrorMessage(err: unknown): string {
   return "Terjadi kesalahan. Silakan coba lagi.";
 }
 
-/** Di browser: same-origin /api/v1 (proxy). Di server: backend URL + /api/v1. */
+/** Di browser: same-origin /api/v1 (proxy). Di server: NEXT_PUBLIC_API_URL (backend Go) + /api/v1. */
 function getBaseUrl(): string {
   if (typeof window !== "undefined") {
     return window.location.origin + "/api/v1";
   }
-  const url =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.BASE_URL ||
-    "http://localhost:8080";
+  const url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
   return url.replace(/\/$/, "") + "/api/v1";
 }
 

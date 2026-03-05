@@ -94,17 +94,15 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
-          <div className="mb-3 flex justify-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
-              <Image
-                src="/fansedu-icon.svg"
-                alt="FansEdu"
-                width={20}
-                height={20}
-                className="shrink-0"
-              />
-              <span>FansEdu LMS</span>
-            </div>
+          <div className="mb-4 flex justify-center">
+            <Image
+              src="/fansedu-logo.png"
+              alt="FansEdu"
+              width={180}
+              height={56}
+              className="h-14 w-auto object-contain"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Welcome back

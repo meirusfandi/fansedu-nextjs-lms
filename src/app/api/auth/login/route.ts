@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.BASE_URL ||
-  "http://localhost:8080";
+// Proxy login ke backend Go. Pakai NEXT_PUBLIC_API_URL (khusus backend Go).
+// Production: set NEXT_PUBLIC_API_URL=https://api.fansedu.web.id
+function getBackendBase(): string {
+  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+  return base.replace(/\/$/, "");
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const url = `${API_BASE.replace(/\/$/, "")}/api/v1/auth/login`;
+    const base = getBackendBase();
+    const url = `${base}/api/v1/auth/login`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

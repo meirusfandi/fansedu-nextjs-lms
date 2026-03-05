@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Backend Go. NEXT_PUBLIC_API_URL = https://api.fansedu.web.id (production).
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.BASE_URL ||
-  "http://localhost:8080";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 async function forward(request: NextRequest, pathSegments: string[]) {
   const path = pathSegments.join("/");
