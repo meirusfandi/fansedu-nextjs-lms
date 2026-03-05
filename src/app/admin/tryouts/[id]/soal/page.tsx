@@ -2,6 +2,8 @@
 
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
+import { QuestionBody } from "@/components/QuestionBody";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import {
   adminCreateQuestion,
   adminDeleteQuestion,
@@ -153,6 +155,13 @@ export default function AdminTryoutSoalPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tryoutId) return;
+    const raw = (form.body || "").trim();
+    const bodyText = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const hasImage = /<img\s/i.test(raw);
+    if (!bodyText && !hasImage) {
+      setSubmitError("Pertanyaan (body) wajib diisi.");
+      return;
+    }
     setSubmitError(null);
     setSubmitLoading(true);
     try {
@@ -271,9 +280,9 @@ export default function AdminTryoutSoalPage() {
                           {TYPE_LABEL[q.type] ?? q.type} · Skor: {q.max_score}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-50">
-                        {q.body}
-                      </p>
+                      <div className="mt-1">
+                        <QuestionBody html={q.body} imageUrl={q.image_url} asPreview />
+                      </div>
                       {q.options && q.options.length > 0 && (
                         <ul className="mt-1 list-inside list-disc text-xs text-zinc-500 dark:text-zinc-400">
                           {q.options.map((opt, i) => (
@@ -365,16 +374,29 @@ export default function AdminTryoutSoalPage() {
 
               <div>
                 <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                  Pertanyaan (body) *
+                  Pertanyaan (body) — editor kaya *
                 </label>
-                <textarea
-                  rows={3}
-                  required
-                  value={form.body}
-                  onChange={(e) => setForm({ ...form, body: e.target.value })}
-                  placeholder="Teks soal..."
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-                />
+                <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Format teks, list, link, gambar, video, dan mode kode (code view).
+                </p>
+                <div className="mt-1">
+                  <RichTextEditor
+                    value={form.body}
+                    onChange={(html) => setForm({ ...form, body: html })}
+                    placeholder="Ketik pertanyaan soal di sini..."
+                    minHeight={260}
+                  />
+                </div>
+                {form.body.trim() && (
+                  <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      Preview
+                    </p>
+                    <div className="mt-1.5 min-h-[2rem]">
+                      <QuestionBody html={form.body} />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {(form.type === "multiple_choice" || form.type === "true_false") && (

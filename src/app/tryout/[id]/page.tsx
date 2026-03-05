@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { QuestionBody } from "@/components/QuestionBody";
 import {
   getTryout,
   getTryoutLeaderboard,
@@ -217,14 +218,12 @@ export default function TryoutDetailPage() {
   if (loadError || (!tryout && status !== "loading")) {
     if (loadError) {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-center dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="text-sm text-zinc-700 dark:text-zinc-200">
-              {loadError}
-            </p>
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 to-white px-4">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
+            <p className="text-sm text-zinc-700">{loadError}</p>
             <Link
               href="/student"
-              className="mt-4 inline-block text-sm font-medium text-zinc-600 underline dark:text-zinc-400"
+              className="mt-4 inline-block text-sm font-medium text-zinc-600 underline underline-offset-2"
             >
               Kembali ke dashboard
             </Link>
@@ -237,8 +236,11 @@ export default function TryoutDetailPage() {
 
   if (status === "loading" || !tryout) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-sm text-zinc-500">Memuat...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 to-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-emerald-500" />
+          <p className="text-sm font-medium text-zinc-500">Memuat...</p>
+        </div>
       </div>
     );
   }
@@ -268,80 +270,75 @@ export default function TryoutDetailPage() {
     };
 
     return (
-      <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
-        <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 md:px-8">
-          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-            <Link
-              href="/student"
-              className="font-medium text-zinc-700 underline-offset-2 hover:underline dark:text-zinc-300"
-            >
+      <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-50 text-zinc-900">
+        <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 md:px-8">
+          <p className="text-[11px] text-zinc-500">
+            <Link href="/student" className="font-medium text-zinc-700 underline-offset-2 hover:underline">
               Dashboard siswa
             </Link>{" "}
             / Simulasi
           </p>
-          <h1 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">
+          <h1 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">
             {tryout.title}
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-zinc-600">
             {tryout.description ?? ""}
           </p>
           <section className="mt-6 grid gap-3 text-sm sm:grid-cols-3">
-            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-              <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                Durasi
-              </p>
+            <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+              <p className="text-[11px] font-medium text-zinc-500">Durasi</p>
               <p className="mt-1 font-semibold">{tryout.duration_minutes} menit</p>
             </div>
-            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-              <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                Jumlah soal
-              </p>
+            <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+              <p className="text-[11px] font-medium text-zinc-500">Jumlah soal</p>
               <p className="mt-1 font-semibold">{tryout.questions_count} soal</p>
             </div>
-            <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-              <p className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                Tingkat
-              </p>
+            <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 py-3 shadow-sm">
+              <p className="text-[11px] font-medium text-zinc-500">Tingkat</p>
               <p className="mt-1 font-semibold">{levelLabel(tryout.level)}</p>
             </div>
           </section>
 
-          {isFutureStrict && (
-            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-100/80 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-900/50">
-              <p className="font-medium text-zinc-800 dark:text-zinc-200">
-                Tryout dibuka pada {formatDateTime(tryout.opens_at)}
-              </p>
-              <p className="mt-1 text-zinc-600 dark:text-zinc-400">
-                Tombol &quot;Mulai simulasi&quot; akan muncul 10 menit sebelum waktu buka.
-              </p>
+          {(isFutureStrict || (canShowButton && !hasCompletedAttempt)) && (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-zinc-200 bg-zinc-100/80 p-4 text-sm">
+              <div>
+                <p className="font-medium text-zinc-800">
+                  Tryout dibuka pada {formatDateTime(tryout.opens_at)}
+                </p>
+                <p className="mt-1 text-zinc-600">
+                  Tombol &quot;Mulai simulasi&quot; akan muncul 10 menit sebelum waktu buka.
+                </p>
+              </div>
+              {canShowButton && !hasCompletedAttempt && (
+                <button
+                  type="button"
+                  onClick={startTryoutFlow}
+                  disabled={starting}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {starting ? "Memulai..." : "Mulai simulasi"}
+                </button>
+              )}
             </div>
           )}
           {isPast && (
-            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-100/80 p-4 text-sm dark:border-zinc-700 dark:bg-zinc-900/50">
-              <p className="font-medium text-zinc-800 dark:text-zinc-200">
-                Tryout sudah berakhir
-              </p>
-              <p className="mt-1 text-zinc-600 dark:text-zinc-400">
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-100/80 p-4 text-sm">
+              <p className="font-medium text-zinc-800">Tryout sudah berakhir</p>
+              <p className="mt-1 text-zinc-600">
                 Periode pengerjaan berakhir {formatDateTime(tryout.closes_at)}.
               </p>
             </div>
           )}
           {hasCompletedAttempt && (
-            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm dark:border-emerald-900/50 dark:bg-emerald-950/30">
-              <p className="font-medium text-emerald-800 dark:text-emerald-200">
-                Anda sudah mengerjakan tryout ini.
-              </p>
-              <p className="mt-1 text-[11px] text-emerald-700 dark:text-emerald-300">
-                Lihat leaderboard di bawah.
-              </p>
+            <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+              <p className="font-medium text-emerald-800">Anda sudah mengerjakan tryout ini.</p>
+              <p className="mt-1 text-[11px] text-emerald-700">Lihat leaderboard di bawah.</p>
             </div>
           )}
           {canShowButton && !hasCompletedAttempt && (
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/30">
-              <h2 className="font-semibold text-amber-900 dark:text-amber-100">
-                Tata tertib simulasi
-              </h2>
-              <ul className="mt-2 list-inside list-disc space-y-1 text-amber-800 dark:text-amber-200">
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm">
+              <h2 className="font-semibold text-amber-900">Tata tertib simulasi</h2>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-amber-800">
                 <li>Timer berjalan setelah kamu klik &quot;Mulai simulasi&quot;.</li>
                 <li>Jawaban disimpan otomatis.</li>
                 <li>Waktu habis atau kirim jawaban akan mengakhiri simulasi.</li>
@@ -349,39 +346,38 @@ export default function TryoutDetailPage() {
             </div>
           )}
 
-          {/* Leaderboard tryout ini */}
-          <div className="mt-6 rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <h2 className="px-4 pt-3 text-sm font-semibold dark:text-zinc-50">
+          <div className="mt-6 rounded-2xl border border-zinc-200/80 bg-white shadow-sm">
+            <h2 className="border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 text-sm font-bold text-zinc-900">
               Leaderboard
             </h2>
-            <p className="px-4 pb-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+            <p className="px-4 pb-3 text-[11px] text-zinc-500">
               Urutan tampilan berdasarkan abjad. Peringkat resmi menurut skor tertinggi dan waktu pengerjaan tercepat.
             </p>
-            <div className="border-t border-zinc-100 dark:border-zinc-800" />
+            <div className="border-t border-zinc-100" />
             {leaderboard.length === 0 ? (
-              <p className="px-4 py-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="px-4 py-4 text-center text-xs text-zinc-500">
                 Belum ada data leaderboard untuk tryout ini.
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-xs">
                   <thead>
-                    <tr className="border-b border-zinc-100 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <tr className="border-b border-zinc-100 bg-zinc-50/80">
                       <th className="px-3 py-2 text-left font-medium text-zinc-500">Peringkat</th>
                       <th className="px-3 py-2 text-left font-medium text-zinc-500">Nama</th>
                       <th className="px-3 py-2 text-left font-medium text-zinc-500">Skor</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-zinc-100">
                     {leaderboard.map((entry, i) => {
                       const rank = entry.rank ?? i + 1;
                       const name = entry.user_name ?? entry.name ?? entry.nama ?? "–";
                       const score = entry.score ?? entry.best_score ?? entry.skor ?? "–";
                       return (
-                        <tr key={entry.user_id ?? `${rank}-${name}`} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/30">
-                          <td className="px-3 py-2 font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">#{rank}</td>
-                          <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200">{name}</td>
-                          <td className="px-3 py-2 tabular-nums text-zinc-700 dark:text-zinc-300">{score}</td>
+                        <tr key={entry.user_id ?? `${rank}-${name}`} className="hover:bg-zinc-50/80">
+                          <td className="px-3 py-2 font-semibold tabular-nums text-zinc-900">#{rank}</td>
+                          <td className="px-3 py-2 font-medium text-zinc-800">{name}</td>
+                          <td className="px-3 py-2 tabular-nums text-zinc-700">{score}</td>
                         </tr>
                       );
                     })}
@@ -391,23 +387,13 @@ export default function TryoutDetailPage() {
             )}
           </div>
 
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
+          <div className="mt-8">
             <Link
               href="/student"
-              className="rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              className="inline-block rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
             >
               Kembali
             </Link>
-            {canShowButton && !hasCompletedAttempt && (
-              <button
-                type="button"
-                onClick={startTryoutFlow}
-                disabled={starting}
-                className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
-              >
-                {starting ? "Memulai..." : "Mulai simulasi"}
-              </button>
-            )}
           </div>
         </main>
       </div>
@@ -428,120 +414,100 @@ export default function TryoutDetailPage() {
     const improvements = feedback.improvement_areas ?? [];
     const hasAnalysis = strengths.length > 0 || improvements.length > 0 || feedback.recommendation_text || feedback.summary;
     return (
-      <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
-        <main className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6 md:px-8">
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+      <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-50 text-zinc-900">
+        <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 md:px-8">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
             Simulasi selesai
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {tryout.title}
-          </p>
-          <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="mt-2 text-sm text-zinc-600">{tryout.title}</p>
+          <section className="mt-6 rounded-2xl border border-zinc-200/80 bg-white p-6 shadow-sm">
             <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
               <div className="text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Skor (nilai)
-                </p>
-                <p className="mt-1 text-3xl font-bold text-zinc-900 dark:text-zinc-50">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Skor (nilai)</p>
+                <p className="mt-1 text-3xl font-bold text-zinc-900">
                   {score}<span className="text-lg font-normal text-zinc-500">/{maxScore}</span>
                 </p>
                 <p className="text-xs text-zinc-500">{scorePct}%</p>
               </div>
               <div className="text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Persentil
-                </p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Persentil</p>
                 <p className="mt-1 text-2xl font-semibold">{percentileDisplay}</p>
                 <p className="text-[10px] text-zinc-500">peringkat vs peserta</p>
               </div>
               <div className="text-center">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  Soal terjawab
-                </p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Soal terjawab</p>
                 <p className="mt-1 text-2xl font-semibold">
                   {answeredCount} / {totalQuestions}
                 </p>
               </div>
             </div>
             {feedback.summary && (
-              <p className="mt-4 text-center text-xs text-zinc-600 dark:text-zinc-400">
-                {feedback.summary}
-              </p>
+              <p className="mt-4 text-center text-xs text-zinc-600">{feedback.summary}</p>
             )}
             {feedback.recommendation_text && (
-              <p className="mt-2 text-center text-xs text-zinc-600 dark:text-zinc-400">
-                {feedback.recommendation_text}
-              </p>
+              <p className="mt-2 text-center text-xs text-zinc-600">{feedback.recommendation_text}</p>
             )}
           </section>
 
-          {/* Analisis kelemahan & kekuatan (dari backend / AI) */}
-          <section className="mt-6 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-              Analisis hasil
-            </h2>
-            <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+          <section className="mt-6 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+            <h2 className="text-sm font-bold text-zinc-900">Analisis hasil</h2>
+            <p className="mt-1 text-[11px] text-zinc-500">
               Kelemahan dan kekuatan berdasarkan jawaban (dari backend/AI).
             </p>
             {hasAnalysis ? (
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                    Kekuatan
-                  </p>
-                  <ul className="mt-2 space-y-1 text-xs text-emerald-900 dark:text-emerald-100">
+                <div className="rounded-xl bg-emerald-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Kekuatan</p>
+                  <ul className="mt-2 space-y-1 text-xs text-emerald-900">
                     {strengths.length > 0 ? strengths.map((s) => <li key={s}>• {s}</li>) : <li className="text-zinc-500">–</li>}
                   </ul>
                 </div>
-                <div className="rounded-xl bg-amber-50 p-3 dark:bg-amber-950/30">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
-                    Perlu ditingkatkan
-                  </p>
-                  <ul className="mt-2 space-y-1 text-xs text-amber-900 dark:text-amber-100">
+                <div className="rounded-xl bg-amber-50 p-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">Perlu ditingkatkan</p>
+                  <ul className="mt-2 space-y-1 text-xs text-amber-900">
                     {improvements.length > 0 ? improvements.map((i) => <li key={i}>• {i}</li>) : <li className="text-zinc-500">–</li>}
                   </ul>
                 </div>
               </div>
             ) : (
-              <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-                Analisis kelemahan/kekuatan akan tampil di sini jika backend mengirim <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">feedback.strength_areas</code> dan <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">feedback.improvement_areas</code> (bisa dari AI).
+              <p className="mt-3 text-xs text-zinc-500">
+                Analisis kelemahan/kekuatan akan tampil di sini jika backend mengirim feedback (bisa dari AI).
               </p>
             )}
           </section>
 
-          {/* Leaderboard tryout — setelah selesai */}
-          <div className="mt-6 rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <h2 className="px-4 pt-3 text-sm font-semibold dark:text-zinc-50">
+          <div className="mt-6 rounded-2xl border border-zinc-200/80 bg-white shadow-sm">
+            <h2 className="border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 text-sm font-bold text-zinc-900">
               Leaderboard
             </h2>
-            <p className="px-4 pb-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+            <p className="px-4 pb-3 text-[11px] text-zinc-500">
               Urutan tampilan berdasarkan abjad. Peringkat resmi menurut skor tertinggi dan waktu pengerjaan tercepat.
             </p>
-            <div className="border-t border-zinc-100 dark:border-zinc-800" />
+            <div className="border-t border-zinc-100" />
             {leaderboard.length === 0 ? (
-              <p className="px-4 py-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="px-4 py-4 text-center text-xs text-zinc-500">
                 Belum ada data leaderboard untuk tryout ini.
               </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-xs">
                   <thead>
-                    <tr className="border-b border-zinc-100 bg-zinc-50/80 dark:border-zinc-800 dark:bg-zinc-900/50">
+                    <tr className="border-b border-zinc-100 bg-zinc-50/80">
                       <th className="px-3 py-2 text-left font-medium text-zinc-500">Peringkat</th>
                       <th className="px-3 py-2 text-left font-medium text-zinc-500">Nama</th>
                       <th className="px-3 py-2 text-left font-medium text-zinc-500">Skor</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-zinc-100">
                     {leaderboard.map((entry, i) => {
                       const rank = entry.rank ?? i + 1;
                       const name = entry.user_name ?? entry.name ?? entry.nama ?? "–";
                       const score = entry.score ?? entry.best_score ?? entry.skor ?? "–";
                       return (
-                        <tr key={entry.user_id ?? `${rank}-${name}`} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-900/30">
-                          <td className="px-3 py-2 font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">#{rank}</td>
-                          <td className="px-3 py-2 font-medium text-zinc-800 dark:text-zinc-200">{name}</td>
-                          <td className="px-3 py-2 tabular-nums text-zinc-700 dark:text-zinc-300">{score}</td>
+                        <tr key={entry.user_id ?? `${rank}-${name}`} className="hover:bg-zinc-50/80">
+                          <td className="px-3 py-2 font-semibold tabular-nums text-zinc-900">#{rank}</td>
+                          <td className="px-3 py-2 font-medium text-zinc-800">{name}</td>
+                          <td className="px-3 py-2 tabular-nums text-zinc-700">{score}</td>
                         </tr>
                       );
                     })}
@@ -554,13 +520,13 @@ export default function TryoutDetailPage() {
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
               href={`/student/attempts/${attemptId}/review`}
-              className="rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
             >
               Lihat soal & jawaban
             </Link>
             <Link
               href="/student"
-              className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-700"
             >
               Kembali ke dashboard siswa
             </Link>
@@ -572,16 +538,22 @@ export default function TryoutDetailPage() {
 
   if (status === "submitted" && !submitResult) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-sm text-zinc-500">Mengirim jawaban...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 to-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-emerald-500" />
+          <p className="text-sm font-medium text-zinc-500">Mengirim jawaban...</p>
+        </div>
       </div>
     );
   }
 
   if (!question) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-sm text-zinc-500">Memuat soal...</p>
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 to-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-300 border-t-emerald-500" />
+          <p className="text-sm font-medium text-zinc-500">Memuat soal...</p>
+        </div>
       </div>
     );
   }
@@ -590,13 +562,13 @@ export default function TryoutDetailPage() {
   const optionKeys = ["A", "B", "C", "D"].slice(0, options.length);
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900 dark:bg-black dark:text-zinc-50">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-50 text-zinc-900">
       <main className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6 md:px-8 md:py-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <Link
               href="/student"
-              className="text-[11px] font-medium text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
+              className="text-[11px] font-medium text-zinc-600 underline-offset-2 hover:underline"
             >
               Dashboard
             </Link>
@@ -605,9 +577,7 @@ export default function TryoutDetailPage() {
           </div>
           <div
             className={`rounded-full px-3 py-1.5 text-sm font-mono font-semibold ${
-              timeLeftSeconds <= 300
-                ? "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-300"
-                : "bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
+              timeLeftSeconds <= 300 ? "bg-red-100 text-red-800" : "bg-zinc-200 text-zinc-800"
             }`}
           >
             {formatTime(timeLeftSeconds)}
@@ -615,8 +585,8 @@ export default function TryoutDetailPage() {
         </div>
 
         <section className="grid gap-4 md:grid-cols-[minmax(0,180px)_1fr]">
-          <aside className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <aside className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
               Soal
             </p>
             <div className="grid grid-cols-4 gap-2">
@@ -632,12 +602,12 @@ export default function TryoutDetailPage() {
                     onClick={() => setCurrentIndex(i)}
                     className={`flex h-11 w-full min-w-[2.25rem] items-center justify-center rounded-lg text-sm font-medium transition ${
                       isCurrent
-                        ? "border-2 border-zinc-900 bg-zinc-900 text-zinc-50 dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
+                        ? "border-2 border-zinc-900 bg-zinc-900 text-white"
                         : marked
-                          ? "border border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-200"
+                          ? "border border-amber-400 bg-amber-50 text-amber-800"
                           : answered
-                            ? "border border-emerald-400 bg-emerald-50 text-emerald-800 dark:border-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-200"
-                            : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                            ? "border border-emerald-400 bg-emerald-50 text-emerald-800"
+                            : "border border-zinc-200 bg-zinc-50 text-zinc-700 hover:bg-zinc-100"
                     }`}
                   >
                     {i + 1}
@@ -647,20 +617,20 @@ export default function TryoutDetailPage() {
             </div>
           </aside>
 
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-            <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">
+          <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold text-zinc-800">
               Soal #{currentIndex + 1} — {question.type === "short" ? "Isian singkat" : question.type === "multiple_choice" ? "Pilihan ganda" : "Benar/Salah"}
             </p>
-            <p className="mt-3 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">
-              {question.body}
-            </p>
+            <div className="mt-3">
+              <QuestionBody html={question.body} imageUrl={question.image_url} />
+            </div>
 
             <div className="mt-4 space-y-2">
               {question.type === "short" && (
                 <>
                   <label
                     htmlFor="answer-input"
-                    className="block text-[11px] font-medium text-zinc-700 dark:text-zinc-200"
+                    className="block text-[11px] font-medium text-zinc-700"
                   >
                     Isian singkat
                   </label>
@@ -671,14 +641,14 @@ export default function TryoutDetailPage() {
                     onChange={(e) =>
                       saveCurrentAnswer({ text: e.target.value })
                     }
-                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:text-zinc-900 focus:ring-2 focus:ring-zinc-900/5 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:border-zinc-200 dark:focus:bg-zinc-800 dark:focus:text-zinc-50"
+                    className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
                     placeholder="Ketik jawaban..."
                   />
                 </>
               )}
               {question.type === "multiple_choice" && (
                 <>
-                  <p className="text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
+                  <p className="text-[11px] font-medium text-zinc-700">
                     Pilihan ganda
                   </p>
                   <div className="mt-2 space-y-2">
@@ -690,8 +660,8 @@ export default function TryoutDetailPage() {
                           key={opt}
                           className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition ${
                             isSelected
-                              ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800"
-                              : "border-zinc-200 bg-zinc-50 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
+                              ? "border-zinc-900 bg-zinc-100"
+                              : "border-zinc-200 bg-zinc-50 hover:border-zinc-300"
                           }`}
                         >
                           <input
@@ -713,7 +683,7 @@ export default function TryoutDetailPage() {
               )}
               {question.type === "true_false" && (
                 <>
-                  <p className="text-[11px] font-medium text-zinc-700 dark:text-zinc-200">
+                  <p className="text-[11px] font-medium text-zinc-700">
                     Benar / Salah
                   </p>
                   <div className="mt-2 flex gap-3">
@@ -724,8 +694,8 @@ export default function TryoutDetailPage() {
                           key={opt}
                           className={`flex cursor-pointer items-center gap-2 rounded-xl border px-5 py-3 text-sm font-medium transition ${
                             isSelected
-                              ? "border-zinc-900 bg-zinc-100 dark:border-zinc-100 dark:bg-zinc-800"
-                              : "border-zinc-200 bg-zinc-50 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
+                              ? "border-zinc-900 bg-zinc-100"
+                              : "border-zinc-200 bg-zinc-50 hover:border-zinc-300"
                           }`}
                         >
                           <input
@@ -754,8 +724,8 @@ export default function TryoutDetailPage() {
                 }
                 className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition ${
                   currentAnswer.marked
-                    ? "border-amber-400 bg-amber-50 text-amber-800 dark:border-amber-600 dark:bg-amber-950/50 dark:text-amber-200"
-                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    ? "border-amber-400 bg-amber-50 text-amber-800"
+                    : "border-zinc-200 text-zinc-600 hover:bg-zinc-100"
                 }`}
               >
                 {currentAnswer.marked ? "✓ Ditandai" : "Tandai untuk ditinjau"}
@@ -765,7 +735,7 @@ export default function TryoutDetailPage() {
                   type="button"
                   onClick={goPrev}
                   disabled={currentIndex === 0}
-                  className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
                 >
                   Sebelumnya
                 </button>
@@ -773,7 +743,7 @@ export default function TryoutDetailPage() {
                   <button
                     type="button"
                     onClick={goNext}
-                    className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
                   >
                     Berikutnya
                   </button>
@@ -781,7 +751,7 @@ export default function TryoutDetailPage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmSubmit(true)}
-                    className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
                   >
                     Selesai & kirim
                   </button>
@@ -791,7 +761,7 @@ export default function TryoutDetailPage() {
           </div>
         </section>
 
-        <div className="mt-4 flex justify-end border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <div className="mt-4 flex justify-end border-t border-zinc-200 pt-4">
           <button
             type="button"
             onClick={() => setShowConfirmSubmit(true)}
@@ -804,25 +774,23 @@ export default function TryoutDetailPage() {
 
       {showConfirmSubmit && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-lg dark:border-zinc-800 dark:bg-zinc-950">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-              Kirim jawaban?
-            </h3>
-            <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-5 shadow-lg">
+            <h3 className="text-sm font-semibold text-zinc-900">Kirim jawaban?</h3>
+            <p className="mt-2 text-xs text-zinc-600">
               Setelah dikirim, jawaban tidak dapat diubah.
             </p>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setShowConfirmSubmit(false)}
-                className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="flex-1 rounded-lg bg-zinc-900 py-2 text-sm font-semibold text-zinc-50 hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+                className="flex-1 rounded-lg bg-emerald-600 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
               >
                 Kirim
               </button>

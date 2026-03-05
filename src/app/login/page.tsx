@@ -91,11 +91,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-950 dark:ring-zinc-800">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
           <div className="mb-3 flex justify-center">
-            <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+            <div className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
               <Image
                 src="/fansedu-icon.svg"
                 alt="FansEdu"
@@ -106,16 +106,16 @@ export default function LoginPage() {
               <span>FansEdu LMS</span>
             </div>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Welcome back
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-zinc-600">
             Sign in to continue to your dashboard.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
           </div>
         )}
@@ -124,7 +124,7 @@ export default function LoginPage() {
           <div className="space-y-1.5">
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-zinc-800 dark:text-zinc-200"
+              className="block text-sm font-medium text-zinc-800"
             >
               Email
             </label>
@@ -136,7 +136,7 @@ export default function LoginPage() {
               autoComplete="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:text-zinc-900 focus:ring-2 focus:ring-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:border-zinc-200 dark:focus:bg-zinc-800 dark:focus:text-zinc-50"
+              className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
               placeholder="you@example.com"
             />
           </div>
@@ -145,13 +145,13 @@ export default function LoginPage() {
             <div className="flex items-center justify-between">
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-zinc-800 dark:text-zinc-200"
+                className="block text-sm font-medium text-zinc-800"
               >
                 Password
               </label>
               <Link
                 href="/forgot-password"
-                className="text-xs font-medium text-zinc-700 underline-offset-2 hover:underline dark:text-zinc-300"
+                className="text-xs font-medium text-zinc-700 underline-offset-2 hover:underline"
               >
                 Forgot password?
               </Link>
@@ -165,13 +165,13 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-3 pr-10 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:text-zinc-900 focus:ring-2 focus:ring-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-50 dark:placeholder:text-zinc-400 dark:focus:border-zinc-200 dark:focus:bg-zinc-800 dark:focus:text-zinc-50"
+                className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-3 pr-10 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
                 aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
               >
                 <EyeIcon visible={showPassword} />
@@ -184,9 +184,9 @@ export default function LoginPage() {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:focus:ring-zinc-200"
+              className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
             />
-            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+            <span className="text-sm text-zinc-700">
               Ingat saya
             </span>
           </label>
@@ -194,21 +194,23 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-950 dark:hover:bg-zinc-200"
+            className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-700"
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
+        {false && (
+        <p className="mt-6 text-center text-sm text-zinc-600">
           Don&apos;t have an account?{" "}
           <Link
             href="/register"
-            className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
+            className="font-medium text-zinc-900 underline-offset-2 hover:underline"
           >
             Create one
           </Link>
         </p>
+        )}
       </div>
     </div>
   );

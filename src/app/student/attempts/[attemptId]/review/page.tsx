@@ -1,5 +1,6 @@
 "use client";
 
+import { QuestionBody } from "@/components/QuestionBody";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -101,9 +102,9 @@ export default function AttemptReviewPage() {
                       {isCorrect ? "Benar" : "Salah"}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                    {q.body}
-                  </p>
+                  <div className="mt-2">
+                    <QuestionBody html={q.body ?? ""} imageUrl={q.image_url} />
+                  </div>
                   <div className="mt-3 grid gap-2 text-xs">
                     <div className="flex flex-wrap gap-2">
                       <span className="font-medium text-zinc-500 dark:text-zinc-400">Jawaban Anda:</span>

@@ -41,6 +41,36 @@ import type {
   User,
 } from "./api-types";
 
+/**
+ * Mengubah error dari API/jaringan menjadi pesan yang ramah pengguna.
+ * Gunakan saat menampilkan error ke pengguna (dashboard, login, dll).
+ */
+export function getFriendlyApiErrorMessage(err: unknown): string {
+  const e = err as Error & { status?: number };
+  const msg = (e?.message ?? "").toLowerCase();
+  const status = e?.status;
+
+  if (status === 500 || msg.includes("internal server error")) {
+    return "Layanan sedang mengalami gangguan. Silakan coba lagi dalam beberapa saat.";
+  }
+  if (status === 502 || status === 503) {
+    return "Layanan sementara tidak tersedia. Silakan coba lagi nanti.";
+  }
+  if (
+    status == null &&
+    (msg.includes("failed to fetch") ||
+      msg.includes("network") ||
+      msg.includes("load failed") ||
+      msg.includes("connection"))
+  ) {
+    return "Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba lagi.";
+  }
+  if (e?.message && e.message.trim()) {
+    return e.message.trim();
+  }
+  return "Terjadi kesalahan. Silakan coba lagi.";
+}
+
 /** Di browser: same-origin /api/v1 (proxy). Di server: backend URL + /api/v1. */
 function getBaseUrl(): string {
   if (typeof window !== "undefined") {
@@ -115,16 +145,37 @@ async function request<T>(
   }
   const verb = method.toUpperCase();
   const hasBody = verb !== "GET" && verb !== "HEAD" && body != null;
-  const res = await fetch(url, {
-    method: verb,
-    headers,
-    body: hasBody ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: verb,
+      headers,
+      body: hasBody ? JSON.stringify(body) : undefined,
+    });
+  } catch (fetchErr) {
+    const msg = (fetchErr as Error)?.message?.toLowerCase() ?? "";
+    if (
+      msg.includes("failed to fetch") ||
+      msg.includes("network") ||
+      msg.includes("load failed") ||
+      msg.includes("connection")
+    ) {
+      throw new Error(
+        "Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba lagi."
+      );
+    }
+    throw fetchErr;
+  }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const d = data as { error?: string; message?: string };
-    const message = d?.error ?? d?.message ?? res.statusText;
+    let message = d?.error ?? d?.message ?? res.statusText;
+    if (res.status === 500 || message.toLowerCase().includes("internal server error")) {
+      message = "Layanan sedang mengalami gangguan. Silakan coba lagi dalam beberapa saat.";
+    } else if (res.status === 502 || res.status === 503) {
+      message = "Layanan sementara tidak tersedia. Silakan coba lagi nanti.";
+    }
     const err = new Error(message);
     (err as Error & { status: number }).status = res.status;
     throw err;

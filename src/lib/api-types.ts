@@ -118,9 +118,12 @@ export interface Question {
   tryout_session_id: string;
   sort_order: number;
   type: QuestionType;
+  /** Teks/HTML soal. Dapat berisi tag HTML, <pre><code> untuk kode, <img> untuk gambar. */
   body: string;
   options: string[] | null;
   max_score: number;
+  /** URL gambar (opsional, dari backend). Gambar juga bisa disisipkan di body sebagai <img>. */
+  image_url?: string | null;
 }
 
 // --- Attempts ---
@@ -168,6 +171,7 @@ export interface AttemptReviewItem {
   user_answer?: string | null;
   is_correct?: boolean;
   sort_order?: number;
+  image_url?: string | null;
 }
 
 export interface AttemptReviewResponse {

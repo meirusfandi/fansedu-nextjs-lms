@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AdminSidebar } from "@/components/AdminSidebar";
-import { getAdminDashboardData, logout, clearAuthToken } from "@/lib/api";
+import { getAdminDashboardData, logout, clearAuthToken, getFriendlyApiErrorMessage } from "@/lib/api";
 import type { AdminDashboardData } from "@/lib/api";
 
 function formatRelativeDate(iso: string): string {
@@ -37,7 +37,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     getAdminDashboardData()
       .then(setData)
-      .catch((e) => setError((e as Error).message ?? "Gagal memuat data"))
+      .catch((e) => setError(getFriendlyApiErrorMessage(e)))
       .finally(() => setLoading(false));
   }, []);
 
@@ -69,12 +69,19 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-black">
-        <div className="rounded-2xl border border-red-200 bg-white p-6 text-center dark:border-red-900/50 dark:bg-zinc-950">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          <p className="mt-2 text-xs text-zinc-500">
-            Pastikan backend API berjalan dan token admin valid.
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-amber-50/50 p-6 text-center shadow-sm">
+          <p className="text-base font-medium text-amber-900">{error}</p>
+          <p className="mt-3 text-sm text-amber-800/90">
+            Jika masalah berlanjut, coba refresh halaman atau pastikan server backend menyala dan token login masih valid.
           </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-4 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+          >
+            Coba lagi
+          </button>
         </div>
       </div>
     );
