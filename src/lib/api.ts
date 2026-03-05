@@ -72,13 +72,20 @@ export function getFriendlyApiErrorMessage(err: unknown): string {
   return "Terjadi kesalahan. Silakan coba lagi.";
 }
 
-/** Di browser: same-origin /api/v1 (proxy). Di server: NEXT_PUBLIC_API_URL (backend Go) + /api/v1. */
+/**
+ * URL dasar untuk panggilan API.
+ * - Browser: pakai NEXT_PUBLIC_API_URL jika ada (langsung ke api.fansedu.web.id), agar request ke backend Go.
+ *   Jika tidak diset, fallback same-origin /api/v1 (proxy Next.js). Backend Go harus allow CORS dari origin frontend.
+ * - Server: selalu NEXT_PUBLIC_API_URL (backend Go).
+ */
 function getBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    return window.location.origin + "/api/v1";
-  }
-  const url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-  return url.replace(/\/$/, "") + "/api/v1";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const base = apiUrl
+    ? apiUrl.replace(/\/$/, "")
+    : typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:8080";
+  return base + "/api/v1";
 }
 
 const BASE = typeof window !== "undefined" ? getBaseUrl() : getBaseUrl();
