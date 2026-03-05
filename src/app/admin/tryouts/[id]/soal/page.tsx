@@ -199,6 +199,7 @@ export default function AdminTryoutSoalPage() {
   };
 
   const handleDelete = async (questionId: string) => {
+    if (!tryoutId) return;
     if (!confirm("Hapus soal ini?")) return;
     try {
       await adminDeleteQuestion(tryoutId, questionId);
