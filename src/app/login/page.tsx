@@ -93,15 +93,6 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
-          <div className="mb-4 flex justify-center">
-            <img
-              src="/fansedu-logo.png"
-              alt="FansEdu"
-              className="h-14 w-auto object-contain"
-              width={180}
-              height={56}
-            />
-          </div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
             Welcome back
           </h1>
