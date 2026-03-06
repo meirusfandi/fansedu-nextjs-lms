@@ -200,11 +200,15 @@ export async function healthCheck(): Promise<{ status: string; time: string }> {
 }
 
 // --- Auth ---
-/** Login via same-origin proxy so browser sends POST only (no CORS OPTIONS). */
+/** Login: jika NEXT_PUBLIC_API_URL diset → POST langsung ke backend (api.fansedu.web.id/api/v1/auth/login). Tanpa itu → proxy same-origin /api/auth/login (dev). */
 export async function login(body: LoginRequest): Promise<LoginResponse> {
-  const base =
-    typeof window !== "undefined" ? window.location.origin : "";
-  return request("/api/auth/login", { method: "POST", body, auth: false }, { baseUrl: base });
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (apiUrl) {
+    const base = apiUrl.replace(/\/$/, "") + "/api/v1";
+    return request("/auth/login", { method: "POST", body, auth: false }, { baseUrl: base });
+  }
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return request("/api/auth/login", { method: "POST", body, auth: false }, { baseUrl: origin });
 }
 
 export async function register(body: RegisterRequest): Promise<RegisterResponse> {
