@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -95,13 +94,12 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
           <div className="mb-4 flex justify-center">
-            <Image
+            <img
               src="/fansedu-logo.png"
               alt="FansEdu"
+              className="h-14 w-auto object-contain"
               width={180}
               height={56}
-              className="h-14 w-auto object-contain"
-              priority
             />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
