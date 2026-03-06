@@ -93,7 +93,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Fansedu - Informatic Olympiad Academy
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-900">
             Welcome back
           </h1>
           <p className="mt-2 text-sm text-zinc-600">

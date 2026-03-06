@@ -61,9 +61,9 @@ export function AdminSidebar({ currentPath = "", onLogout }: AdminSidebarProps) 
           FE
         </div>
         <div>
-          <p className="text-sm font-semibold tracking-tight">FansEdu LMS</p>
+          <p className="text-sm font-semibold tracking-tight">Fansedu</p>
           <p className="text-xs text-zinc-500">
-            Admin dashboard
+            Informatic Olympiad Academy
           </p>
         </div>
       </div>
