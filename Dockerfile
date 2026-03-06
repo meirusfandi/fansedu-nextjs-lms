@@ -22,6 +22,8 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+# Bind to all interfaces so proxy (Cloudflare/Easypanel) can reach the app
+ENV HOSTNAME=0.0.0.0
 EXPOSE 3000
 
 RUN addgroup --system --gid 1001 nodejs
