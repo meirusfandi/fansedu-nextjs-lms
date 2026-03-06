@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Build output
+.next
+out
+build
+
+# Env (set via build-arg / runtime)
+.env
+.env.*
+!.env.example
+
+# Git & IDE
+.git
+.gitignore
+.dockerignore
+Dockerfile
+*.md
+.DS_Store
+.idea
+.vscode
+*.log
+
+# Test & misc
+coverage
+.vercel
+*.tsbuildinfo
+next-env.d.ts
