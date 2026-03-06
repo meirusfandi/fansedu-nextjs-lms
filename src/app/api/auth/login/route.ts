@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 // Proxy login ke backend Go. Pakai NEXT_PUBLIC_API_URL (khusus backend Go).
 // Production: set NEXT_PUBLIC_API_URL=https://api.fansedu.web.id
 function getBackendBase(): string {
-  const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ??
+    process.env.API_URL ??
+    "http://localhost:8080";
+
   return base.replace(/\/$/, "");
 }
 
