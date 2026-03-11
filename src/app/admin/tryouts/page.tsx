@@ -310,6 +310,12 @@ export default function AdminTryoutsPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Link
+                          href={`/admin/tryouts/${t.id}/detail`}
+                          className="mr-2 text-zinc-600 underline hover:text-zinc-900"
+                        >
+                          Lihat detail
+                        </Link>
+                        <Link
                           href={`/admin/tryouts/${t.id}/soal`}
                           className="mr-2 text-zinc-600 underline hover:text-zinc-900"
                         >

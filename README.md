@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FansEdu LMS
 
-## Getting Started
+Frontend web untuk **FansEdu** — platform LMS Olimpiade Informatika (OSN). Dibangun dengan Next.js 16 (App Router), React 19, dan Tailwind CSS. Backend terpisah (API Go) di `api.fansedu.web.id`.
 
-First, run the development server:
+## Mulai cepat
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Local (`npm run dev`):** Pakai **`.env.development`** — default `NEXT_PUBLIC_API_URL=http://localhost:8080`.
+- **Server / production (`npm run build`):** Pakai **`.env.production`** — default `NEXT_PUBLIC_API_URL=https://api.fansedu.web.id`.
+- **Override lokal:** Buat **`.env.local`** (di-ignore Git) jika ingin nilai lain; `.env.local` mengoverride file env lainnya.
+- **Template:** `.env.example` berisi contoh variabel.
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Perintah        | Keterangan                    |
+|-----------------|--------------------------------|
+| `npm run dev`   | Dev server (port 3000)         |
+| `npm run build` | Build production               |
+| `npm run start` | Jalankan build production     |
+| `npm run lint`  | ESLint                         |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Fitur
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Siswa:** Login, dashboard, tryout, review jawaban, sertifikat.
+- **Admin:** Dashboard, user, event/tryout, soal, master data (jenjang, bidang, sekolah, event, role), laporan, payment.
 
-## Deploy on Vercel
+## Dokumentasi
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **[docs/DEVELOPMENT_AND_MAINTENANCE.md](docs/DEVELOPMENT_AND_MAINTENANCE.md)** — Pengembangan & maintenance: struktur project, konvensi, API, deploy, troubleshooting.
+- **[DEPLOY.md](DEPLOY.md)** — Deploy production (Docker) & penanganan 502.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Tech stack
+
+- Next.js 16, React 19, TypeScript
+- Tailwind CSS v4
+- Backend: API Go (`/api/v1`)

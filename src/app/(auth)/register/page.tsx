@@ -1,19 +1,18 @@
- "use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { register as authRegister } from "@/services/auth";
+import { useAuthStore } from "@/store/auth";
+import { getDashboardPathForRole } from "@/hooks/useRedirectByRole";
 
-type RegisterFormState = {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-};
+type RegisterType = "student" | "guru";
+type RegisterFormState = { name: string; email: string; password: string; confirmPassword: string };
 
 export default function RegisterPage() {
   const router = useRouter();
-
+  const [registerType, setRegisterType] = useState<RegisterType>("student");
   const [form, setForm] = useState<RegisterFormState>({
     name: "",
     email: "",
@@ -26,63 +25,62 @@ export default function RegisterPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
-
     if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match.");
+      setError("Kata sandi tidak cocok.");
       return;
     }
-
     setLoading(true);
-
     try {
-      const { register: apiRegister, setAuthToken } = await import(
-        "@/lib/api"
-      );
-      const res = await apiRegister({
+      await authRegister({
         name: form.name,
         email: form.email,
         password: form.password,
+        role: registerType,
       });
-      const u = res.user as { name?: string; nama?: string; full_name?: string; role?: string };
-      const name = u?.name ?? u?.nama ?? u?.full_name ?? "";
-      setAuthToken(res.token, 604800, res.user.role, name || undefined);
-      const dest = res.user.role === "admin" ? "/admin" : "/student";
+      const role = useAuthStore.getState().role;
+      const dest = getDashboardPathForRole(role) ?? "/landing";
       router.push(dest);
     } catch (err) {
-      setError(
-        (err as Error).message || "Gagal mendaftar. Coba lagi atau gunakan email lain."
-      );
+      setError((err as Error).message || "Gagal mendaftar. Coba lagi atau gunakan email lain.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 to-white px-4 py-8">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
-            Create your account
-          </h1>
-          <p className="mt-2 text-sm text-zinc-600">
-            Join the platform and start learning.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Daftar akun</h1>
+          <p className="mt-2 text-sm text-zinc-600">Pilih tipe akun lalu isi data Anda.</p>
         </div>
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
+        <div className="mb-6 flex rounded-xl border border-zinc-200 bg-zinc-50/50 p-1">
+          <button
+            type="button"
+            onClick={() => setRegisterType("student")}
+            className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition ${registerType === "student" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+          >
+            Siswa
+          </button>
+          <button
+            type="button"
+            onClick={() => setRegisterType("guru")}
+            className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition ${registerType === "guru" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+          >
+            Guru
+          </button>
+        </div>
+        {registerType === "guru" && (
+          <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-800">
+            Akun guru akan diarahkan ke dashboard trainer. Setelah mendaftar dan membayar biaya untuk sejumlah siswa, Anda dapat menambahkan siswa tersebut.
           </div>
         )}
-
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label
-              htmlFor="name"
-              className="block text-sm font-medium text-zinc-800"
-            >
-              Full name
-            </label>
+            <label htmlFor="name" className="block text-sm font-medium text-zinc-800">Nama lengkap</label>
             <input
               id="name"
               name="name"
@@ -92,17 +90,11 @@ export default function RegisterPage() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
-              placeholder="Ada Lovelace"
+              placeholder="Nama Anda"
             />
           </div>
-
           <div className="space-y-1.5">
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-zinc-800"
-            >
-              Email
-            </label>
+            <label htmlFor="email" className="block text-sm font-medium text-zinc-800">Email</label>
             <input
               id="email"
               name="email"
@@ -112,17 +104,11 @@ export default function RegisterPage() {
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
-              placeholder="you@example.com"
+              placeholder="anda@contoh.com"
             />
           </div>
-
           <div className="space-y-1.5">
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-zinc-800"
-            >
-              Password
-            </label>
+            <label htmlFor="password" className="block text-sm font-medium text-zinc-800">Kata sandi</label>
             <input
               id="password"
               name="password"
@@ -132,17 +118,11 @@ export default function RegisterPage() {
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
-              placeholder="Create a strong password"
+              placeholder="Buat kata sandi yang kuat"
             />
           </div>
-
           <div className="space-y-1.5">
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-medium text-zinc-800"
-            >
-              Confirm password
-            </label>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-800">Konfirmasi kata sandi</label>
             <input
               id="confirmPassword"
               name="confirmPassword"
@@ -150,34 +130,23 @@ export default function RegisterPage() {
               required
               autoComplete="new-password"
               value={form.confirmPassword}
-              onChange={(e) =>
-                setForm({ ...form, confirmPassword: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
               className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
-              placeholder="Repeat your password"
+              placeholder="Ulangi kata sandi"
             />
           </div>
-
           <button
             type="submit"
             disabled={loading}
             className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-700"
           >
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? "Mendaftar..." : registerType === "guru" ? "Daftar sebagai guru" : "Daftar sebagai siswa"}
           </button>
         </form>
-
         <p className="mt-6 text-center text-sm text-zinc-600">
-          Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-zinc-900 underline-offset-2 hover:underline"
-          >
-            Sign in
-          </Link>
+          Sudah punya akun? <Link href="/login" className="font-medium text-zinc-900 underline-offset-2 hover:underline">Masuk</Link>
         </p>
       </div>
     </div>
   );
 }
-

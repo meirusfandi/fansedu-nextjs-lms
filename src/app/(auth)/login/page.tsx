@@ -3,16 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { login as authLogin } from "@/services/auth";
+import { useAuthStore } from "@/store/auth";
+import { getDashboardPathForRole } from "@/hooks/useRedirectByRole";
 
 const REMEMBER_EMAIL_KEY = "fansedu_login_remember_email";
 
-type LoginFormState = {
-  email: string;
-  password: string;
-};
+type LoginFormState = { email: string; password: string };
 
 function EyeIcon({ visible }: { visible: boolean }) {
-  // visible = password sedang ditampilkan → tampilkan ikon "sembunyikan" (eye-off)
   if (visible) {
     return (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -30,10 +29,7 @@ function EyeIcon({ visible }: { visible: boolean }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [form, setForm] = useState<LoginFormState>({
-    email: "",
-    password: "",
-  });
+  const [form, setForm] = useState<LoginFormState>({ email: "", password: "" });
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,38 +48,22 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
-      const { login: apiLogin, setAuthToken } = await import("@/lib/api");
-      const res = await apiLogin({
-        email: form.email,
-        password: form.password,
-      });
-      // Backend: { user: { id, name/nama, email, role }, token }
-      const { token, user } = res;
-      if (!token || !user?.role) {
-        setError("Format respons login tidak valid.");
-        return;
-      }
-      const name = (user as { name?: string; nama?: string; full_name?: string }).name
-        ?? (user as { name?: string; nama?: string; full_name?: string }).nama
-        ?? (user as { name?: string; nama?: string; full_name?: string }).full_name
-        ?? "";
-      const maxAge = rememberMe ? 2592000 : 604800; // 30 hari vs 7 hari
-      setAuthToken(token, maxAge, user.role, name || undefined);
+      await authLogin(
+        { email: form.email, password: form.password },
+        rememberMe
+      );
       if (rememberMe && form.email) {
         localStorage.setItem(REMEMBER_EMAIL_KEY, form.email);
       } else {
         localStorage.removeItem(REMEMBER_EMAIL_KEY);
       }
-      const dest = user.role === "admin" ? "/admin" : "/student";
+      const role = useAuthStore.getState().role;
+      const dest = getDashboardPathForRole(role) ?? "/landing";
       router.replace(dest);
     } catch (err) {
-      const message =
-        (err as { status?: number }).status === 401
-          ? "Email atau password salah."
-          : "Gagal masuk. Periksa koneksi atau coba lagi.";
-      setError(message);
+      const status = (err as { status?: number }).status;
+      setError(status === 401 ? "Email atau password salah." : "Gagal masuk. Periksa koneksi atau coba lagi.");
     } finally {
       setLoading(false);
     }
@@ -93,31 +73,16 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Fansedu - Informatic Olympiad Academy
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-900">
-            Welcome back
-          </h1>
-          <p className="mt-2 text-sm text-zinc-600">
-            Sign in to continue to your dashboard.
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Fansedu - Informatic Olympiad Academy</p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-900">Welcome back</h1>
+          <p className="mt-2 text-sm text-zinc-600">Sign in to continue to your dashboard.</p>
         </div>
-
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
         )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-zinc-800"
-            >
-              Email
-            </label>
+            <label htmlFor="email" className="block text-sm font-medium text-zinc-800">Email</label>
             <input
               id="email"
               name="email"
@@ -130,21 +95,10 @@ export default function LoginPage() {
               placeholder="you@example.com"
             />
           </div>
-
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-zinc-800"
-              >
-                Password
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-xs font-medium text-zinc-700 underline-offset-2 hover:underline"
-              >
-                Forgot password?
-              </Link>
+              <label htmlFor="password" className="block text-sm font-medium text-zinc-800">Password</label>
+              <Link href="/forgot-password" className="text-xs font-medium text-zinc-700 underline-offset-2 hover:underline">Forgot password?</Link>
             </div>
             <div className="relative">
               <input
@@ -168,19 +122,10 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-
           <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
-            />
-            <span className="text-sm text-zinc-700">
-              Ingat saya
-            </span>
+            <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
+            <span className="text-sm text-zinc-700">Ingat saya</span>
           </label>
-
           <button
             type="submit"
             disabled={loading}
@@ -189,20 +134,10 @@ export default function LoginPage() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        {false && (
         <p className="mt-6 text-center text-sm text-zinc-600">
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="font-medium text-zinc-900 underline-offset-2 hover:underline"
-          >
-            Create one
-          </Link>
+          Belum punya akun? <Link href="/register" className="font-medium text-zinc-900 underline-offset-2 hover:underline">Daftar</Link>
         </p>
-        )}
       </div>
     </div>
   );
 }
-

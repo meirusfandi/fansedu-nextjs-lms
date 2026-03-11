@@ -6,8 +6,10 @@ export default async function Home() {
   const token = cookieStore.get("auth_token")?.value;
   const role = cookieStore.get("auth_role")?.value;
 
-  if (token) {
-    redirect(role === "admin" ? "/admin" : "/student");
+  if (token && role) {
+    if (role === "admin") redirect("/admin/dashboard");
+    if (role === "trainer") redirect("/trainer/dashboard");
+    redirect("/landing");
   }
 
   redirect("/login");

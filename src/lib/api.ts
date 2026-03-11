@@ -12,6 +12,9 @@ import type {
   AdminCreateUserRequest,
   AdminIssueCertificateRequest,
   AdminOverviewResponse,
+  AdminTryoutAnalysis,
+  AdminTryoutAttemptAiAnalysis,
+  AdminTryoutStudent,
   AdminUpdateLevelRequest,
   AdminUpdateUserRequest,
   Attempt,
@@ -20,12 +23,19 @@ import type {
   Certificate,
   Course,
   CourseEnrollment,
+  ChangePasswordRequest,
+  CreatePaymentRequest,
+  CourseDiscussion,
+  CourseMessage,
   DashboardResponse,
+  DiscussionReply,
   ForgotPasswordRequest,
   LeaderboardEntry,
   Level,
   LoginRequest,
   LoginResponse,
+  Notification,
+  Payment,
   PutAnswerRequest,
   Question,
   RegisterRequest,
@@ -37,6 +47,14 @@ import type {
   Subject,
   SubmitAttemptResponse,
   StartTryoutResponse,
+  TrainerAddStudentRequest,
+  TrainerCourseCreateRequest,
+  TrainerPayRequest,
+  TrainerProfileResponse,
+  TrainerProfileUpdateRequest,
+  TrainerCreateSchoolRequest,
+  TrainerStatusResponse,
+  TryoutQuestionStatsBulkResponse,
   TryoutSession,
   User,
   UserRole,
@@ -64,7 +82,7 @@ export function getFriendlyApiErrorMessage(err: unknown): string {
       msg.includes("load failed") ||
       msg.includes("connection"))
   ) {
-    return "Tidak dapat terhubung ke server. Periksa koneksi internet Anda dan coba lagi.";
+    return "Tidak dapat terhubung ke server. Pastikan backend API berjalan (development: jalankan server Go di http://localhost:8080) dan NEXT_PUBLIC_API_URL di .env benar (lokal: http://localhost:8080).";
   }
   if (e?.message && e.message.trim()) {
     return e.message.trim();
@@ -118,6 +136,15 @@ export function getAuthUserName(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`${AUTH_NAME_KEY}=([^;]+)`));
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+export function getAuthRole(): UserRole | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(/auth_role=([^;]+)/);
+  const role = match ? decodeURIComponent(match[1]) : null;
+  if (role === "admin" || role === "student" || role === "trainer") return role;
+  if (role === "guru") return "trainer";
+  return null;
 }
 
 export function clearAuthToken(): void {
@@ -199,6 +226,48 @@ export async function healthCheck(): Promise<{ status: string; time: string }> {
   return request("/health", { method: "GET", auth: false });
 }
 
+// --- Public (no auth) ---
+/** GET /roles — daftar role untuk register/dropdown. */
+export async function getPublicRoles(): Promise<Role[]> {
+  try {
+    const raw = await request<Role[] | { roles?: Role[]; data?: Role[] }>("/roles", { method: "GET", auth: false });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { roles?: Role[]; data?: Role[] }) : {};
+    return Array.isArray(obj.roles) ? obj.roles : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** GET /schools — daftar sekolah (public). */
+export async function getPublicSchools(): Promise<Sekolah[]> {
+  try {
+    const raw = await request<unknown>("/schools", { method: "GET", auth: false });
+    if (Array.isArray(raw)) return raw.map((x) => normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {}));
+    const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const arr = Array.isArray(obj.schools) ? obj.schools : Array.isArray(obj.data) ? obj.data : null;
+    if (arr?.length) return arr.map((x) => normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {}));
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** GET /levels — jenjang pendidikan (public). */
+export async function getPublicLevels(): Promise<Level[]> {
+  try {
+    const raw = await request<Level[] | { levels?: Level[]; data?: Level[] }>("/levels", { method: "GET", auth: false });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { levels?: Level[]; data?: Level[] }) : {};
+    return Array.isArray(obj.levels) ? obj.levels : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
 // --- Auth ---
 /** Login: jika NEXT_PUBLIC_API_URL diset → POST langsung ke backend (api.fansedu.web.id/api/v1/auth/login). Tanpa itu → proxy same-origin /api/auth/login (dev). */
 export async function login(body: LoginRequest): Promise<LoginResponse> {
@@ -237,6 +306,173 @@ export async function resetPassword(
     body,
     auth: false,
   });
+}
+
+/** Ubah kata sandi (user sudah login). POST /auth/change-password. */
+export async function changePassword(body: ChangePasswordRequest): Promise<{ ok: boolean }> {
+  return request("/auth/change-password", { method: "POST", body });
+}
+
+// --- Notifications ---
+/** GET /notifications — daftar notifikasi user (Bearer). */
+export async function listNotifications(): Promise<Notification[]> {
+  try {
+    const raw = await request<Notification[] | { notifications?: Notification[]; data?: Notification[] }>("/notifications", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { notifications?: Notification[]; data?: Notification[] }) : {};
+    return Array.isArray(obj.notifications) ? obj.notifications : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** PATCH /notifications/:id/read — tandai sudah dibaca. */
+export async function markNotificationRead(id: string): Promise<{ ok?: boolean }> {
+  return request(`/notifications/${id}/read`, { method: "PATCH" });
+}
+
+// --- Payments (user) ---
+/** GET /payments — riwayat pembayaran user (Bearer). */
+export async function listPayments(): Promise<Payment[]> {
+  try {
+    const raw = await request<Payment[] | { payments?: Payment[]; data?: Payment[] }>("/payments", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { payments?: Payment[]; data?: Payment[] }) : {};
+    return Array.isArray(obj.payments) ? obj.payments : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** POST /payments — buat pembayaran (upload bukti, dll). */
+export async function createPayment(body: CreatePaymentRequest): Promise<Payment> {
+  return request("/payments", { method: "POST", body });
+}
+
+// --- Trainer (Guru) ---
+/** Status slot & siswa guru. 404/405 = { paid_slots: 0, registered_students_count: 0 }. includeStudents=true → GET /trainer/status?students=1 */
+export async function getTrainerStatus(includeStudents?: boolean): Promise<TrainerStatusResponse> {
+  try {
+    const path = includeStudents ? "/trainer/status?students=1" : "/trainer/status";
+    const raw = await request<Record<string, unknown>>(path, { method: "GET" });
+    if (!raw || typeof raw !== "object") {
+      return { paid_slots: 0, registered_students_count: 0 };
+    }
+    const data = (raw.data && typeof raw.data === "object") ? (raw.data as Record<string, unknown>) : raw;
+    const paid = typeof raw.paid_slots === "number" ? raw.paid_slots : typeof data.paid_slots === "number" ? data.paid_slots : Number(raw.slots_paid ?? data.slots_paid ?? 0) || 0;
+    const count = typeof raw.registered_students_count === "number"
+      ? raw.registered_students_count
+      : typeof data.registered_students_count === "number"
+        ? data.registered_students_count
+        : Number(raw.students_count ?? data.students_count ?? raw.registered_count ?? 0) || 0;
+    const students = Array.isArray(raw.students) ? raw.students : Array.isArray(data.students) ? data.students : undefined;
+    return {
+      paid_slots: paid,
+      registered_students_count: count,
+      students: Array.isArray(students) ? students.map((s: Record<string, unknown>) => ({
+        id: String(s.id ?? ""),
+        name: String(s.name ?? s.nama ?? ""),
+        email: String(s.email ?? ""),
+      })) : undefined,
+    };
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return { paid_slots: 0, registered_students_count: 0 };
+    throw e;
+  }
+}
+
+/** Bayar slot pendaftaran siswa (guru). POST /trainer/pay. */
+export async function trainerPaySlots(body: TrainerPayRequest): Promise<{ ok: boolean; paid_slots?: number }> {
+  return request("/trainer/pay", { method: "POST", body });
+}
+
+/** Daftarkan siswa oleh guru. POST /trainer/students. Hanya bisa jika ada slot (paid_slots > registered_students_count). */
+export async function trainerAddStudent(body: TrainerAddStudentRequest): Promise<{ id: string; email: string }> {
+  return request("/trainer/students", { method: "POST", body });
+}
+
+/** Profil guru (nama, email, sekolah). GET /trainer/profile. 404 = null. */
+export async function getTrainerProfile(): Promise<TrainerProfileResponse | null> {
+  try {
+    const raw = await request<Record<string, unknown>>("/trainer/profile", { method: "GET" });
+    if (!raw || typeof raw !== "object") return null;
+    const data = (raw.data && typeof raw.data === "object") ? (raw.data as Record<string, unknown>) : raw;
+    const name = typeof raw.name === "string" ? raw.name : typeof data.name === "string" ? data.name : undefined;
+    const email = typeof raw.email === "string" ? raw.email : typeof data.email === "string" ? data.email : undefined;
+    const schoolRaw = raw.school ?? data.school ?? raw.sekolah ?? data.sekolah;
+    let school: TrainerProfileResponse["school"] = null;
+    if (schoolRaw && typeof schoolRaw === "object") {
+      const s = schoolRaw as Record<string, unknown>;
+      school = {
+        id: String(s.id ?? ""),
+        nama_sekolah: String(s.nama_sekolah ?? s.nama ?? s.school_name ?? ""),
+        npsn: s.npsn != null ? String(s.npsn) : null,
+        kabupaten_kota: s.kabupaten_kota != null ? String(s.kabupaten_kota) : s.kabupaten != null ? String(s.kabupaten) : s.kota != null ? String(s.kota) : null,
+        telepon: s.telepon != null ? String(s.telepon) : s.phone != null ? String(s.phone) : null,
+        alamat: s.alamat != null ? String(s.alamat) : s.address != null ? String(s.address) : null,
+      };
+    }
+    return { name, email, school };
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
+}
+
+/** Update profil guru (nama). PUT /trainer/profile. */
+export async function updateTrainerProfile(body: TrainerProfileUpdateRequest): Promise<{ ok: boolean }> {
+  return request("/trainer/profile", { method: "PUT", body });
+}
+
+/** Daftar sekolah untuk guru (pilih/kaitkan). GET /trainer/schools. 404/405 = []. */
+export async function listTrainerSchools(): Promise<Sekolah[]> {
+  try {
+    const raw = await request<unknown>("/trainer/schools", { method: "GET" });
+    if (Array.isArray(raw)) {
+      return raw.map((x) => normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {}));
+    }
+    const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const arr = Array.isArray(obj.schools) ? obj.schools : Array.isArray(obj.sekolah) ? obj.sekolah : Array.isArray(obj.data) ? obj.data : null;
+    if (arr && arr.length > 0) {
+      return arr.map((x) => normalizeToSekolah(typeof x === "object" && x ? (x as Record<string, unknown>) : {}));
+    }
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Buat sekolah baru oleh guru. POST /trainer/schools. Mengembalikan sekolah yang dibuat (dengan id). */
+export async function createTrainerSchool(body: TrainerCreateSchoolRequest): Promise<Sekolah> {
+  const raw = await request<Record<string, unknown>>("/trainer/schools", { method: "POST", body });
+  if (!raw || typeof raw !== "object") throw new Error("Respons tidak valid.");
+  const data = (raw.data && typeof raw.data === "object")
+    ? (raw.data as Record<string, unknown>)
+    : (raw.school && typeof raw.school === "object")
+      ? (raw.school as Record<string, unknown>)
+      : raw;
+  return normalizeToSekolah(data);
+}
+
+/** Daftar kelas trainer. GET /trainer/courses (Bearer). */
+export async function listTrainerCourses(): Promise<Course[]> {
+  try {
+    const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>("/trainer/courses", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { courses?: Course[]; data?: Course[] }) : {};
+    return Array.isArray(obj.courses) ? obj.courses : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Buat kelas oleh trainer. POST /trainer/courses. */
+export async function createTrainerCourse(body: TrainerCourseCreateRequest): Promise<Course> {
+  return request("/trainer/courses", { method: "POST", body });
 }
 
 // --- Tryouts ---
@@ -291,6 +527,11 @@ export async function startTryout(
   tryoutId: string
 ): Promise<StartTryoutResponse> {
   return request(`/tryouts/${tryoutId}/start`, { method: "POST" });
+}
+
+/** Daftar tryout (siswa). POST /tryouts/:tryoutId/register. */
+export async function registerTryout(tryoutId: string): Promise<{ ok?: boolean }> {
+  return request(`/tryouts/${tryoutId}/register`, { method: "POST" });
 }
 
 // --- Attempts ---
@@ -400,6 +641,7 @@ export async function getStudentDashboard(): Promise<StudentDashboardResponse> {
   const strength = raw.strength_areas ?? data.strength_areas ?? raw.kekuatan ?? data.kekuatan ?? raw.strengths ?? data.strengths ?? raw.strength;
   const improvement = raw.improvement_areas ?? data.improvement_areas ?? raw.perlu_ditingkatkan ?? data.perlu_ditingkatkan ?? raw.improvements ?? data.improvements ?? raw.improvement;
   const rec = raw.recommendation ?? data.recommendation ?? raw.rekomendasi ?? data.rekomendasi ?? raw.recommendation_text ?? data.recommendation_text ?? "";
+  const expiresAt = raw.expires_at ?? data.expires_at ?? raw.access_expires_at ?? data.access_expires_at ?? raw.subscription_expires_at ?? data.subscription_expires_at;
   return {
     ...raw,
     summary: (raw.summary as StudentDashboardResponse["summary"]) ?? (data.summary as StudentDashboardResponse["summary"]) ?? {
@@ -412,6 +654,7 @@ export async function getStudentDashboard(): Promise<StudentDashboardResponse> {
     strength_areas: arr(strength),
     improvement_areas: arr(improvement),
     recommendation: typeof rec === "string" ? rec : str(rec),
+    expires_at: typeof expiresAt === "string" ? expiresAt : undefined,
   } as StudentDashboardResponse;
 }
 
@@ -425,6 +668,47 @@ export async function getStudentTryouts(): Promise<TryoutSession[]> {
     if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts;
     if (raw?.data && Array.isArray(raw.data)) return raw.data;
     return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Daftar kursus siswa (yang di-enroll). GET /student/courses. */
+export async function getStudentCourses(): Promise<Course[]> {
+  try {
+    const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>("/student/courses", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { courses?: Course[]; data?: Course[] }) : {};
+    return Array.isArray(obj.courses) ? obj.courses : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Daftar kelas yang sesuai subject siswa. GET /student/courses/by-subject. */
+export async function getStudentCoursesBySubject(): Promise<Course[]> {
+  try {
+    const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>("/student/courses/by-subject", {
+      method: "GET",
+    });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { courses?: Course[]; data?: Course[] }) : {};
+    return Array.isArray(obj.courses) ? obj.courses : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Riwayat pembayaran siswa. GET /student/payments. */
+export async function getStudentPayments(): Promise<Payment[]> {
+  try {
+    const raw = await request<Payment[] | { payments?: Payment[]; data?: Payment[] }>("/student/payments", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { payments?: Payment[]; data?: Payment[] }) : {};
+    return Array.isArray(obj.payments) ? obj.payments : Array.isArray(obj.data) ? obj.data : [];
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -501,6 +785,75 @@ export async function enrollCourse(
   courseId: string
 ): Promise<CourseEnrollment> {
   return request(`/courses/${courseId}/enroll`, { method: "POST" });
+}
+
+// --- Course chat & forum (user ter-enroll) ---
+/** GET /courses/:courseId/messages */
+export async function getCourseMessages(courseId: string): Promise<CourseMessage[]> {
+  try {
+    const raw = await request<CourseMessage[] | { messages?: CourseMessage[]; data?: CourseMessage[] }>(
+      `/courses/${courseId}/messages`,
+      { method: "GET" }
+    );
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { messages?: CourseMessage[]; data?: CourseMessage[] }) : {};
+    return Array.isArray(obj.messages) ? obj.messages : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** POST /courses/:courseId/messages — body: { message } */
+export async function postCourseMessage(courseId: string, body: { message: string }): Promise<CourseMessage> {
+  return request(`/courses/${courseId}/messages`, { method: "POST", body });
+}
+
+/** GET /courses/:courseId/discussions */
+export async function getCourseDiscussions(courseId: string): Promise<CourseDiscussion[]> {
+  try {
+    const raw = await request<CourseDiscussion[] | { discussions?: CourseDiscussion[]; data?: CourseDiscussion[] }>(
+      `/courses/${courseId}/discussions`,
+      { method: "GET" }
+    );
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { discussions?: CourseDiscussion[]; data?: CourseDiscussion[] }) : {};
+    return Array.isArray(obj.discussions) ? obj.discussions : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** POST /courses/:courseId/discussions — body: { title, body } */
+export async function postCourseDiscussion(courseId: string, body: { title: string; body: string }): Promise<CourseDiscussion> {
+  return request(`/courses/${courseId}/discussions`, { method: "POST", body });
+}
+
+/** GET /discussions/:id */
+export async function getDiscussion(discussionId: string): Promise<CourseDiscussion> {
+  return request(`/discussions/${discussionId}`, { method: "GET" });
+}
+
+/** GET /discussions/:id/replies */
+export async function getDiscussionReplies(discussionId: string): Promise<DiscussionReply[]> {
+  try {
+    const raw = await request<DiscussionReply[] | { replies?: DiscussionReply[]; data?: DiscussionReply[] }>(
+      `/discussions/${discussionId}/replies`,
+      { method: "GET" }
+    );
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { replies?: DiscussionReply[]; data?: DiscussionReply[] }) : {};
+    return Array.isArray(obj.replies) ? obj.replies : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** POST /discussions/:id/replies — body: { body } */
+export async function postDiscussionReply(discussionId: string, body: { body: string }): Promise<DiscussionReply> {
+  return request(`/discussions/${discussionId}/replies`, { method: "POST", body });
 }
 
 // --- Admin ---
@@ -580,6 +933,34 @@ export async function adminListTryouts(): Promise<TryoutSession[]> {
 
 export async function adminGetTryout(tryoutId: string): Promise<TryoutSession> {
   return request(`/admin/tryouts/${tryoutId}`, { method: "GET" });
+}
+
+/** Analisis & grafik per tryout (per soal). GET /admin/tryouts/:tryoutId/analysis */
+export async function adminGetTryoutAnalysis(tryoutId: string): Promise<AdminTryoutAnalysis> {
+  return request(`/admin/tryouts/${tryoutId}/analysis`, { method: "GET" });
+}
+
+/** Daftar siswa yang submit tryout. GET /admin/tryouts/:tryoutId/students */
+export async function adminGetTryoutStudents(tryoutId: string): Promise<AdminTryoutStudent[]> {
+  try {
+    const raw = await request<
+      AdminTryoutStudent[] | { students?: AdminTryoutStudent[]; data?: AdminTryoutStudent[] }
+    >(`/admin/tryouts/${tryoutId}/students`, { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { students?: AdminTryoutStudent[]; data?: AdminTryoutStudent[] }) : {};
+    return Array.isArray(obj.students) ? obj.students : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Analisis AI per attempt. GET /admin/tryouts/:tryoutId/attempts/:attemptId/ai-analysis */
+export async function adminGetTryoutAttemptAiAnalysis(
+  tryoutId: string,
+  attemptId: string
+): Promise<AdminTryoutAttemptAiAnalysis> {
+  return request(`/admin/tryouts/${tryoutId}/attempts/${attemptId}/ai-analysis`, { method: "GET" });
 }
 
 /** Ambil respons mentah dari path (untuk debug). Gagal = return null. */
@@ -763,6 +1144,67 @@ export async function adminDeleteQuestion(
   return request(`/admin/tryouts/${tryoutId}/questions/${questionId}`, {
     method: "DELETE",
   });
+}
+
+/** Statistik soal (jumlah mengerjakan, % benar/salah). 404/405 = null. */
+export async function adminGetQuestionStats(
+  tryoutId: string,
+  questionId: string
+): Promise<{
+  participants_count?: number;
+  answered_count?: number;
+  correct_count?: number;
+  wrong_count?: number;
+  correct_percent?: number;
+  wrong_percent?: number;
+} | null> {
+  try {
+    const raw = await request<Record<string, unknown>>(
+      `/admin/tryouts/${tryoutId}/questions/${questionId}/stats`,
+      { method: "GET" }
+    );
+    if (!raw || typeof raw !== "object") return null;
+    return {
+      participants_count: typeof raw.participants_count === "number" ? raw.participants_count : undefined,
+      answered_count: typeof raw.answered_count === "number" ? raw.answered_count : undefined,
+      correct_count: typeof raw.correct_count === "number" ? raw.correct_count : undefined,
+      wrong_count: typeof raw.wrong_count === "number" ? raw.wrong_count : undefined,
+      correct_percent: typeof raw.correct_percent === "number" ? raw.correct_percent : undefined,
+      wrong_percent: typeof raw.wrong_percent === "number" ? raw.wrong_percent : undefined,
+    };
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
+}
+
+/** Statistik semua soal tryout sekaligus (bulk). GET /admin/tryouts/:tryoutId/questions/stats. 404/405 = null. */
+export async function adminGetAllQuestionStats(
+  tryoutId: string
+): Promise<TryoutQuestionStatsBulkResponse | null> {
+  try {
+    const raw = await request<Record<string, unknown>>(
+      `/admin/tryouts/${tryoutId}/questions/stats`,
+      { method: "GET" }
+    );
+    if (!raw || typeof raw !== "object") return null;
+    const questions = Array.isArray(raw.questions) ? raw.questions : [];
+    const items = questions.map((q: Record<string, unknown>) => ({
+      question_id: String(q.question_id ?? q.questionId ?? ""),
+      answered_count: typeof q.answered_count === "number" ? q.answered_count : undefined,
+      correct_count: typeof q.correct_count === "number" ? q.correct_count : undefined,
+      wrong_count: typeof q.wrong_count === "number" ? q.wrong_count : undefined,
+      correct_percent: typeof q.correct_percent === "number" ? q.correct_percent : undefined,
+      wrong_percent: typeof q.wrong_percent === "number" ? q.wrong_percent : undefined,
+    }));
+    return {
+      participants_count: typeof raw.participants_count === "number" ? raw.participants_count : undefined,
+      questions: items,
+    };
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
 }
 
 export async function adminCreateCourse(
