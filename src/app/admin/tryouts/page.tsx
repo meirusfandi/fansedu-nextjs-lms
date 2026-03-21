@@ -5,23 +5,14 @@ import {
   adminDeleteTryout,
   adminListTryouts,
   adminUpdateTryout,
-  logout,
-  clearAuthToken,
 } from "@/lib/api";
 import Link from "next/link";
 import type {
   AdminCreateTryoutRequest,
   TryoutSession,
 } from "@/lib/api-types";
-import { AdminSidebar } from "@/components/AdminSidebar";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
-import { usePathname, useRouter } from "next/navigation";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const LEVEL_LABEL: Record<string, string> = {
   easy: "Mudah",
@@ -65,8 +56,6 @@ const emptyForm: AdminCreateTryoutRequest = {
 };
 
 export default function AdminTryoutsPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [list, setList] = useState<TryoutSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,12 +76,6 @@ export default function AdminTryoutsPage() {
       setPage(1);
     }
   }, [list.length, page]);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const loadList = useCallback(() => {
     setLoading(true);
@@ -204,10 +187,7 @@ export default function AdminTryoutsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex items-center justify-between md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -371,7 +351,6 @@ export default function AdminTryoutsPage() {
             />
           )}
         </div>
-      </main>
 
       {/* Modal Tambah / Edit */}
       {modalOpen && (

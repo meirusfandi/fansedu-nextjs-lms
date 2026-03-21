@@ -6,12 +6,23 @@ export const adminSidebarSections: NavSection[] = [
   {
     title: "Manage",
     items: [
-      { href: "/admin/master-data", label: "Master Data" },
       { href: "/admin/users", label: "Users" },
       { href: "/admin/kelas", label: "Kelas" },
       { href: "/admin/tryouts", label: "Tryouts" },
       { href: "/admin/payment", label: "Payment" },
       { href: "/admin/report", label: "Report" },
+    ],
+  },
+  {
+    title: "Master Data",
+    items: [
+      { href: "/admin/master-data", label: "Overview" },
+      { href: "/admin/master-data/setting", label: "Setting" },
+      { href: "/admin/master-data/role", label: "Role" },
+      { href: "/admin/master-data/subject", label: "Subject" },
+      { href: "/admin/master-data/sekolah", label: "Sekolah" },
+      { href: "/admin/master-data/jenjang", label: "Jenjang Pendidikan" },
+      { href: "/admin/master-data/event", label: "Event" },
     ],
   },
 ];

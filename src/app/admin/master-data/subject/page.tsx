@@ -1,6 +1,5 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import {
   adminCreateCourseUnderSubject,
   adminCreateSubject,
@@ -11,11 +10,8 @@ import {
   adminListLevels,
   adminUpdateCourse,
   adminUpdateSubject,
-  logout,
-  clearAuthToken,
 } from "@/lib/api";
 import type { Course, Level, Subject } from "@/lib/api-types";
-import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const SD_SMP_SMA_SLUGS = ["sd", "smp", "sma"];
@@ -30,8 +26,6 @@ function filterLevelsSDSMPSMA(levels: Level[]): Level[] {
 }
 
 export default function MasterDataSubjectPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [levels, setLevels] = useState<Level[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,12 +47,6 @@ export default function MasterDataSubjectPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const levelsSDSMPSMA = useMemo(() => filterLevelsSDSMPSMA(levels), [levels]);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const loadLevels = useCallback(() => {
     setLoading(true);
@@ -226,10 +214,7 @@ export default function MasterDataSubjectPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 md:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Master Data
@@ -407,7 +392,6 @@ export default function MasterDataSubjectPage() {
             ))
           )}
         </div>
-      </main>
 
       {/* Modal Bidang */}
       {bidangModalMode && bidangModalLevelId && (

@@ -1,9 +1,6 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
-import { logout, clearAuthToken } from "@/lib/api";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 const MOCK_TARGET_SISWA = [
   { bulan: "Februari 2026", target_lulus: 12, actual: 10, progress: 83 },
@@ -18,21 +15,10 @@ const MOCK_PEMBELIAN = [
 ];
 
 export default function AdminReportPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [month, setMonth] = useState("2026-02");
 
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
-
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -136,7 +122,6 @@ export default function AdminReportPage() {
             Data di atas contoh. Integrasi dengan backend untuk laporan real-time.
           </p>
         </section>
-      </main>
     </div>
   );
 }

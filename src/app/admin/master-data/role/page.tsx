@@ -1,15 +1,11 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
-import { adminListRoles, logout, clearAuthToken } from "@/lib/api";
+import { adminListRoles } from "@/lib/api";
 import type { Role } from "@/lib/api-types";
-import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 export default function MasterDataRolePage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,12 +20,6 @@ export default function MasterDataRolePage() {
       setPage(1);
     }
   }, [roles.length, page]);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const loadRoles = useCallback(() => {
     setLoading(true);
@@ -48,9 +38,7 @@ export default function MasterDataRolePage() {
   }, [loadRoles]);
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 md:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Master Data
@@ -127,7 +115,6 @@ export default function MasterDataRolePage() {
             />
           )}
         </div>
-      </main>
     </div>
   );
 }

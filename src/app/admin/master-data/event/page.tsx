@@ -1,10 +1,7 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
-import { logout, clearAuthToken } from "@/lib/api";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 export type EventCategorySlug = "tryout" | "free_class" | "paid_class";
 
@@ -22,8 +19,6 @@ const DEFAULT_CATEGORIES: EventCategory[] = [
 ];
 
 export default function MasterDataEventPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [categories, setCategories] = useState<EventCategory[]>(DEFAULT_CATEGORIES);
   const [modalOpen, setModalOpen] = useState<"add" | "edit" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -35,12 +30,6 @@ export default function MasterDataEventPage() {
     () => categories.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [categories, page]
   );
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const openAdd = () => {
     setForm({ name: "", slug: "", description: "" });
@@ -112,9 +101,7 @@ export default function MasterDataEventPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -206,8 +193,6 @@ export default function MasterDataEventPage() {
         <p className="mt-4 text-xs text-zinc-500">
           Sesi tryout (buat soal, jadwal) dikelola di menu <strong>Tryout</strong>. Di sini hanya kategori/jenis event.
         </p>
-      </main>
-
       {modalOpen && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">

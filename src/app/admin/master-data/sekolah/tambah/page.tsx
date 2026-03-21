@@ -1,10 +1,7 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
-import { logout, clearAuthToken } from "@/lib/api";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 const defaultInfo = {
   nama_sekolah: "",
@@ -21,16 +18,8 @@ const defaultInfo = {
 };
 
 export default function TambahDataSekolahPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [info, setInfo] = useState(defaultInfo);
   const [saved, setSaved] = useState(false);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,9 +29,7 @@ export default function TambahDataSekolahPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -239,7 +226,6 @@ export default function TambahDataSekolahPage() {
             )}
           </div>
         </form>
-      </main>
     </div>
   );
 }

@@ -1,25 +1,8 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
-import { logout, clearAuthToken } from "@/lib/api";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback } from "react";
-
 export default function AdminPaymentPage() {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
-
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 md:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Manage
@@ -40,7 +23,6 @@ export default function AdminPaymentPage() {
             Anda dapat melihat riwayat pembayaran, konfirmasi pembayaran, dan laporan pembelian kelas.
           </p>
         </div>
-      </main>
     </div>
   );
 }

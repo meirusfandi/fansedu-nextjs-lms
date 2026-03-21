@@ -108,6 +108,26 @@ function getBaseUrl(): string {
 
 const BASE = typeof window !== "undefined" ? getBaseUrl() : getBaseUrl();
 
+/** Cegah beberapa redirect bersamaan jika banyak request gagal 401 sekaligus. */
+let unauthorizedRedirectScheduled = false;
+
+/**
+ * Saat backend mengembalikan 401 pada request yang mengharapkan auth (token kedaluwarsa / tidak valid):
+ * bersihkan cookie + Zustand, lalu alihkan ke halaman login.
+ * Tidak dipanggil untuk `auth: false` (mis. login/register) agar error kredensial tetap ditampilkan di form.
+ */
+function scheduleUnauthorizedRedirect(): void {
+  if (typeof window === "undefined" || unauthorizedRedirectScheduled) return;
+  unauthorizedRedirectScheduled = true;
+  void import("@/store/auth").then(({ useAuthStore }) => {
+    useAuthStore.getState().clearAuth();
+    const next = `${window.location.pathname}${window.location.search}`;
+    const qs = new URLSearchParams({ session: "expired" });
+    if (next && next !== "/login") qs.set("next", next);
+    window.location.assign(`/login?${qs.toString()}`);
+  });
+}
+
 function getToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/auth_token=([^;]+)/);
@@ -201,6 +221,9 @@ async function request<T>(
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    if (auth && res.status === 401) {
+      scheduleUnauthorizedRedirect();
+    }
     const d = data as { error?: string; message?: string };
     let message = d?.error ?? d?.message ?? res.statusText;
     if (res.status === 500 || message.toLowerCase().includes("internal server error")) {

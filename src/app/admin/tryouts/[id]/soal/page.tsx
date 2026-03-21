@@ -1,6 +1,5 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { QuestionBody } from "@/components/QuestionBody";
 import { RichTextEditor } from "@/components/RichTextEditor";
@@ -10,12 +9,10 @@ import {
   adminGetTryout,
   adminListTryoutQuestions,
   adminUpdateQuestion,
-  logout,
-  clearAuthToken,
 } from "@/lib/api";
 import type { AdminCreateQuestionRequest, Question, TryoutSession } from "@/lib/api-types";
 import Link from "next/link";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const TYPE_LABEL: Record<string, string> = {
@@ -39,8 +36,6 @@ const emptyQuestionForm: {
 };
 
 export default function AdminTryoutSoalPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const params = useParams();
   const tryoutId = params?.id as string | undefined;
 
@@ -69,12 +64,6 @@ export default function AdminTryoutSoalPage() {
       setPage(1);
     }
   }, [questions.length, page]);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const loadData = useCallback(() => {
     if (!tryoutId) return;
@@ -211,17 +200,14 @@ export default function AdminTryoutSoalPage() {
 
   if (!tryoutId) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
+      <div className="px-4 py-8">
         <p className="text-sm text-zinc-500">ID tryout tidak valid.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <Link
@@ -322,7 +308,6 @@ export default function AdminTryoutSoalPage() {
             </>
           )}
         </div>
-      </main>
 
       {modalOpen && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">

@@ -1,10 +1,7 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
-import { logout, clearAuthToken } from "@/lib/api";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type BatchItem = {
   id: string;
@@ -15,8 +12,6 @@ type BatchItem = {
 };
 
 export default function AdminKelasPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({
@@ -32,12 +27,6 @@ export default function AdminKelasPage() {
     () => batches.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [batches, page]
   );
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,10 +51,7 @@ export default function AdminKelasPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -169,7 +155,6 @@ export default function AdminKelasPage() {
         <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50/80 p-3 text-xs text-zinc-600 ">
           <strong>Beda dengan Master Data → Subject:</strong> Subject berisi kelas/bidang yang <em>saat ini dibuka</em>. Management Kelas berisi penjadwalan kelas <em>per batch</em> (periode/angkatan) yang akan dibuka.
         </div>
-      </main>
 
       {modalOpen && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">

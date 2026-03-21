@@ -1,19 +1,15 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import {
   adminGetLevel,
   adminUpdateLevel,
-  logout,
-  clearAuthToken,
 } from "@/lib/api";
 import Link from "next/link";
-import { usePathname, useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function EditJenjangPendidikanPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const params = useParams();
   const levelId = params?.id as string | undefined;
   const [form, setForm] = useState({
@@ -26,12 +22,6 @@ export default function EditJenjangPendidikanPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   useEffect(() => {
     if (!levelId) {
@@ -87,38 +77,30 @@ export default function EditJenjangPendidikanPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-        <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-        <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
-          <p className="text-sm text-zinc-500">Memuat...</p>
-        </main>
+      <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+        <p className="text-sm text-zinc-500">Memuat...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-        <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-        <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-          <Link
-            href="/admin/master-data/jenjang"
-            className="mt-4 inline-block text-sm font-medium text-zinc-600"
-          >
-            ← Kembali ke list
-          </Link>
-        </main>
+      <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+        <Link
+          href="/admin/master-data/jenjang"
+          className="mt-4 inline-block text-sm font-medium text-zinc-600"
+        >
+          ← Kembali ke list
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -231,7 +213,6 @@ export default function EditJenjangPendidikanPage() {
             </Link>
           </div>
         </form>
-      </main>
     </div>
   );
 }

@@ -1,14 +1,12 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
-import { adminCreateLevel, logout, clearAuthToken } from "@/lib/api";
+import { adminCreateLevel } from "@/lib/api";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 export default function TambahJenjangPendidikanPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -18,12 +16,6 @@ export default function TambahJenjangPendidikanPage() {
   });
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,9 +56,7 @@ export default function TambahJenjangPendidikanPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -185,7 +175,6 @@ export default function TambahJenjangPendidikanPage() {
             </Link>
           </div>
         </form>
-      </main>
     </div>
   );
 }

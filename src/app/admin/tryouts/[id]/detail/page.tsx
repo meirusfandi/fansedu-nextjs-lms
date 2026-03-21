@@ -1,6 +1,5 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import { QuestionBody } from "@/components/QuestionBody";
 import {
   adminGetTryout,
@@ -8,12 +7,10 @@ import {
   adminGetQuestionStats,
   adminGetAllQuestionStats,
   getTryoutLeaderboard,
-  logout,
-  clearAuthToken,
 } from "@/lib/api";
 import type { LeaderboardEntry, Question, TryoutSession } from "@/lib/api-types";
 import Link from "next/link";
-import { useParams, usePathname, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 const LEVEL_LABEL: Record<string, string> = {
@@ -112,8 +109,6 @@ function QuestionStatsBlock({
 type QuestionWithStats = Question & { stats: Awaited<ReturnType<typeof adminGetQuestionStats>> };
 
 export default function AdminTryoutDetailPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const params = useParams();
   const tryoutId = params?.id as string | undefined;
 
@@ -123,11 +118,6 @@ export default function AdminTryoutDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const loadData = useCallback(async () => {
     if (!tryoutId) return;
@@ -196,35 +186,27 @@ export default function AdminTryoutDetailPage() {
 
   if (loading && !tryout) {
     return (
-      <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-        <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-        <main className="flex-1 px-4 py-8">
-          <p className="text-sm text-zinc-500">Memuat detail event...</p>
-        </main>
+      <div className="px-4 py-8">
+        <p className="text-sm text-zinc-500">Memuat detail event...</p>
       </div>
     );
   }
 
   if (error && !tryout) {
     return (
-      <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-        <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-        <main className="flex-1 px-4 py-8">
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-          <Link href="/admin/tryouts" className="mt-4 inline-block text-sm text-zinc-600 underline">
-            ← Kembali ke daftar event
-          </Link>
-        </main>
+      <div className="px-4 py-8">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+        <Link href="/admin/tryouts" className="mt-4 inline-block text-sm text-zinc-600 underline">
+          ← Kembali ke daftar event
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link href="/admin/tryouts" className="text-sm text-zinc-600 underline hover:text-zinc-900">
@@ -377,7 +359,6 @@ export default function AdminTryoutDetailPage() {
             )}
           </div>
         </section>
-      </main>
     </div>
   );
 }

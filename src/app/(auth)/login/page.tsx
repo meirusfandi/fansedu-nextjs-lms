@@ -34,6 +34,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set dari query `?session=expired` setelah token kedaluwarsa (redirect dari api.ts). */
+  const [sessionExpired, setSessionExpired] = useState(false);
+  /** Path aman internal dari `?next=` untuk redirect pasca-login. */
+  const [returnPath, setReturnPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -42,6 +46,14 @@ export default function LoginPage() {
       setForm((f) => ({ ...f, email: saved }));
       setRememberMe(true);
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("session") === "expired") setSessionExpired(true);
+    const next = p.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) setReturnPath(next);
   }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -59,7 +71,8 @@ export default function LoginPage() {
         localStorage.removeItem(REMEMBER_EMAIL_KEY);
       }
       const role = useAuthStore.getState().role;
-      const dest = getDashboardPathForRole(role) ?? "/landing";
+      const byRole = getDashboardPathForRole(role) ?? "/landing";
+      const dest = returnPath ?? byRole;
       router.replace(dest);
     } catch (err) {
       const status = (err as { status?: number }).status;
@@ -77,6 +90,11 @@ export default function LoginPage() {
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-900">Welcome back</h1>
           <p className="mt-2 text-sm text-zinc-600">Sign in to continue to your dashboard.</p>
         </div>
+        {sessionExpired && !error && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Sesi Anda telah berakhir atau token tidak valid. Silakan masuk kembali.
+          </div>
+        )}
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
         )}

@@ -1,6 +1,5 @@
 "use client";
 
-import { AdminSidebar } from "@/components/AdminSidebar";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminCreateUser,
@@ -9,11 +8,8 @@ import {
   adminListSekolah,
   adminListSubjects,
   adminUpdateUser,
-  logout,
-  clearAuthToken,
 } from "@/lib/api";
 import type { Sekolah, Subject, User } from "@/lib/api-types";
-import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -23,8 +19,6 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
-  const router = useRouter();
-  const pathname = usePathname();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,12 +48,6 @@ export default function AdminUsersPage() {
       setPage(1);
     }
   }, [users.length, page]);
-
-  const handleLogout = useCallback(() => {
-    logout().catch(() => {});
-    clearAuthToken();
-    router.push("/login");
-  }, [router]);
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -193,10 +181,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-zinc-50 text-zinc-900">
-      <AdminSidebar currentPath={pathname ?? ""} onLogout={handleLogout} />
-
-      <main className="flex-1 px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex items-center justify-between md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
@@ -307,7 +292,6 @@ export default function AdminUsersPage() {
             />
           )}
         </div>
-      </main>
 
       {/* Modal: Detail / Add / Edit */}
       {modalMode && (
