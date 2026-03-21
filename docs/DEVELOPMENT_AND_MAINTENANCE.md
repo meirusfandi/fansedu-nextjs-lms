@@ -196,7 +196,9 @@ fansedu-lms/
 | `/admin/tryouts/[id]/soal` | Kelola soal tryout | Admin |
 | `/admin/master-data/*` | Jenjang, bidang, sekolah, event, role, setting | Admin |
 | `/admin/report` | Laporan | Admin |
-| `/admin/payment` | Payment | Admin |
+| `/admin/payment` | Daftar pembayaran, setujui/tolak (verifikasi admin) | Admin |
+
+Alur pembayaran & konfirmasi (siswa/trainer → admin): **[PAYMENT_AND_CONFIRMATION_FLOW.md](PAYMENT_AND_CONFIRMATION_FLOW.md)**.
 
 ---
 
@@ -204,6 +206,7 @@ fansedu-lms/
 
 - **Base URL:** `NEXT_PUBLIC_API_URL` + `/api/v1` (contoh: `https://api.fansedu.web.id/api/v1`).
 - **Auth:** Header `Authorization: Bearer <token>` untuk endpoint yang memerlukan login/admin.
+- **Pembayaran (admin):** `GET /admin/payments`, `POST /admin/payments/:id/confirm`, `POST /admin/payments/:id/reject` — lihat [PAYMENT_AND_CONFIRMATION_FLOW.md](PAYMENT_AND_CONFIRMATION_FLOW.md).
 - **Endpoint tryout (ringkas):**
   - `GET /admin/tryouts/:tryoutId` — detail tryout
   - `GET /admin/tryouts/:tryoutId/questions` — daftar soal

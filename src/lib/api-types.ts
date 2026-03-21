@@ -484,15 +484,25 @@ export interface Notification {
 }
 
 // --- Payments (user: GET /payments, POST /payments) ---
+/** Status umum: pending (menunggu verifikasi), confirmed/completed (disetujui), rejected (ditolak). */
+export type PaymentStatus = "pending" | "confirmed" | "completed" | "rejected" | string;
+
 export interface Payment {
   id: string;
   user_id?: string;
+  /** Nama pengguna yang melakukan pembayaran (jika backend mengirim di list admin). */
+  user_name?: string;
+  user_email?: string;
+  /** student | trainer — siapa yang membayar (untuk tampilan admin). */
+  payer_role?: string;
   amount_cents?: number;
   amount?: number;
   type?: string;
-  status?: string;
+  status?: PaymentStatus;
   reference_id?: string | null;
   proof_url?: string | null;
+  /** Catatan admin / alasan penolakan */
+  notes?: string | null;
   created_at?: string;
   updated_at?: string;
   [key: string]: unknown;

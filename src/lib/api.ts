@@ -374,6 +374,46 @@ export async function createPayment(body: CreatePaymentRequest): Promise<Payment
   return request("/payments", { method: "POST", body });
 }
 
+/** GET /admin/payments — daftar semua pembayaran untuk verifikasi admin. 404/405 = []. */
+export async function adminListPayments(): Promise<Payment[]> {
+  try {
+    const raw = await request<Payment[] | { payments?: Payment[]; data?: Payment[] }>("/admin/payments", {
+      method: "GET",
+    });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { payments?: Payment[]; data?: Payment[] }) : {};
+    return Array.isArray(obj.payments) ? obj.payments : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** POST /admin/payments/:id/confirm — konfirmasi pembayaran (admin). */
+export async function adminConfirmPayment(paymentId: string): Promise<Payment> {
+  return request(`/admin/payments/${paymentId}/confirm`, { method: "POST" });
+}
+
+/** POST /admin/payments/:id/reject — tolak pembayaran (admin). */
+export async function adminRejectPayment(paymentId: string, body?: { reason?: string }): Promise<Payment> {
+  return request(`/admin/payments/${paymentId}/reject`, { method: "POST", body: body ?? {} });
+}
+
+/** GET /trainer/payments — riwayat pembayaran milik trainer (slot, dll). 404/405 = []. */
+export async function trainerListPayments(): Promise<Payment[]> {
+  try {
+    const raw = await request<Payment[] | { payments?: Payment[]; data?: Payment[] }>("/trainer/payments", {
+      method: "GET",
+    });
+    if (Array.isArray(raw)) return raw;
+    const obj = raw && typeof raw === "object" ? (raw as { payments?: Payment[]; data?: Payment[] }) : {};
+    return Array.isArray(obj.payments) ? obj.payments : Array.isArray(obj.data) ? obj.data : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
 // --- Trainer (Guru) ---
 /** Status slot & siswa guru. 404/405 = { paid_slots: 0, registered_students_count: 0 }. includeStudents=true → GET /trainer/status?students=1 */
 export async function getTrainerStatus(includeStudents?: boolean): Promise<TrainerStatusResponse> {

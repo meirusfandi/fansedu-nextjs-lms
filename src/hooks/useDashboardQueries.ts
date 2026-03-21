@@ -21,6 +21,10 @@ import {
   markNotificationRead,
   listPayments,
   createPayment,
+  adminListPayments,
+  adminConfirmPayment,
+  adminRejectPayment,
+  trainerListPayments,
 } from "@/lib/api";
 import type { TrainerCourseCreateRequest, CreatePaymentRequest } from "@/lib/api-types";
 
@@ -42,6 +46,8 @@ export const queryKeys = {
   dashboard: ["dashboard"] as const,
   notifications: ["notifications"] as const,
   payments: ["payments"] as const,
+  adminPayments: ["admin", "payments"] as const,
+  trainerPayments: ["trainer", "payments"] as const,
 };
 
 export function useStudentDashboard() {
@@ -190,6 +196,53 @@ export function useCreatePayment() {
   });
 }
 
+/** Semua pembayaran untuk verifikasi admin. GET /admin/payments */
+export function useAdminPayments() {
+  return useQuery({
+    queryKey: queryKeys.adminPayments,
+    queryFn: adminListPayments,
+  });
+}
+
+/** Riwayat pembayaran trainer: GET /trainer/payments, fallback GET /payments. */
+export function useTrainerPayments() {
+  return useQuery({
+    queryKey: queryKeys.trainerPayments,
+    queryFn: async () => {
+      const fromTrainer = await trainerListPayments();
+      if (fromTrainer.length > 0) return fromTrainer;
+      return listPayments();
+    },
+  });
+}
+
+export function useAdminConfirmPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => adminConfirmPayment(paymentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.payments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
+    },
+  });
+}
+
+export function useAdminRejectPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, reason }: { paymentId: string; reason?: string }) =>
+      adminRejectPayment(paymentId, reason ? { reason } : undefined),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.payments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
+    },
+  });
+}
+
 export function useQueryClientInvalidator() {
   const qc = useQueryClient();
   return {
@@ -198,5 +251,6 @@ export function useQueryClientInvalidator() {
     invalidateTrainer: () => qc.invalidateQueries({ queryKey: ["trainer"] }),
     invalidateNotifications: () => qc.invalidateQueries({ queryKey: queryKeys.notifications }),
     invalidatePayments: () => qc.invalidateQueries({ queryKey: queryKeys.payments }),
+    invalidateAdminPayments: () => qc.invalidateQueries({ queryKey: queryKeys.adminPayments }),
   };
 }
