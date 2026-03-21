@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function TeacherRedirectPage() {
-  redirect("/landing");
+  redirect("/login?reason=unsupported");
 }

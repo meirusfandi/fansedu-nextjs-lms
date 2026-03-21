@@ -16,8 +16,7 @@ export default function GuruLayout({
   useEffect(() => {
     const role = getAuthRole();
     if (role !== "trainer") {
-      if (role) router.replace("/student");
-      else router.replace("/login");
+      router.replace(role ? "/login?reason=unsupported" : "/login");
     }
   }, [router]);
 

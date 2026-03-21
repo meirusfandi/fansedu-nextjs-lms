@@ -47,7 +47,7 @@ export default function MasterDataRolePage() {
             Role
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            Daftar role user dari API (admin, pengajar, siswa, dll).
+            Daftar role user dari API (sesuai backend).
           </p>
         </div>
 

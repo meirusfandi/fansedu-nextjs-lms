@@ -12,8 +12,8 @@ export type {
   RegisterResponse,
 } from "@/lib/api-types";
 
-/** Role used for dashboard routing (backend may use "guru" → we use "trainer"). */
-export type DashboardRole = "admin" | "student" | "teacher" | "trainer";
+/** Role untuk routing aplikasi ini — hanya Admin & Trainer (siswa tidak memakai web ini). */
+export type DashboardRole = "admin" | "trainer";
 
 export interface AuthUser {
   id: string;

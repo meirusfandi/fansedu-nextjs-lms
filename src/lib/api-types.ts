@@ -66,7 +66,7 @@ export interface RegisterRequest {
   name: string;
   email: string;
   password: string;
-  /** Role saat mendaftar: student (default), siswa (alias), atau guru. Sesuai backend. */
+  /** Role saat mendaftar (backend). Di app ini self-service hanya mengirim `guru` (trainer). */
   role?: "student" | "siswa" | "guru";
 }
 

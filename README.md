@@ -29,8 +29,9 @@ Buka [http://localhost:3000](http://localhost:3000).
 
 ## Fitur
 
-- **Siswa:** Login, dashboard, tryout, review jawaban, sertifikat.
-- **Admin:** Dashboard, user, event/tryout, soal, master data (jenjang, bidang, sekolah, event, role), laporan, payment.
+- **Admin & Trainer (pengajar):** Satu-satunya peran yang didukung di web app ini — login, dashboard, manajemen konten, tryout, dll. (Akun siswa tidak masuk lewat aplikasi ini.)
+- **Admin:** Dashboard, user (trainer), event/tryout, soal, master data (jenjang, bidang, sekolah, event, role), laporan, payment.
+- **Trainer:** Dashboard, kelas, bank soal, kuis, menu trainer & kelola peserta (slot).
 
 ## Dokumentasi
 

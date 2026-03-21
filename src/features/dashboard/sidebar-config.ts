@@ -1,6 +1,6 @@
 import type { NavSection } from "@/components/layout/Sidebar";
 
-/** Hanya admin dan trainer. Siswa/guru di-handle di landing. */
+/** Hanya admin dan trainer (app ini tidak untuk siswa). */
 export const adminSidebarSections: NavSection[] = [
   { title: "Overview", items: [{ href: "/admin/dashboard", label: "Dashboard" }] },
   {

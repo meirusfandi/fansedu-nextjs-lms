@@ -8,8 +8,8 @@ export default async function Home() {
 
   if (token && role) {
     if (role === "admin") redirect("/admin/dashboard");
-    if (role === "trainer") redirect("/trainer/dashboard");
-    redirect("/landing");
+    if (role === "trainer" || role === "guru") redirect("/trainer/dashboard");
+    redirect("/login?reason=unsupported");
   }
 
   redirect("/login");

@@ -7,12 +7,11 @@ import { register as authRegister } from "@/services/auth";
 import { useAuthStore } from "@/store/auth";
 import { getDashboardPathForRole } from "@/hooks/useRedirectByRole";
 
-type RegisterType = "student" | "guru";
 type RegisterFormState = { name: string; email: string; password: string; confirmPassword: string };
 
+/** Backend: role `guru` dipetakan ke trainer di layanan auth. */
 export default function RegisterPage() {
   const router = useRouter();
-  const [registerType, setRegisterType] = useState<RegisterType>("student");
   const [form, setForm] = useState<RegisterFormState>({
     name: "",
     email: "",
@@ -35,10 +34,10 @@ export default function RegisterPage() {
         name: form.name,
         email: form.email,
         password: form.password,
-        role: registerType,
+        role: "guru",
       });
       const role = useAuthStore.getState().role;
-      const dest = getDashboardPathForRole(role) ?? "/landing";
+      const dest = getDashboardPathForRole(role) ?? "/trainer/dashboard";
       router.push(dest);
     } catch (err) {
       setError((err as Error).message || "Gagal mendaftar. Coba lagi atau gunakan email lain.");
@@ -51,36 +50,19 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-zinc-50 to-white px-4 py-8">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Daftar akun</h1>
-          <p className="mt-2 text-sm text-zinc-600">Pilih tipe akun lalu isi data Anda.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Daftar akun Trainer</h1>
+          <p className="mt-2 text-sm text-zinc-600">
+            Pendaftaran untuk pengajar (trainer). Akun admin dan manajemen siswa diluar self-service ini.
+          </p>
         </div>
-        <div className="mb-6 flex rounded-xl border border-zinc-200 bg-zinc-50/50 p-1">
-          <button
-            type="button"
-            onClick={() => setRegisterType("student")}
-            className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition ${registerType === "student" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
-          >
-            Siswa
-          </button>
-          <button
-            type="button"
-            onClick={() => setRegisterType("guru")}
-            className={`flex-1 rounded-lg py-2.5 text-sm font-medium transition ${registerType === "guru" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
-          >
-            Guru
-          </button>
-        </div>
-        {registerType === "guru" && (
-          <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-800">
-            Akun guru akan diarahkan ke dashboard trainer. Setelah mendaftar dan membayar biaya untuk sejumlah siswa, Anda dapat menambahkan siswa tersebut.
-          </div>
-        )}
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <label htmlFor="name" className="block text-sm font-medium text-zinc-800">Nama lengkap</label>
+            <label htmlFor="name" className="block text-sm font-medium text-zinc-800">
+              Nama lengkap
+            </label>
             <input
               id="name"
               name="name"
@@ -94,7 +76,9 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-sm font-medium text-zinc-800">Email</label>
+            <label htmlFor="email" className="block text-sm font-medium text-zinc-800">
+              Email
+            </label>
             <input
               id="email"
               name="email"
@@ -108,7 +92,9 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-sm font-medium text-zinc-800">Kata sandi</label>
+            <label htmlFor="password" className="block text-sm font-medium text-zinc-800">
+              Kata sandi
+            </label>
             <input
               id="password"
               name="password"
@@ -122,7 +108,9 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-800">Konfirmasi kata sandi</label>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-800">
+              Konfirmasi kata sandi
+            </label>
             <input
               id="confirmPassword"
               name="confirmPassword"
@@ -140,11 +128,14 @@ export default function RegisterPage() {
             disabled={loading}
             className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-700"
           >
-            {loading ? "Mendaftar..." : registerType === "guru" ? "Daftar sebagai guru" : "Daftar sebagai siswa"}
+            {loading ? "Mendaftar..." : "Daftar sebagai Trainer"}
           </button>
         </form>
         <p className="mt-6 text-center text-sm text-zinc-600">
-          Sudah punya akun? <Link href="/login" className="font-medium text-zinc-900 underline-offset-2 hover:underline">Masuk</Link>
+          Sudah punya akun?{" "}
+          <Link href="/login" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+            Masuk
+          </Link>
         </p>
       </div>
     </div>

@@ -18,12 +18,14 @@ function readTokenFromCookie(): string | null {
 }
 
 function userToAuthUser(u: User): AuthUser {
-  const role: DashboardRole = u.role === "trainer" ? "trainer" : u.role;
+  if (u.role !== "admin" && u.role !== "trainer") {
+    throw new Error("Aplikasi ini hanya mendukung akun Admin atau Trainer.");
+  }
   return {
     id: u.id,
     name: u.name,
     email: u.email,
-    role,
+    role: u.role,
     avatar_url: u.avatar_url,
   };
 }
@@ -49,10 +51,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
   isHydrated: false,
 
   setAuth: ({ token, user, maxAgeSeconds = 604800 }) => {
+    let authUser: AuthUser;
+    try {
+      authUser = userToAuthUser(user);
+    } catch {
+      clearCookieAuth();
+      set({ token: null, user: null, role: null, isHydrated: true });
+      throw new Error("Aplikasi ini hanya untuk Admin dan Trainer.");
+    }
     const roleForCookie = user.role;
     const name = user.name;
     setCookieAuth(token, maxAgeSeconds, roleForCookie, name);
-    const authUser = userToAuthUser(user);
     set({
       token,
       user: authUser,
@@ -75,7 +84,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({ token: null, user: null, role: null, isHydrated: true });
       return;
     }
-    const role: DashboardRole = roleFromCookie;
+    if (roleFromCookie !== "admin" && roleFromCookie !== "trainer") {
+      clearCookieAuth();
+      set({ token: null, user: null, role: null, isHydrated: true });
+      return;
+    }
+    const role = roleFromCookie;
     set({
       token,
       user: {
@@ -90,11 +104,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 }));
 
-/** Map backend role (e.g. "guru") to DashboardRole. */
-export function toDashboardRole(backendRole: string): DashboardRole {
+/** Map string role backend ke DashboardRole (hanya admin | trainer dipakai di app). */
+export function toDashboardRole(backendRole: string): DashboardRole | null {
   if (backendRole === "admin") return "admin";
-  if (backendRole === "student") return "student";
-  if (backendRole === "guru" || backendRole === "trainer") return "trainer";
-  if (backendRole === "teacher") return "teacher";
-  return "student";
+  if (backendRole === "guru" || backendRole === "trainer" || backendRole === "teacher") return "trainer";
+  return null;
 }

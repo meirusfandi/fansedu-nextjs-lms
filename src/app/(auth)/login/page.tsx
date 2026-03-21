@@ -38,6 +38,8 @@ export default function LoginPage() {
   const [sessionExpired, setSessionExpired] = useState(false);
   /** Path aman internal dari `?next=` untuk redirect pasca-login. */
   const [returnPath, setReturnPath] = useState<string | null>(null);
+  /** Cookie role siswa / tidak didukung — paksa bersihkan sesi. */
+  const [unsupportedRole, setUnsupportedRole] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -52,6 +54,10 @@ export default function LoginPage() {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
     if (p.get("session") === "expired") setSessionExpired(true);
+    if (p.get("reason") === "unsupported") {
+      setUnsupportedRole(true);
+      useAuthStore.getState().clearAuth();
+    }
     const next = p.get("next");
     if (next && next.startsWith("/") && !next.startsWith("//")) setReturnPath(next);
   }, []);
@@ -71,10 +77,15 @@ export default function LoginPage() {
         localStorage.removeItem(REMEMBER_EMAIL_KEY);
       }
       const role = useAuthStore.getState().role;
-      const byRole = getDashboardPathForRole(role) ?? "/landing";
+      const byRole = getDashboardPathForRole(role) ?? "/trainer/dashboard";
       const dest = returnPath ?? byRole;
       router.replace(dest);
     } catch (err) {
+      const message = (err as Error)?.message ?? "";
+      if (message.includes("Admin dan Trainer")) {
+        setError(message);
+        return;
+      }
       const status = (err as { status?: number }).status;
       setError(status === 401 ? "Email atau password salah." : "Gagal masuk. Periksa koneksi atau coba lagi.");
     } finally {
@@ -88,9 +99,14 @@ export default function LoginPage() {
         <div className="mb-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Fansedu - Informatic Olympiad Academy</p>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-900">Welcome back</h1>
-          <p className="mt-2 text-sm text-zinc-600">Sign in to continue to your dashboard.</p>
+          <p className="mt-2 text-sm text-zinc-600">Masuk sebagai Admin atau Trainer.</p>
         </div>
-        {sessionExpired && !error && (
+        {unsupportedRole && !error && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Aplikasi ini hanya untuk Admin dan Trainer. Sesi tidak didukung telah dihapus.
+          </div>
+        )}
+        {sessionExpired && !error && !unsupportedRole && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Sesi Anda telah berakhir atau token tidak valid. Silakan masuk kembali.
           </div>
@@ -153,7 +169,10 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="mt-6 text-center text-sm text-zinc-600">
-          Belum punya akun? <Link href="/register" className="font-medium text-zinc-900 underline-offset-2 hover:underline">Daftar</Link>
+          Trainer baru?{" "}
+          <Link href="/register" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
+            Daftar akun Trainer
+          </Link>
         </p>
       </div>
     </div>

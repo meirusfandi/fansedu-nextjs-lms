@@ -77,7 +77,15 @@ export default function TrainerDashboardPage() {
       </section>
 
       <p className="mt-6 text-sm text-zinc-500">
-        Untuk kelola siswa dan pembayaran slot, gunakan menu <Link href="/guru/kelola-siswa" className="font-medium text-sky-600 hover:underline">Kelola Siswa</Link> dan <Link href="/guru/pembayaran" className="font-medium text-sky-600 hover:underline">Pembayaran</Link> di Guru (legacy).
+        Kelola peserta dan pembayaran slot:{" "}
+        <Link href="/guru/kelola-siswa" className="font-medium text-sky-600 hover:underline">
+          Kelola peserta
+        </Link>{" "}
+        ·{" "}
+        <Link href="/guru/pembayaran" className="font-medium text-sky-600 hover:underline">
+          Pembayaran
+        </Link>
+        .
       </p>
     </>
   );

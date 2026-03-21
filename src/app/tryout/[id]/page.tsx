@@ -222,10 +222,10 @@ export default function TryoutDetailPage() {
           <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-center shadow-sm">
             <p className="text-sm text-zinc-700">{loadError}</p>
             <Link
-              href="/student"
+              href="/login"
               className="mt-4 inline-block text-sm font-medium text-zinc-600 underline underline-offset-2"
             >
-              Kembali ke dashboard
+              Kembali ke login
             </Link>
           </div>
         </div>
@@ -273,8 +273,8 @@ export default function TryoutDetailPage() {
       <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-50 text-zinc-900">
         <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 md:px-8">
           <p className="text-[11px] text-zinc-500">
-            <Link href="/student" className="font-medium text-zinc-700 underline-offset-2 hover:underline">
-              Dashboard siswa
+            <Link href="/login" className="font-medium text-zinc-700 underline-offset-2 hover:underline">
+              Login
             </Link>{" "}
             / Simulasi
           </p>
@@ -389,10 +389,10 @@ export default function TryoutDetailPage() {
 
           <div className="mt-8">
             <Link
-              href="/student"
+              href="/login"
               className="inline-block rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
             >
-              Kembali
+              Kembali ke login
             </Link>
           </div>
         </main>
@@ -519,16 +519,16 @@ export default function TryoutDetailPage() {
 
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
-              href={`/student/attempts/${attemptId}/review`}
+              href="/login"
               className="rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50"
             >
-              Lihat soal & jawaban
+              Login
             </Link>
             <Link
-              href="/student"
+              href="/login"
               className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-700"
             >
-              Kembali ke dashboard siswa
+              Kembali ke login
             </Link>
           </div>
         </main>
@@ -567,10 +567,10 @@ export default function TryoutDetailPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <Link
-              href="/student"
+              href="/login"
               className="text-[11px] font-medium text-zinc-600 underline-offset-2 hover:underline"
             >
-              Dashboard
+              Login
             </Link>
             <span className="text-[11px] text-zinc-400">|</span>
             <span className="text-xs font-medium">{tryout.title}</span>

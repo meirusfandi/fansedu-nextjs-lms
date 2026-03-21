@@ -7,15 +7,13 @@ import type { DashboardRole } from "@/types";
 
 const ROLE_DASHBOARD: Record<DashboardRole, string> = {
   admin: "/admin/dashboard",
-  student: "/landing",
-  teacher: "/landing",
   trainer: "/trainer/dashboard",
 };
 
-/** Hanya admin dan trainer yang punya dashboard di app ini. Siswa/guru → landing. */
+/** Hanya admin dan trainer (aplikasi ini tidak memakai dashboard siswa). */
 export function getDashboardPathForRole(role: DashboardRole | null): string | null {
   if (!role) return null;
-  return ROLE_DASHBOARD[role] ?? "/landing";
+  return ROLE_DASHBOARD[role] ?? null;
 }
 
 /**
@@ -30,7 +28,12 @@ export function useRedirectByRole() {
   useEffect(() => {
     if (!isHydrated) return;
     if (!isAuthenticated) {
-      if (pathname !== "/login" && pathname !== "/register" && pathname !== "/forgot-password") {
+      if (
+        pathname !== "/login" &&
+        pathname !== "/register" &&
+        pathname !== "/forgot-password" &&
+        pathname !== "/landing"
+      ) {
         router.replace("/login");
       }
       return;

@@ -9,11 +9,12 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-white">
       <div className="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-          Platform Belajar Siswa & Guru
+          Fansedu LMS
         </h1>
         <p className="mt-4 text-zinc-600">
-          Dashboard dan fitur belajar untuk siswa serta guru tersedia di platform terpisah.
-          Silakan akses melalui link di bawah.
+          Aplikasi web ini untuk <strong className="text-zinc-800">Admin</strong> dan{" "}
+          <strong className="text-zinc-800">Trainer</strong> (pengajar). Masuk melalui halaman login untuk mengelola
+          platform.
         </p>
         {LANDING_URL !== "#" ? (
           <a
@@ -22,22 +23,19 @@ export default function LandingPage() {
             rel="noopener noreferrer"
             className="mt-8 inline-block rounded-lg bg-emerald-600 px-6 py-3 text-sm font-medium text-white hover:bg-emerald-700"
           >
-            Buka platform belajar →
+            Situs publik / informasi →
           </a>
         ) : (
           <p className="mt-6 text-sm text-zinc-500">
-            Atur <code className="rounded bg-zinc-200 px-1.5 py-0.5">NEXT_PUBLIC_LANDING_URL</code> di .env untuk menambahkan link.
+            Atur <code className="rounded bg-zinc-200 px-1.5 py-0.5">NEXT_PUBLIC_LANDING_URL</code> di .env untuk link
+            eksternal opsional.
           </p>
         )}
         <p className="mt-8 text-sm text-zinc-500">
-          Jika Anda admin atau trainer/guru, gunakan menu di atas untuk masuk ke dashboard.
+          <Link href="/login" className="font-medium text-zinc-800 underline-offset-2 hover:underline">
+            Masuk sebagai Admin atau Trainer
+          </Link>
         </p>
-        <Link
-          href="/login"
-          className="mt-4 inline-block text-sm font-medium text-zinc-700 hover:text-zinc-900"
-        >
-          ← Kembali ke login
-        </Link>
       </div>
     </div>
   );

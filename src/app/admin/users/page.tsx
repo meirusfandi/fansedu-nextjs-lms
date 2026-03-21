@@ -28,7 +28,7 @@ export default function AdminUsersPage() {
     name: "",
     email: "",
     password: "",
-    role: "student" as "student" | "trainer",
+    role: "trainer" as const,
     subject_id: "",
     school_id: "",
   });
@@ -78,7 +78,7 @@ export default function AdminUsersPage() {
       name: "",
       email: "",
       password: "",
-      role: "student",
+      role: "trainer",
       subject_id: "",
       school_id: "",
     });
@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
         name: full.name,
         email: full.email,
         password: "",
-        role: (full.role === "admin" ? "student" : full.role) as "student" | "trainer",
+        role: "trainer",
         subject_id: full.subject_id ?? "",
         school_id: full.school_id ?? "",
       });
@@ -124,7 +124,7 @@ export default function AdminUsersPage() {
         name: u.name,
         email: u.email,
         password: "",
-        role: (u.role === "admin" ? "student" : u.role) as "student" | "trainer",
+        role: "trainer",
         subject_id: u.subject_id ?? "",
         school_id: u.school_id ?? "",
       });
@@ -149,7 +149,7 @@ export default function AdminUsersPage() {
           name: form.name.trim(),
           email: form.email.trim(),
           password: form.password,
-          role: form.role,
+          role: "trainer",
           subject_id: form.subject_id.trim() || undefined,
           school_id: form.school_id.trim() || undefined,
         });
@@ -158,13 +158,13 @@ export default function AdminUsersPage() {
           name?: string;
           email?: string;
           password?: string;
-          role?: "student" | "trainer";
+          role?: "trainer";
           subject_id?: string | null;
           school_id?: string | null;
         } = {
           name: form.name.trim(),
           email: form.email.trim(),
-          role: form.role,
+          role: "trainer",
           subject_id: form.subject_id.trim() || null,
           school_id: form.school_id.trim() || null,
         };
@@ -191,7 +191,7 @@ export default function AdminUsersPage() {
               Management User
             </h1>
             <p className="mt-1 text-sm text-zinc-500">
-              Lihat detail, tambah, dan edit data user (siswa & pengajar).
+              Lihat detail; tambah & edit akun pengajar (trainer). Akun siswa hanya dari data backend.
             </p>
           </div>
           <button
@@ -266,7 +266,7 @@ export default function AdminUsersPage() {
                           >
                             Detail
                           </button>
-                          {u.role !== "admin" && (
+                          {u.role !== "admin" && u.role !== "student" && (
                             <button
                               type="button"
                               onClick={() => openEdit(u)}
@@ -354,7 +354,7 @@ export default function AdminUsersPage() {
                   </div>
                 ) : null}
                 <div className="mt-6 flex justify-end gap-2">
-                  {selectedUser && selectedUser.role !== "admin" && (
+                  {selectedUser && selectedUser.role !== "admin" && selectedUser.role !== "student" && (
                     <button
                       type="button"
                       onClick={() => openEdit(selectedUser)}
@@ -426,21 +426,11 @@ export default function AdminUsersPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-zinc-600">
-                        Role *
+                        Role
                       </label>
-                      <select
-                        value={form.role}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            role: e.target.value as "student" | "trainer",
-                          })
-                        }
-                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
-                      >
-                        <option value="student">Siswa</option>
-                        <option value="trainer">Pengajar</option>
-                      </select>
+                      <p className="mt-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
+                        Pengajar (Trainer) — satu-satunya role yang dapat dibuat dari halaman ini.
+                      </p>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-zinc-600">
