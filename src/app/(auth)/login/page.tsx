@@ -94,7 +94,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4 text-zinc-900 [color-scheme:light]">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Fansedu - Informatic Olympiad Academy</p>

@@ -77,15 +77,15 @@ export default function EditJenjangPendidikanPage() {
 
   if (loading) {
     return (
-      <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
-        <p className="text-sm text-zinc-500">Memuat...</p>
+      <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
+        <p className="text-sm text-zinc-600">Memuat...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+      <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
         </div>
@@ -100,16 +100,16 @@ export default function EditJenjangPendidikanPage() {
   }
 
   return (
-    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
               Master Data · Jenjang Pendidikan
             </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">
               Edit Jenjang Pendidikan
             </h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-zinc-600">
               Ubah data jenjang.
             </p>
           </div>

@@ -1,0 +1,41 @@
+import type { LandingPackage } from "./types";
+
+/** Nilai awal jika file `data/landing-packages.json` belum ada. */
+export const DEFAULT_LANDING_PACKAGES: LandingPackage[] = [
+  {
+    id: "pkg-tryout-starter",
+    title: "Paket Tryout Starter",
+    description: "Akses beberapa event tryout pilihan dan ringkasan performa dasar. Cocok untuk persiapan kompetisi.",
+    priceLabel: "Rp 149.000",
+    promoLabel: "Promo perdana",
+    highlight: "Populer",
+    ctaLabel: "Daftar trainer",
+    ctaHref: "/register",
+    sortOrder: 0,
+    active: true,
+  },
+  {
+    id: "pkg-kelas-plus",
+    title: "Paket Kelas Plus",
+    description: "Kombinasi kelas terbuka + akses materi lanjutan. Untuk pengajar dan lembaga yang ingin skala.",
+    priceLabel: "Rp 499.000",
+    promoLabel: "Hemat bundling",
+    highlight: "Nilai terbaik",
+    ctaLabel: "Hubungi kami",
+    ctaHref: "/login",
+    sortOrder: 1,
+    active: true,
+  },
+  {
+    id: "pkg-institusi",
+    title: "Paket Institusi",
+    description: "Kustom untuk sekolah/kampus: multi-trainer, laporan, dan dukungan onboarding.",
+    priceLabel: "Sesuai kebutuhan",
+    promoLabel: undefined,
+    highlight: "Enterprise",
+    ctaLabel: "Masuk admin",
+    ctaHref: "/login",
+    sortOrder: 2,
+    active: true,
+  },
+];

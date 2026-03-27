@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
+import { useEffect, useMemo, useState } from "react";
 import { getTrainerStatus, trainerPaySlots, trainerAddStudent, getFriendlyApiErrorMessage } from "@/lib/api";
 
 export default function GuruKelolaSiswaPage() {
@@ -15,6 +16,19 @@ export default function GuruKelolaSiswaPage() {
   const [addStudentForm, setAddStudentForm] = useState({ name: "", email: "", password: "" });
   const [addStudentLoading, setAddStudentLoading] = useState(false);
   const [addStudentError, setAddStudentError] = useState<string | null>(null);
+  const [studentPage, setStudentPage] = useState(1);
+
+  const students = trainerStatus?.students ?? [];
+  const paginatedStudents = useMemo(
+    () => students.slice((studentPage - 1) * PAGE_SIZE, studentPage * PAGE_SIZE),
+    [students, studentPage]
+  );
+
+  useEffect(() => {
+    if (students.length > 0 && (studentPage - 1) * PAGE_SIZE >= students.length) {
+      setStudentPage(1);
+    }
+  }, [students.length, studentPage]);
 
   const refetch = () => {
     getTrainerStatus(true).then(setTrainerStatus).catch(() => {});
@@ -166,7 +180,7 @@ export default function GuruKelolaSiswaPage() {
             <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
               <h2 className="text-sm font-semibold text-zinc-800">Siswa yang sudah didaftarkan</h2>
               <ul className="mt-3 space-y-2">
-                {trainerStatus.students.map((s) => (
+                {paginatedStudents.map((s) => (
                   <li
                     key={s.id}
                     className="flex items-center justify-between rounded-lg border border-zinc-100 bg-zinc-50/50 px-4 py-2.5 text-sm"
@@ -176,6 +190,14 @@ export default function GuruKelolaSiswaPage() {
                   </li>
                 ))}
               </ul>
+              {students.length > 0 && (
+                <Pagination
+                  currentPage={studentPage}
+                  totalItems={students.length}
+                  onPageChange={setStudentPage}
+                  label="siswa"
+                />
+              )}
             </section>
           )}
         </div>

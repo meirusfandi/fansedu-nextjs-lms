@@ -41,6 +41,17 @@ function formatDate(iso: string) {
   }
 }
 
+function toDatetimeLocalValue(value: string | null | undefined): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // Use local time so value is valid for <input type="datetime-local">
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+    d.getMinutes()
+  )}`;
+}
+
 const emptyForm: AdminCreateTryoutRequest = {
   title: "",
   short_title: "",
@@ -111,13 +122,13 @@ export default function AdminTryoutsPage() {
       title: t.title,
       short_title: t.short_title ?? "",
       description: t.description ?? "",
-      duration_minutes: t.duration_minutes,
-      questions_count: t.questions_count,
-      level: t.level,
-      opens_at: t.opens_at.slice(0, 16),
-      closes_at: t.closes_at.slice(0, 16),
+      duration_minutes: t.duration_minutes ?? 90,
+      questions_count: t.questions_count ?? 25,
+      level: t.level ?? "medium",
+      opens_at: toDatetimeLocalValue(t.opens_at),
+      closes_at: toDatetimeLocalValue(t.closes_at),
       max_participants: t.max_participants ?? undefined,
-      status: t.status,
+      status: t.status ?? "draft",
       event_category: (t.event_category as "tryout" | "free_class" | "paid_class") ?? "tryout",
     });
     setEditingId(t.id);
@@ -137,29 +148,53 @@ export default function AdminTryoutsPage() {
     setSubmitError(null);
     setSubmitLoading(true);
     try {
-      const opensAt = form.opens_at ? new Date(form.opens_at).toISOString() : "";
-      const closesAt = form.closes_at ? new Date(form.closes_at).toISOString() : "";
+      const opensDate = form.opens_at ? new Date(form.opens_at) : null;
+      const closesDate = form.closes_at ? new Date(form.closes_at) : null;
+      const opensAt =
+        opensDate && !Number.isNaN(opensDate.getTime())
+          ? opensDate.toISOString()
+          : "";
+      const closesAt =
+        closesDate && !Number.isNaN(closesDate.getTime())
+          ? closesDate.toISOString()
+          : "";
       if (!opensAt || !closesAt) {
         setSubmitError("Tanggal buka dan tutup wajib diisi.");
         return;
       }
+      if (new Date(opensAt).getTime() >= new Date(closesAt).getTime()) {
+        setSubmitError("Tanggal tutup harus setelah tanggal buka.");
+        return;
+      }
+
+      const duration = Number(form.duration_minutes);
+      const questionCount = Number(form.questions_count);
+      if (!Number.isFinite(duration) || duration <= 0) {
+        setSubmitError("Durasi harus lebih dari 0.");
+        return;
+      }
+      if (!Number.isFinite(questionCount) || questionCount <= 0) {
+        setSubmitError("Jumlah soal harus lebih dari 0.");
+        return;
+      }
+
       const payload: AdminCreateTryoutRequest = {
         title: form.title.trim(),
-        duration_minutes: Number(form.duration_minutes) || 90,
-        questions_count: Number(form.questions_count) || 25,
+        duration_minutes: duration,
+        questions_count: questionCount,
         level: form.level,
         opens_at: opensAt,
         closes_at: closesAt,
         status: form.status ?? "draft",
+        // Kirim eksplisit agar update create/update konsisten.
+        short_title: form.short_title?.trim() ? form.short_title.trim() : null,
+        description: form.description?.trim() ? form.description.trim() : null,
+        max_participants:
+          form.max_participants != null && Number(form.max_participants) > 0
+            ? Number(form.max_participants)
+            : null,
+        event_category: form.event_category ?? "tryout",
       };
-      if (form.short_title?.trim()) payload.short_title = form.short_title.trim();
-      if (form.description?.trim()) payload.description = form.description.trim();
-      if (form.max_participants != null && form.max_participants > 0) {
-        payload.max_participants = Number(form.max_participants);
-      }
-      if (form.event_category) {
-        payload.event_category = form.event_category;
-      }
       if (modalOpen === "add") {
         await adminCreateTryout(payload);
       } else if (editingId) {
@@ -355,7 +390,7 @@ export default function AdminTryoutsPage() {
       {/* Modal Tambah / Edit */}
       {modalOpen && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 text-zinc-900 shadow-xl [color-scheme:light]">
             <h2 className="text-lg font-semibold text-zinc-900">
               {modalOpen === "add" ? "Tambah Event" : "Edit Event"}
             </h2>
@@ -374,7 +409,7 @@ export default function AdminTryoutsPage() {
                   required
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
               <div>
@@ -389,7 +424,7 @@ export default function AdminTryoutsPage() {
                       event_category: e.target.value as "tryout" | "free_class" | "paid_class",
                     })
                   }
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 >
                   <option value="tryout">Tryout</option>
                   <option value="free_class">Free Class</option>
@@ -406,7 +441,7 @@ export default function AdminTryoutsPage() {
                   onChange={(e) =>
                     setForm({ ...form, short_title: e.target.value || undefined })
                   }
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
               <div>
@@ -419,7 +454,7 @@ export default function AdminTryoutsPage() {
                   onChange={(e) =>
                     setForm({ ...form, description: e.target.value || undefined })
                   }
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -431,14 +466,14 @@ export default function AdminTryoutsPage() {
                     type="number"
                     min={1}
                     required
-                    value={form.duration_minutes}
+                    value={form.duration_minutes ?? 90}
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        duration_minutes: Number(e.target.value),
+                        duration_minutes: Number(e.target.value) || 90,
                       })
                     }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   />
                 </div>
                 <div>
@@ -449,14 +484,14 @@ export default function AdminTryoutsPage() {
                     type="number"
                     min={1}
                     required
-                    value={form.questions_count}
+                    value={form.questions_count ?? 25}
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        questions_count: Number(e.target.value),
+                        questions_count: Number(e.target.value) || 25,
                       })
                     }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   />
                 </div>
               </div>
@@ -466,14 +501,14 @@ export default function AdminTryoutsPage() {
                     Level
                   </label>
                   <select
-                    value={form.level}
+                    value={form.level ?? "medium"}
                     onChange={(e) =>
                       setForm({
                         ...form,
                         level: e.target.value as "easy" | "medium" | "hard",
                       })
                     }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   >
                     <option value="easy">Mudah</option>
                     <option value="medium">Menengah</option>
@@ -492,7 +527,7 @@ export default function AdminTryoutsPage() {
                         status: e.target.value as "draft" | "open" | "closed",
                       })
                     }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   >
                     <option value="draft">Draft</option>
                     <option value="open">Dibuka</option>
@@ -509,7 +544,7 @@ export default function AdminTryoutsPage() {
                   required
                   value={form.opens_at}
                   onChange={(e) => setForm({ ...form, opens_at: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
               <div>
@@ -523,7 +558,7 @@ export default function AdminTryoutsPage() {
                   onChange={(e) =>
                     setForm({ ...form, closes_at: e.target.value })
                   }
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
               <div>
@@ -542,7 +577,7 @@ export default function AdminTryoutsPage() {
                         : undefined,
                     })
                   }
-                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
               <div className="flex justify-end gap-2 pt-4">

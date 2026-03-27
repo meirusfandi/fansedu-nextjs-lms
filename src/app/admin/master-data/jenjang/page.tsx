@@ -39,16 +39,16 @@ export default function MasterDataJenjangPage() {
   }, [loadLevels]);
 
   return (
-    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 md:mb-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
               Master Data
             </p>
-            <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+            <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">
               Jenjang Pendidikan
             </h1>
-            <p className="mt-1 text-sm text-zinc-500">
+            <p className="mt-1 text-sm text-zinc-600">
               Daftar jenjang pendidikan (SD, SMP, SMA, dll).
             </p>
           </div>

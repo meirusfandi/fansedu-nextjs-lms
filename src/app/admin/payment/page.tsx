@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
+import { useEffect, useMemo, useState } from "react";
 import {
   useAdminPayments,
   useAdminConfirmPayment,
@@ -10,11 +11,36 @@ import { getFriendlyApiErrorMessage } from "@/lib/api";
 import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/paymentDisplay";
 import type { Payment } from "@/lib/api-types";
 
+function getPaymentCreatedAt(p: Payment): string | undefined {
+  return (p as Payment & { createdAt?: string }).createdAt ?? p.created_at;
+}
+
+function getPaymentUserName(p: Payment): string {
+  const x = p as Payment & { userName?: string; name?: string };
+  return x.userName ?? p.user_name ?? x.name ?? "–";
+}
+
+function getPaymentUserEmail(p: Payment): string {
+  const x = p as Payment & { userEmail?: string; email?: string; userId?: string };
+  return x.userEmail ?? p.user_email ?? x.email ?? x.userId ?? p.user_id ?? "";
+}
+
+function getPaymentPayerRole(p: Payment): string {
+  const x = p as Payment & { payerRole?: string };
+  return x.payerRole ?? p.payer_role ?? (p.type?.includes("slot") ? "trainer" : "–");
+}
+
+function getPaymentProofUrl(p: Payment): string | null {
+  const x = p as Payment & { proofUrl?: string | null };
+  return (x.proofUrl ?? p.proof_url ?? null) as string | null;
+}
+
 export default function AdminPaymentPage() {
   const { data: payments = [], isLoading, error, refetch, isFetching } = useAdminPayments();
   const confirmMutation = useAdminConfirmPayment();
   const rejectMutation = useAdminRejectPayment();
   const [filter, setFilter] = useState<"all" | "pending">("all");
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
     if (filter === "pending") {
@@ -22,6 +48,21 @@ export default function AdminPaymentPage() {
     }
     return payments;
   }, [payments, filter]);
+
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
+
+  useEffect(() => {
+    if (filtered.length > 0 && (page - 1) * PAGE_SIZE >= filtered.length) {
+      setPage(1);
+    }
+  }, [filtered.length, page]);
 
   const handleConfirm = async (p: Payment) => {
     if (!confirm("Konfirmasi pembayaran ini? Status akan menjadi disetujui.")) return;
@@ -131,25 +172,23 @@ export default function AdminPaymentPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {filtered.map((p) => (
+                {paginated.map((p) => (
                   <tr key={p.id} className="hover:bg-zinc-50/80">
                     <td className="whitespace-nowrap px-4 py-3 text-zinc-600">
-                      {p.created_at
-                        ? new Date(p.created_at).toLocaleString("id-ID", {
+                      {getPaymentCreatedAt(p)
+                        ? new Date(getPaymentCreatedAt(p) as string).toLocaleString("id-ID", {
                             dateStyle: "short",
                             timeStyle: "short",
                           })
                         : "–"}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900">
-                        {p.user_name ?? (p as { name?: string }).name ?? "–"}
-                      </div>
-                      <div className="text-xs text-zinc-500">{p.user_email ?? (p as { email?: string }).email ?? p.user_id ?? ""}</div>
+                      <div className="font-medium text-zinc-900">{getPaymentUserName(p)}</div>
+                      <div className="text-xs text-zinc-500">{getPaymentUserEmail(p)}</div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">
-                        {p.payer_role ?? (p.type?.includes("slot") ? "trainer" : "–")}
+                        {getPaymentPayerRole(p)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-zinc-600">{p.type ?? "–"}</td>
@@ -170,9 +209,9 @@ export default function AdminPaymentPage() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
-                      {p.proof_url && (
+                      {getPaymentProofUrl(p) && (
                         <a
-                          href={String(p.proof_url)}
+                          href={String(getPaymentProofUrl(p))}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mr-2 text-xs font-medium text-sky-600 hover:underline"
@@ -206,6 +245,14 @@ export default function AdminPaymentPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {!isLoading && filtered.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalItems={filtered.length}
+            onPageChange={setPage}
+            label="transaksi"
+          />
         )}
       </div>
 

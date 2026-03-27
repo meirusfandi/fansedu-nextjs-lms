@@ -1,5 +1,6 @@
 "use client";
 
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminCreateCourseUnderSubject,
   adminCreateSubject,
@@ -25,6 +26,177 @@ function filterLevelsSDSMPSMA(levels: Level[]): Level[] {
   return SD_SMP_SMA_SLUGS.map((s) => bySlug.get(s)).filter(Boolean) as Level[];
 }
 
+type SubjectLevelBodyProps = {
+  levelId: string;
+  subjects: Subject[];
+  subjectPage: number;
+  onSubjectPageChange: (p: number) => void;
+  expandedSubjectId: string | null;
+  modulePage: number;
+  onModulePageChange: (p: number) => void;
+  toggleSubject: (id: string) => void;
+  openBidangEdit: (s: Subject, levelId: string) => void;
+  openModuleAdd: (id: string) => void;
+  handleDeleteBidang: (subjectId: string, levelId: string) => void;
+  modulesBySubject: Record<string, Course[]>;
+  openModuleEdit: (c: Course, subjectId: string) => void;
+  handleDeleteModule: (moduleId: string, subjectId: string) => void;
+};
+
+function SubjectLevelBody({
+  levelId,
+  subjects,
+  subjectPage,
+  onSubjectPageChange,
+  expandedSubjectId,
+  modulePage,
+  onModulePageChange,
+  toggleSubject,
+  openBidangEdit,
+  openModuleAdd,
+  handleDeleteBidang,
+  modulesBySubject,
+  openModuleEdit,
+  handleDeleteModule,
+}: SubjectLevelBodyProps) {
+  const paginatedSubjects = useMemo(
+    () => subjects.slice((subjectPage - 1) * PAGE_SIZE, subjectPage * PAGE_SIZE),
+    [subjects, subjectPage]
+  );
+
+  const expandedModules = expandedSubjectId ? modulesBySubject[expandedSubjectId] : undefined;
+  const paginatedModules = useMemo(() => {
+    if (!expandedModules?.length) return [];
+    return expandedModules.slice((modulePage - 1) * PAGE_SIZE, modulePage * PAGE_SIZE);
+  }, [expandedModules, modulePage]);
+
+  useEffect(() => {
+    if (subjects.length > 0 && (subjectPage - 1) * PAGE_SIZE >= subjects.length) {
+      onSubjectPageChange(1);
+    }
+  }, [subjects.length, subjectPage, onSubjectPageChange]);
+
+  useEffect(() => {
+    const len = expandedModules?.length ?? 0;
+    if (len > 0 && (modulePage - 1) * PAGE_SIZE >= len) {
+      onModulePageChange(1);
+    }
+  }, [expandedModules?.length, modulePage, onModulePageChange]);
+
+  return (
+    <div>
+      <div className="space-y-3">
+        {paginatedSubjects.map((subject) => (
+          <div key={subject.id} className="rounded-xl border border-zinc-100">
+            <div className="flex items-center justify-between px-3 py-2">
+              <button
+                type="button"
+                onClick={() => toggleSubject(subject.id)}
+                className="flex flex-1 items-center gap-2 text-left text-sm"
+              >
+                <span className="font-medium text-zinc-900">{subject.name}</span>
+                {subject.description && (
+                  <span className="text-xs text-zinc-500">— {subject.description}</span>
+                )}
+                <span className="text-zinc-400">
+                  {expandedSubjectId === subject.id ? "▼" : "▶"}
+                </span>
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => openBidangEdit(subject, levelId)}
+                  className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openModuleAdd(subject.id)}
+                  className="rounded bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
+                >
+                  + Module
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteBidang(subject.id, levelId)}
+                  className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+            {expandedSubjectId === subject.id && (
+              <div className="border-t border-zinc-100 bg-zinc-50/50 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Module
+                </p>
+                {!modulesBySubject[subject.id] ? (
+                  <p className="text-sm text-zinc-500">Memuat...</p>
+                ) : modulesBySubject[subject.id].length === 0 ? (
+                  <p className="text-sm text-zinc-500">
+                    Belum ada module. Klik &quot;+ Module&quot;.
+                  </p>
+                ) : (
+                  <>
+                    <ul className="space-y-2">
+                      {paginatedModules.map((c) => (
+                        <li
+                          key={c.id}
+                          className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+                        >
+                          <div>
+                            <p className="font-medium text-zinc-900">{c.title}</p>
+                            {c.description && (
+                              <p className="text-xs text-zinc-500">{c.description}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openModuleEdit(c, subject.id)}
+                              className="text-xs text-zinc-600 underline hover:text-zinc-900"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteModule(c.id, subject.id)}
+                              className="text-xs text-red-600 underline"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    {modulesBySubject[subject.id].length > PAGE_SIZE && (
+                      <Pagination
+                        currentPage={modulePage}
+                        totalItems={modulesBySubject[subject.id].length}
+                        onPageChange={onModulePageChange}
+                        label="module"
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      {subjects.length > PAGE_SIZE && (
+        <Pagination
+          currentPage={subjectPage}
+          totalItems={subjects.length}
+          onPageChange={onSubjectPageChange}
+          label="bidang"
+        />
+      )}
+    </div>
+  );
+}
+
 export default function MasterDataSubjectPage() {
   const [levels, setLevels] = useState<Level[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,8 +217,18 @@ export default function MasterDataSubjectPage() {
 
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [subjectPage, setSubjectPage] = useState(1);
+  const [modulePage, setModulePage] = useState(1);
 
   const levelsSDSMPSMA = useMemo(() => filterLevelsSDSMPSMA(levels), [levels]);
+
+  useEffect(() => {
+    setSubjectPage(1);
+  }, [expandedLevelId]);
+
+  useEffect(() => {
+    setModulePage(1);
+  }, [expandedSubjectId]);
 
   const loadLevels = useCallback(() => {
     setLoading(true);
@@ -214,15 +396,15 @@ export default function MasterDataSubjectPage() {
   };
 
   return (
-    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 md:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Master Data
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">
             Subject — Kelas yang dibuka
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-600">
             Daftar kelas/bidang yang saat ini dibuka untuk peserta. Hanya menampilkan yang dibuka per level SD, SMP, SMA.
           </p>
         </div>
@@ -284,107 +466,22 @@ export default function MasterDataSubjectPage() {
                         Belum ada subject di level ini. Klik &quot;+ Tambah Bidang&quot;.
                       </p>
                     ) : (
-                      <div className="space-y-3">
-                        {subjectsByLevel[level.id].map((subject) => (
-                          <div
-                            key={subject.id}
-                            className="rounded-xl border border-zinc-100"
-                          >
-                            <div className="flex items-center justify-between px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleSubject(subject.id)}
-                                className="flex flex-1 items-center gap-2 text-left text-sm"
-                              >
-                                <span className="font-medium text-zinc-900">
-                                  {subject.name}
-                                </span>
-                                {subject.description && (
-                                  <span className="text-xs text-zinc-500">
-                                    — {subject.description}
-                                  </span>
-                                )}
-                                <span className="text-zinc-400">
-                                  {expandedSubjectId === subject.id ? "▼" : "▶"}
-                                </span>
-                              </button>
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => openBidangEdit(subject, level.id)}
-                                  className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openModuleAdd(subject.id)}
-                                  className="rounded bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
-                                >
-                                  + Module
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteBidang(subject.id, level.id)}
-                                  className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                                >
-                                  Hapus
-                                </button>
-                              </div>
-                            </div>
-                            {expandedSubjectId === subject.id && (
-                              <div className="border-t border-zinc-100 bg-zinc-50/50 p-3">
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                                  Module
-                                </p>
-                                {!modulesBySubject[subject.id] ? (
-                                  <p className="text-sm text-zinc-500">Memuat...</p>
-                                ) : modulesBySubject[subject.id].length === 0 ? (
-                                  <p className="text-sm text-zinc-500">
-                                    Belum ada module. Klik &quot;+ Module&quot;.
-                                  </p>
-                                ) : (
-                                  <ul className="space-y-2">
-                                    {modulesBySubject[subject.id].map((c) => (
-                                      <li
-                                        key={c.id}
-                                        className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
-                                      >
-                                        <div>
-                                          <p className="font-medium text-zinc-900">
-                                            {c.title}
-                                          </p>
-                                          {c.description && (
-                                            <p className="text-xs text-zinc-500">
-                                              {c.description}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <div className="flex gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => openModuleEdit(c, subject.id)}
-                                            className="text-xs text-zinc-600 underline hover:text-zinc-900"
-                                          >
-                                            Edit
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeleteModule(c.id, subject.id)}
-                                            className="text-xs text-red-600 underline"
-                                          >
-                                            Hapus
-                                          </button>
-                                        </div>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                      <SubjectLevelBody
+                        levelId={level.id}
+                        subjects={subjectsByLevel[level.id]}
+                        subjectPage={subjectPage}
+                        onSubjectPageChange={setSubjectPage}
+                        expandedSubjectId={expandedSubjectId}
+                        modulePage={modulePage}
+                        onModulePageChange={setModulePage}
+                        toggleSubject={toggleSubject}
+                        openBidangEdit={openBidangEdit}
+                        openModuleAdd={openModuleAdd}
+                        handleDeleteBidang={handleDeleteBidang}
+                        modulesBySubject={modulesBySubject}
+                        openModuleEdit={openModuleEdit}
+                        handleDeleteModule={handleDeleteModule}
+                      />
                     )}
                   </div>
                 )}

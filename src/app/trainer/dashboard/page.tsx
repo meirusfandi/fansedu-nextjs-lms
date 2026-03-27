@@ -25,7 +25,7 @@ export default function TrainerDashboardPage() {
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Overview</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-900">Trainer Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-500">Kelola kelas, bank soal, dan kuis.</p>
+        <p className="mt-1 text-sm text-zinc-600">Kelola kelas, bank soal, dan kuis.</p>
       </div>
 
       <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

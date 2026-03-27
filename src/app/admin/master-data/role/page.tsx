@@ -38,15 +38,15 @@ export default function MasterDataRolePage() {
   }, [loadRoles]);
 
   return (
-    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
         <div className="mb-6 md:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
             Master Data
           </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">
             Role
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-zinc-600">
             Daftar role user dari API (sesuai backend).
           </p>
         </div>

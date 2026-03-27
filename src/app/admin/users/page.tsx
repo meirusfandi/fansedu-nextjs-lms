@@ -9,7 +9,7 @@ import {
   adminListSubjects,
   adminUpdateUser,
 } from "@/lib/api";
-import type { Sekolah, Subject, User } from "@/lib/api-types";
+import type { Sekolah, Subject, User, UserRole } from "@/lib/api-types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -17,6 +17,13 @@ const ROLE_LABEL: Record<string, string> = {
   student: "Siswa",
   trainer: "Pengajar",
 };
+
+function normalizeUserRole(role: string | undefined): UserRole {
+  const r = (role ?? "").toLowerCase();
+  if (r === "admin") return "admin";
+  if (r === "trainer" || r === "guru" || r === "teacher") return "trainer";
+  return "student";
+}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -28,7 +35,7 @@ export default function AdminUsersPage() {
     name: "",
     email: "",
     password: "",
-    role: "trainer" as const,
+    role: "trainer" as UserRole,
     subject_id: "",
     school_id: "",
   });
@@ -113,7 +120,7 @@ export default function AdminUsersPage() {
         name: full.name,
         email: full.email,
         password: "",
-        role: "trainer",
+        role: normalizeUserRole(full.role),
         subject_id: full.subject_id ?? "",
         school_id: full.school_id ?? "",
       });
@@ -124,7 +131,7 @@ export default function AdminUsersPage() {
         name: u.name,
         email: u.email,
         password: "",
-        role: "trainer",
+        role: normalizeUserRole(u.role),
         subject_id: u.subject_id ?? "",
         school_id: u.school_id ?? "",
       });
@@ -149,22 +156,24 @@ export default function AdminUsersPage() {
           name: form.name.trim(),
           email: form.email.trim(),
           password: form.password,
-          role: "trainer",
-          subject_id: form.subject_id.trim() || undefined,
-          school_id: form.school_id.trim() || undefined,
+          // Backend create saat ini hanya menerima student/trainer.
+          // Jika admin dipilih di UI, fallback ke trainer agar request tetap valid.
+          role: form.role === "admin" ? "trainer" : form.role,
+          subject_id: form.subject_id.trim() || null,
+          school_id: form.school_id.trim() || null,
         });
       } else if (modalMode === "edit" && selectedUser) {
         const body: {
           name?: string;
           email?: string;
           password?: string;
-          role?: "trainer";
+          role?: "student" | "trainer" | "admin";
           subject_id?: string | null;
           school_id?: string | null;
         } = {
           name: form.name.trim(),
           email: form.email.trim(),
-          role: "trainer",
+          role: form.role,
           subject_id: form.subject_id.trim() || null,
           school_id: form.school_id.trim() || null,
         };
@@ -190,8 +199,8 @@ export default function AdminUsersPage() {
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               Management User
             </h1>
-            <p className="mt-1 text-sm text-zinc-500">
-              Lihat detail; tambah & edit akun pengajar (trainer). Akun siswa hanya dari data backend.
+            <p className="mt-1 text-sm text-zinc-600">
+              Admin dapat melihat, menambah, dan mengedit akun yang ada (role, subject, sekolah) sesuai dukungan backend.
             </p>
           </div>
           <button
@@ -218,7 +227,7 @@ export default function AdminUsersPage() {
             <div className="p-8 text-center text-sm text-zinc-500">
               <p>Belum ada user ditampilkan.</p>
               <p className="mt-2 text-xs">
-                Pastikan backend <code className="rounded bg-zinc-200 px-1">GET /api/v1/admin/users</code> mengembalikan semua user (termasuk admin). Klik &quot;Tambah User&quot; untuk menambah siswa atau pengajar.
+                Pastikan backend <code className="rounded bg-zinc-200 px-1">GET /api/v1/admin/users</code> mengembalikan semua user. Klik &quot;Tambah User&quot; untuk menambah akun baru.
               </p>
             </div>
           ) : (
@@ -266,15 +275,13 @@ export default function AdminUsersPage() {
                           >
                             Detail
                           </button>
-                          {u.role !== "admin" && u.role !== "student" && (
-                            <button
-                              type="button"
-                              onClick={() => openEdit(u)}
-                              className="rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
-                            >
-                              Edit
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => openEdit(u)}
+                            className="rounded-lg bg-zinc-900 px-2 py-1 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
+                          >
+                            Edit
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -354,7 +361,7 @@ export default function AdminUsersPage() {
                   </div>
                 ) : null}
                 <div className="mt-6 flex justify-end gap-2">
-                  {selectedUser && selectedUser.role !== "admin" && selectedUser.role !== "student" && (
+                  {selectedUser && (
                     <button
                       type="button"
                       onClick={() => openEdit(selectedUser)}
@@ -375,7 +382,7 @@ export default function AdminUsersPage() {
             ) : (
               <>
                 <h2 className="text-lg font-semibold text-zinc-900">
-                  {modalMode === "add" ? "Tambah User" : "Edit User"}
+                  {modalMode === "add" ? "Tambah User" : "Edit akun Admin"}
                 </h2>
                 {submitError && (
                   <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -425,17 +432,25 @@ export default function AdminUsersPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-zinc-600">
-                        Role
-                      </label>
-                      <p className="mt-1 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-                        Pengajar (Trainer) — satu-satunya role yang dapat dibuat dari halaman ini.
-                      </p>
+                      <label className="block text-xs font-medium text-zinc-600">Role</label>
+                      <select
+                        value={form.role}
+                        onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                      >
+                        <option value="student">Siswa</option>
+                        <option value="trainer">Trainer</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      {modalMode === "add" && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          Catatan: endpoint create user backend saat ini menerima role <strong>student</strong> atau{" "}
+                          <strong>trainer</strong>. Jika pilih Admin, akan dibuat sebagai Trainer.
+                        </p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-zinc-600">
-                        Bidang / Subject
-                      </label>
+                      <label className="block text-xs font-medium text-zinc-600">Bidang / Subject</label>
                       <select
                         value={form.subject_id}
                         onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
@@ -450,9 +465,7 @@ export default function AdminUsersPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-zinc-600">
-                        Sekolah
-                      </label>
+                      <label className="block text-xs font-medium text-zinc-600">Sekolah</label>
                       <select
                         value={form.school_id}
                         onChange={(e) => setForm({ ...form, school_id: e.target.value })}

@@ -1,12 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
+import { useEffect, useMemo, useState } from "react";
 import { useTrainerPayments } from "@/hooks/useDashboardQueries";
 import { getFriendlyApiErrorMessage } from "@/lib/api";
 import { formatPaymentMoney, paymentStatusLabel } from "@/lib/paymentDisplay";
 
 export default function GuruPembayaranPage() {
   const { data: payments = [], isLoading, error, refetch } = useTrainerPayments();
+  const [page, setPage] = useState(1);
+
+  const paginated = useMemo(
+    () => payments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [payments, page]
+  );
+
+  useEffect(() => {
+    if (payments.length > 0 && (page - 1) * PAGE_SIZE >= payments.length) {
+      setPage(1);
+    }
+  }, [payments.length, page]);
 
   return (
     <main className="flex flex-1 flex-col px-4 py-6 sm:px-6 md:px-8 md:py-8">
@@ -49,7 +63,7 @@ export default function GuruPembayaranPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {payments.map((p) => (
+                {paginated.map((p) => (
                   <tr key={p.id} className="hover:bg-zinc-50/80">
                     <td className="whitespace-nowrap px-4 py-3 text-zinc-600">
                       {p.created_at
@@ -83,6 +97,14 @@ export default function GuruPembayaranPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {!isLoading && payments.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalItems={payments.length}
+            onPageChange={setPage}
+            label="transaksi"
+          />
         )}
       </div>
 

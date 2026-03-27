@@ -58,6 +58,9 @@ import type {
   TryoutSession,
   User,
   UserRole,
+  LandingPackage,
+  AdminLandingPackageCreateRequest,
+  AdminLandingPackageUpdateRequest,
 } from "./api-types";
 
 /**
@@ -180,6 +183,26 @@ interface RequestOptions {
   auth?: boolean;
 }
 
+function toCamelCaseKey(key: string): string {
+  return key
+    .replace(/[_-\s]+([a-zA-Z0-9])/g, (_, c: string) => c.toUpperCase())
+    .replace(/^([A-Z])/, (m) => m.toLowerCase());
+}
+
+function deepToCamelCase<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => deepToCamelCase(v)) as T;
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([k, v]) => {
+      out[toCamelCaseKey(k)] = deepToCamelCase(v);
+    });
+    return out as T;
+  }
+  return value;
+}
+
 async function request<T>(
   path: string,
   options: RequestOptions = {},
@@ -197,12 +220,16 @@ async function request<T>(
   }
   const verb = method.toUpperCase();
   const hasBody = verb !== "GET" && verb !== "HEAD" && body != null;
+  const normalizedBody =
+    hasBody && body && typeof body === "object"
+      ? deepToCamelCase(body)
+      : body;
   let res: Response;
   try {
     res = await fetch(url, {
       method: verb,
       headers,
-      body: hasBody ? JSON.stringify(body) : undefined,
+      body: hasBody ? JSON.stringify(normalizedBody) : undefined,
     });
   } catch (fetchErr) {
     const msg = (fetchErr as Error)?.message?.toLowerCase() ?? "";
@@ -219,7 +246,8 @@ async function request<T>(
     throw fetchErr;
   }
   if (res.status === 204) return undefined as T;
-  const data = await res.json().catch(() => ({}));
+  const rawData = await res.json().catch(() => ({}));
+  const data = deepToCamelCase(rawData);
   if (!res.ok) {
     if (auth && res.status === 401) {
       scheduleUnauthorizedRedirect();
@@ -242,6 +270,56 @@ async function request<T>(
 function isNotFoundOrMethodNotAllowed(e: unknown): boolean {
   const status = (e as { status?: number })?.status;
   return status === 404 || status === 405;
+}
+
+/** Normalisasi TryoutSession agar aman untuk snake_case / camelCase dari backend. */
+function normalizeToTryoutSession(item: unknown): TryoutSession {
+  const obj = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  return {
+    id: String(obj.id ?? ""),
+    title: String(obj.title ?? ""),
+    short_title:
+      obj.short_title != null
+        ? String(obj.short_title)
+        : obj.shortTitle != null
+          ? String(obj.shortTitle)
+          : null,
+    description: obj.description != null ? String(obj.description) : null,
+    duration_minutes: Number(
+      obj.duration_minutes ?? obj.durationMinutes ?? 0
+    ),
+    questions_count: Number(
+      obj.questions_count ?? obj.questionsCount ?? 0
+    ),
+    level: String(obj.level ?? "medium") as TryoutSession["level"],
+    opens_at: String(obj.opens_at ?? obj.opensAt ?? ""),
+    closes_at: String(obj.closes_at ?? obj.closesAt ?? ""),
+    max_participants:
+      obj.max_participants != null
+        ? Number(obj.max_participants)
+        : obj.maxParticipants != null
+          ? Number(obj.maxParticipants)
+          : null,
+    status: String(obj.status ?? "draft") as TryoutSession["status"],
+    event_category:
+      obj.event_category != null
+        ? String(obj.event_category)
+        : obj.eventCategory != null
+          ? String(obj.eventCategory)
+          : null,
+  };
+}
+
+/** Bersihkan payload tryout; request() akan ubah key menjadi snake_case global. */
+function toTryoutApiPayload(
+  body: AdminCreateTryoutRequest | Partial<AdminCreateTryoutRequest>
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+  // Buang undefined agar update parsial tetap bersih.
+  Object.keys(payload).forEach((k) => {
+    if (payload[k] === undefined) delete payload[k];
+  });
+  return payload;
 }
 
 // --- Health ---
@@ -276,6 +354,54 @@ export async function getPublicSchools(): Promise<Sekolah[]> {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
   }
+}
+
+// --- Landing packages (public) ---
+/** Publik: GET /packages — untuk halaman landing. */
+export async function getLandingPackages(): Promise<LandingPackage[]> {
+  try {
+    const raw = await request<unknown>("/packages", { method: "GET", auth: false });
+    if (Array.isArray(raw)) return raw as LandingPackage[];
+    const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const arr = Array.isArray(obj.packages) ? obj.packages : Array.isArray(obj.data) ? obj.data : null;
+    return (arr ?? []) as LandingPackage[];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+// --- Admin Landing packages ---
+/** Admin: GET /admin/landing/packages */
+export async function adminLandingListPackages(): Promise<LandingPackage[]> {
+  try {
+    const raw = await request<unknown>("/admin/landing/packages", { method: "GET" });
+    if (Array.isArray(raw)) return raw as LandingPackage[];
+    const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+    const arr = Array.isArray(obj.packages) ? obj.packages : Array.isArray(obj.data) ? obj.data : null;
+    return (arr ?? []) as LandingPackage[];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Admin: POST /admin/landing/packages */
+export async function adminLandingCreatePackage(body: AdminLandingPackageCreateRequest): Promise<LandingPackage> {
+  return request("/admin/landing/packages", { method: "POST", body });
+}
+
+/** Admin: PUT /admin/landing/packages/:id */
+export async function adminLandingUpdatePackage(
+  packageId: string,
+  body: AdminLandingPackageUpdateRequest
+): Promise<LandingPackage> {
+  return request(`/admin/landing/packages/${packageId}`, { method: "PUT", body });
+}
+
+/** Admin: DELETE /admin/landing/packages/:id */
+export async function adminLandingDeletePackage(packageId: string): Promise<{ ok: boolean } | void> {
+  return request(`/admin/landing/packages/${packageId}`, { method: "DELETE" });
 }
 
 /** GET /levels — jenjang pendidikan (public). */
@@ -983,10 +1109,12 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
 export async function adminListTryouts(): Promise<TryoutSession[]> {
   try {
-    const raw = await request<TryoutSession[] | { tryouts?: TryoutSession[]; data?: TryoutSession[] }>("/admin/tryouts", { method: "GET" });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    const raw = await request<
+      unknown[] | { tryouts?: unknown[]; data?: unknown[] }
+    >("/admin/tryouts", { method: "GET" });
+    if (Array.isArray(raw)) return raw.map(normalizeToTryoutSession);
+    if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts.map(normalizeToTryoutSession);
+    if (raw?.data && Array.isArray(raw.data)) return raw.data.map(normalizeToTryoutSession);
     return [];
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
@@ -995,7 +1123,8 @@ export async function adminListTryouts(): Promise<TryoutSession[]> {
 }
 
 export async function adminGetTryout(tryoutId: string): Promise<TryoutSession> {
-  return request(`/admin/tryouts/${tryoutId}`, { method: "GET" });
+  const raw = await request<unknown>(`/admin/tryouts/${tryoutId}`, { method: "GET" });
+  return normalizeToTryoutSession(raw);
 }
 
 /** Analisis & grafik per tryout (per soal). GET /admin/tryouts/:tryoutId/analysis */
@@ -1133,14 +1262,21 @@ export async function adminListHasilKelas(): Promise<Sekolah[]> {
 export async function adminCreateTryout(
   body: AdminCreateTryoutRequest
 ): Promise<TryoutSession> {
-  return request("/admin/tryouts", { method: "POST", body });
+  const raw = await request<unknown>("/admin/tryouts", {
+    method: "POST",
+    body: toTryoutApiPayload(body),
+  });
+  return normalizeToTryoutSession(raw);
 }
 
 export async function adminUpdateTryout(
   tryoutId: string,
   body: Partial<AdminCreateTryoutRequest>
 ): Promise<Record<string, never>> {
-  return request(`/admin/tryouts/${tryoutId}`, { method: "PUT", body });
+  return request(`/admin/tryouts/${tryoutId}`, {
+    method: "PUT",
+    body: toTryoutApiPayload(body),
+  });
 }
 
 export async function adminDeleteTryout(
@@ -1274,6 +1410,20 @@ export async function adminCreateCourse(
   body: AdminCreateCourseRequest
 ): Promise<Course> {
   return request("/admin/courses", { method: "POST", body });
+}
+
+/** List courses. GET /admin/courses. 404/405 = []. */
+export async function adminListCourses(): Promise<Course[]> {
+  try {
+    const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>("/admin/courses", { method: "GET" });
+    if (Array.isArray(raw)) return raw;
+    if (raw?.courses && Array.isArray(raw.courses)) return raw.courses;
+    if (raw?.data && Array.isArray(raw.data)) return raw.data;
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }
 
 /** Daftar enrollment per course. 404 = daftar kosong. */

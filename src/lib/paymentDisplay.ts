@@ -2,19 +2,22 @@ import type { Payment } from "@/lib/api-types";
 
 /** Tampilkan nominal (amount_cents = sen, atau amount = rupiah utuh — sesuaikan dengan backend). */
 export function formatPaymentMoney(p: Payment): string {
-  if (p.amount_cents != null && Number.isFinite(p.amount_cents)) {
+  const amountCents =
+    (p as Payment & { amountCents?: number }).amountCents ?? p.amount_cents;
+  if (amountCents != null && Number.isFinite(amountCents)) {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       maximumFractionDigits: 0,
-    }).format(p.amount_cents / 100);
+    }).format(amountCents / 100);
   }
-  if (p.amount != null && Number.isFinite(p.amount)) {
+  const amount = p.amount;
+  if (amount != null && Number.isFinite(amount)) {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
       maximumFractionDigits: 0,
-    }).format(p.amount);
+    }).format(amount);
   }
   return "–";
 }

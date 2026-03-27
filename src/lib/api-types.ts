@@ -411,10 +411,48 @@ export interface AdminUpdateUserRequest {
   name?: string;
   email?: string;
   password?: string;
-  role?: "student" | "trainer";
+  role?: "student" | "trainer" | "admin";
   subject_id?: string | null;
   school_id?: string | null;
 }
+
+// --- Landing packages (public + admin landing manage) ---
+export type LandingPackage = {
+  id: string;
+  name: string;
+  slug?: string | null;
+  short_description?: string | null;
+  price_early_bird?: number | null;
+  price_normal?: number | null;
+  is_open?: boolean | null;
+  is_bundle?: boolean | null;
+  durasi?: string | null;
+  materi?: string[] | null;
+  fasilitas?: string[] | null;
+  bonus?: string[] | null;
+  /** Dari backend publik bisa berupa objek course lengkap, admin bisa hanya ids. */
+  linked_courses?: unknown[] | null;
+  linked_course_ids?: string[] | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type AdminLandingPackageCreateRequest = {
+  name: string;
+  slug: string;
+  short_description?: string;
+  price_early_bird?: number;
+  price_normal?: number;
+  is_open?: boolean;
+  is_bundle?: boolean;
+  durasi?: string;
+  materi?: string[];
+  fasilitas?: string[];
+  bonus?: string[];
+  linked_course_ids?: string[];
+};
+
+export type AdminLandingPackageUpdateRequest = Partial<AdminLandingPackageCreateRequest>;
 
 export interface AdminCreateSubjectRequest {
   name: string;

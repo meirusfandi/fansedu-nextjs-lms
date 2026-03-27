@@ -10,6 +10,7 @@ export const adminSidebarSections: NavSection[] = [
       { href: "/admin/kelas", label: "Kelas" },
       { href: "/admin/tryouts", label: "Tryouts" },
       { href: "/admin/payment", label: "Payment" },
+      { href: "/admin/landing-packages", label: "Paket landing" },
       { href: "/admin/report", label: "Report" },
     ],
   },

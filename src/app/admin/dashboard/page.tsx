@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { useAdminDashboard } from "@/hooks/useDashboardQueries";
 import { getFriendlyApiErrorMessage } from "@/lib/api";
 import { CardStats } from "@/components/ui/CardStats";
@@ -28,6 +30,7 @@ const quickLinks = [
   { href: "/admin/kelas", label: "Management Kelas", desc: "Kelas dan enrollment" },
   { href: "/admin/tryouts", label: "Event", desc: "Tryout & ujian" },
   { href: "/admin/payment", label: "Payment", desc: "Pembayaran & tagihan" },
+  { href: "/admin/landing-packages", label: "Paket landing", desc: "Promo di halaman publik" },
   { href: "/admin/report", label: "Report", desc: "Laporan & statistik" },
 ] as const;
 
@@ -94,6 +97,8 @@ function TableSkeleton() {
 
 export default function AdminDashboardPage() {
   const { data, isLoading, error } = useAdminDashboard();
+  const [userPage, setUserPage] = useState(1);
+  const [tryoutPage, setTryoutPage] = useState(1);
 
   const stats = data
     ? [
@@ -113,13 +118,38 @@ export default function AdminDashboardPage() {
         { label: "Sertifikat diterbitkan", value: "–", icon: iconAward },
       ];
 
-  const recentUsers = (data?.users ?? [])
-    .slice(0, 8)
-    .map((u) => ({ name: u.name, email: u.email, role: u.role, id: u.id }));
-  const recentTryouts = (data?.tryouts ?? [])
-    .slice()
-    .sort((a, b) => new Date(b.closes_at).getTime() - new Date(a.closes_at).getTime())
-    .slice(0, 6);
+  const allUsers = useMemo(
+    () => (data?.users ?? []).map((u) => ({ name: u.name, email: u.email, role: u.role, id: u.id })),
+    [data?.users]
+  );
+  const sortedTryouts = useMemo(
+    () =>
+      [...(data?.tryouts ?? [])].sort(
+        (a, b) => new Date(b.closes_at).getTime() - new Date(a.closes_at).getTime()
+      ),
+    [data?.tryouts]
+  );
+
+  const paginatedUsers = useMemo(
+    () => allUsers.slice((userPage - 1) * PAGE_SIZE, userPage * PAGE_SIZE),
+    [allUsers, userPage]
+  );
+  const paginatedTryouts = useMemo(
+    () => sortedTryouts.slice((tryoutPage - 1) * PAGE_SIZE, tryoutPage * PAGE_SIZE),
+    [sortedTryouts, tryoutPage]
+  );
+
+  useEffect(() => {
+    if (allUsers.length > 0 && (userPage - 1) * PAGE_SIZE >= allUsers.length) {
+      setUserPage(1);
+    }
+  }, [allUsers.length, userPage]);
+
+  useEffect(() => {
+    if (sortedTryouts.length > 0 && (tryoutPage - 1) * PAGE_SIZE >= sortedTryouts.length) {
+      setTryoutPage(1);
+    }
+  }, [sortedTryouts.length, tryoutPage]);
 
   if (error) {
     return (
@@ -146,7 +176,7 @@ export default function AdminDashboardPage() {
       <header className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Overview</p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">Dashboard</h1>
-        <p className="mt-2 max-w-xl text-sm text-zinc-500">
+        <p className="mt-2 max-w-xl text-sm text-zinc-600">
           Ringkasan platform: user, kelas, event, payment, dan laporan.
         </p>
       </header>
@@ -231,14 +261,14 @@ export default function AdminDashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {recentUsers.length === 0 ? (
+                  {paginatedUsers.length === 0 ? (
                     <tr>
                       <td colSpan={3} className="px-4 py-10 text-center text-sm text-zinc-500">
                         Belum ada user dari API.
                       </td>
                     </tr>
                   ) : (
-                    recentUsers.map((u) => (
+                    paginatedUsers.map((u) => (
                       <tr key={u.id} className="transition hover:bg-zinc-50/80">
                         <td className="px-4 py-3 font-medium text-zinc-900">{u.name}</td>
                         <td className="px-4 py-3 text-zinc-600">{u.email}</td>
@@ -254,6 +284,14 @@ export default function AdminDashboardPage() {
               </table>
             )}
           </div>
+          {!isLoading && allUsers.length > 0 && (
+            <Pagination
+              currentPage={userPage}
+              totalItems={allUsers.length}
+              onPageChange={setUserPage}
+              label="user"
+            />
+          )}
         </div>
 
         <div className="space-y-6">
@@ -277,32 +315,40 @@ export default function AdminDashboardPage() {
                     <div key={i} className="h-20 animate-pulse rounded-xl bg-zinc-100" />
                   ))}
                 </div>
-              ) : recentTryouts.length === 0 ? (
+              ) : sortedTryouts.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50/50 py-8 text-center text-sm text-zinc-500">
                   Belum ada event dari API.
                 </p>
               ) : (
-                <ul className="space-y-3">
-                  {recentTryouts.map((t) => (
-                    <li key={t.id}>
-                      <Link
-                        href={`/admin/tryouts/${t.id}/soal`}
-                        className="block rounded-xl border border-zinc-100 p-3 transition hover:border-zinc-200 hover:bg-zinc-50/50"
-                      >
-                        <span className="block font-medium text-zinc-900">
-                          {t.title || t.short_title || "Event"}
-                        </span>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-zinc-500">{t.questions_count} soal</span>
-                          <StatusBadge status={t.status} />
-                        </div>
-                        <p className="mt-1.5 text-xs text-zinc-400">
-                          Tutup: {formatRelativeDate(t.closes_at)}
-                        </p>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ul className="space-y-3 p-4">
+                    {paginatedTryouts.map((t) => (
+                      <li key={t.id}>
+                        <Link
+                          href={`/admin/tryouts/${t.id}/soal`}
+                          className="block rounded-xl border border-zinc-100 p-3 transition hover:border-zinc-200 hover:bg-zinc-50/50"
+                        >
+                          <span className="block font-medium text-zinc-900">
+                            {t.title || t.short_title || "Event"}
+                          </span>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-zinc-500">{t.questions_count} soal</span>
+                            <StatusBadge status={t.status} />
+                          </div>
+                          <p className="mt-1.5 text-xs text-zinc-400">
+                            Tutup: {formatRelativeDate(t.closes_at)}
+                          </p>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                  <Pagination
+                    currentPage={tryoutPage}
+                    totalItems={sortedTryouts.length}
+                    onPageChange={setTryoutPage}
+                    label="event"
+                  />
+                </>
               )}
             </div>
           </div>

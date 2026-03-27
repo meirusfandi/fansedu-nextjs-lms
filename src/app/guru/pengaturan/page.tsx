@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getAuthUserName, changePassword, getTrainerProfile, updateTrainerProfile, adminListSekolah, createTrainerSchool } from "@/lib/api";
 import type { Sekolah } from "@/lib/api-types";
@@ -38,6 +39,7 @@ export default function GuruPengaturanPage() {
     telepon: "",
   });
   const [createSchoolLoading, setCreateSchoolLoading] = useState(false);
+  const [schoolPage, setSchoolPage] = useState(1);
 
   const [passwordForm, setPasswordForm] = useState({
     current_password: "",
@@ -198,7 +200,21 @@ export default function GuruPengaturanPage() {
         s.nama_sekolah.toLowerCase().includes(schoolSearchQuery.toLowerCase())
       )
     : schoolList;
-  const filteredSchoolsSlice = filteredSchools.slice(0, 10);
+
+  const paginatedSchools = useMemo(
+    () => filteredSchools.slice((schoolPage - 1) * PAGE_SIZE, schoolPage * PAGE_SIZE),
+    [filteredSchools, schoolPage]
+  );
+
+  useEffect(() => {
+    setSchoolPage(1);
+  }, [schoolSearchQuery]);
+
+  useEffect(() => {
+    if (filteredSchools.length > 0 && (schoolPage - 1) * PAGE_SIZE >= filteredSchools.length) {
+      setSchoolPage(1);
+    }
+  }, [filteredSchools.length, schoolPage]);
 
   const handleUnlinkSchool = async () => {
     setSchoolLinkLoading(true);
@@ -347,24 +363,34 @@ export default function GuruPengaturanPage() {
             />
             {schoolListLoading ? (
               <p className="mt-2 text-xs text-zinc-500">Memuat daftar sekolah...</p>
-            ) : filteredSchoolsSlice.length > 0 ? (
-              <ul className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 bg-white">
-                {filteredSchoolsSlice.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectSchool(s)}
-                      disabled={schoolLinkLoading}
-                      className="w-full px-3 py-2.5 text-left text-sm hover:bg-zinc-50 disabled:opacity-50"
-                    >
-                      <span className="font-medium text-zinc-900">{s.nama_sekolah}</span>
-                      {s.kabupaten_kota && (
-                        <span className="ml-2 text-zinc-500">— {s.kabupaten_kota}</span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            ) : paginatedSchools.length > 0 ? (
+              <div className="mt-2 overflow-hidden rounded-lg border border-zinc-200 bg-white">
+                <ul className="max-h-60 overflow-y-auto">
+                  {paginatedSchools.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSchool(s)}
+                        disabled={schoolLinkLoading}
+                        className="w-full px-3 py-2.5 text-left text-sm hover:bg-zinc-50 disabled:opacity-50"
+                      >
+                        <span className="font-medium text-zinc-900">{s.nama_sekolah}</span>
+                        {s.kabupaten_kota && (
+                          <span className="ml-2 text-zinc-500">— {s.kabupaten_kota}</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {filteredSchools.length > 0 && (
+                  <Pagination
+                    currentPage={schoolPage}
+                    totalItems={filteredSchools.length}
+                    onPageChange={setSchoolPage}
+                    label="sekolah"
+                  />
+                )}
+              </div>
             ) : (
               <p className="mt-2 text-xs text-zinc-500">
                 {schoolSearchQuery.trim() ? "Tidak ada sekolah yang cocok." : "Daftar sekolah kosong atau belum dimuat."}

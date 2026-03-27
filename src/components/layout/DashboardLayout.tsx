@@ -23,7 +23,9 @@ export function DashboardLayout({
       {sidebar}
       <div className="flex flex-1 flex-col min-w-0">
         <TopNavbar title={title} user={user} onLogout={onLogout} />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 p-4 text-zinc-900 md:p-6 [color-scheme:light]">
+          {children}
+        </main>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ const MASTER_LINKS = [
 
 export default function AdminMasterDataPage() {
   return (
-    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
       <div className="mb-6 md:mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
           Master Data
@@ -21,7 +21,7 @@ export default function AdminMasterDataPage() {
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
           Konfigurasi Master Data
         </h1>
-        <p className="mt-2 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-zinc-600">
           Kelola setting global, role user, subject/kelas, sekolah, jenjang pendidikan, dan kategori event.
         </p>
       </div>
@@ -34,7 +34,7 @@ export default function AdminMasterDataPage() {
             className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-zinc-300 hover:shadow"
           >
             <h2 className="font-semibold text-zinc-900">{item.title}</h2>
-            <p className="mt-1 text-sm text-zinc-500">{item.description}</p>
+            <p className="mt-1 text-sm text-zinc-600">{item.description}</p>
             <span className="mt-3 inline-block text-xs font-medium text-zinc-600">
               Kelola →
             </span>

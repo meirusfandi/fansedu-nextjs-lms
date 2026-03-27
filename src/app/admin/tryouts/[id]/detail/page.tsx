@@ -1,6 +1,7 @@
 "use client";
 
 import { QuestionBody } from "@/components/QuestionBody";
+import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminGetTryout,
   adminListTryoutQuestions,
@@ -11,7 +12,7 @@ import {
 import type { LeaderboardEntry, Question, TryoutSession } from "@/lib/api-types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const LEVEL_LABEL: Record<string, string> = {
   easy: "Mudah",
@@ -118,6 +119,33 @@ export default function AdminTryoutDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
+  const [leaderboardPage, setLeaderboardPage] = useState(1);
+  const [questionPage, setQuestionPage] = useState(1);
+
+  const paginatedLeaderboard = useMemo(
+    () => leaderboard.slice((leaderboardPage - 1) * PAGE_SIZE, leaderboardPage * PAGE_SIZE),
+    [leaderboard, leaderboardPage]
+  );
+  const paginatedQuestions = useMemo(
+    () => questions.slice((questionPage - 1) * PAGE_SIZE, questionPage * PAGE_SIZE),
+    [questions, questionPage]
+  );
+
+  useEffect(() => {
+    if (leaderboard.length > 0 && (leaderboardPage - 1) * PAGE_SIZE >= leaderboard.length) {
+      setLeaderboardPage(1);
+    }
+  }, [leaderboard.length, leaderboardPage]);
+
+  useEffect(() => {
+    if (questions.length > 0 && (questionPage - 1) * PAGE_SIZE >= questions.length) {
+      setQuestionPage(1);
+    }
+  }, [questions.length, questionPage]);
+
+  useEffect(() => {
+    setExpandedQuestionId(null);
+  }, [questionPage]);
 
   const loadData = useCallback(async () => {
     if (!tryoutId) return;
@@ -287,9 +315,11 @@ export default function AdminTryoutDetailPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {leaderboard.map((entry, i) => (
-                    <tr key={entry.user_id ?? i} className="hover:bg-zinc-50/50">
-                      <td className="px-4 py-2 font-medium text-zinc-900">{entry.rank ?? i + 1}</td>
+                  {paginatedLeaderboard.map((entry, i) => (
+                    <tr key={entry.user_id ?? `${leaderboardPage}-${i}`} className="hover:bg-zinc-50/50">
+                      <td className="px-4 py-2 font-medium text-zinc-900">
+                        {entry.rank ?? (leaderboardPage - 1) * PAGE_SIZE + i + 1}
+                      </td>
                       <td className="px-4 py-2 text-zinc-700">
                         {entry.user_name ?? entry.name ?? entry.nama ?? "–"}
                       </td>
@@ -303,6 +333,14 @@ export default function AdminTryoutDetailPage() {
               </table>
             )}
           </div>
+          {leaderboard.length > 0 && (
+            <Pagination
+              currentPage={leaderboardPage}
+              totalItems={leaderboard.length}
+              onPageChange={setLeaderboardPage}
+              label="peserta"
+            />
+          )}
         </section>
 
         {/* Daftar soal + detail */}
@@ -314,7 +352,7 @@ export default function AdminTryoutDetailPage() {
             {questions.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-zinc-500">Belum ada soal. Kelola soal untuk menambah.</p>
             ) : (
-              questions.map((q) => (
+              paginatedQuestions.map((q) => (
                 <div key={q.id} className="px-4 py-3">
                   <button
                     type="button"
@@ -358,6 +396,14 @@ export default function AdminTryoutDetailPage() {
               ))
             )}
           </div>
+          {questions.length > 0 && (
+            <Pagination
+              currentPage={questionPage}
+              totalItems={questions.length}
+              onPageChange={setQuestionPage}
+              label="soal"
+            />
+          )}
         </section>
     </div>
   );
