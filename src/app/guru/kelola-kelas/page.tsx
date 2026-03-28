@@ -8,23 +8,28 @@ export default function GuruKelolaKelasPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Kelola Kelas</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Buat dan atur kelas untuk mengelompokkan siswa Anda.
+          Sinkron dengan kelas yang disiapkan admin. Trainer/pengajar bisa mengelola detail konten dari workspace kelas.
         </p>
       </div>
 
-      <div className="rounded-2xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 p-8 text-center">
-        <p className="text-sm font-medium text-zinc-600">
-          Fitur kelola kelas akan segera tersedia.
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+        <p className="text-sm text-zinc-600">
+          Gunakan menu berikut untuk mengelola kelas Anda:
         </p>
-        <p className="mt-1 text-xs text-zinc-500">
-          Anda dapat membuat kelas, menambahkan siswa ke kelas, dan melihat rekap per kelas. Pastikan backend menyediakan endpoint untuk guru (mis. GET/POST /trainer/classes).
-        </p>
-        <Link
-          href="/guru"
-          className="mt-4 inline-block rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
-        >
-          Kembali ke Dashboard
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Link
+            href="/trainer/classes"
+            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"
+          >
+            Buka Kelas Saya
+          </Link>
+          <Link
+            href="/trainer/classes/create"
+            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Buat Kelas Baru
+          </Link>
+        </div>
       </div>
     </main>
   );

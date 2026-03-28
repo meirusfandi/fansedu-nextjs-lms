@@ -160,6 +160,7 @@ export default function AdminLandingPackagesPage() {
   };
 
   const handleDelete = (id: string) => {
+    if (saving) return;
     if (!confirm("Hapus paket ini dari landing?")) return;
     (async () => {
       setSaving(true);
@@ -198,6 +199,7 @@ export default function AdminLandingPackagesPage() {
         <button
           type="button"
           onClick={openAdd}
+          disabled={saving}
           className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 shadow-sm hover:bg-zinc-800"
         >
           + Tambah paket
@@ -264,6 +266,7 @@ export default function AdminLandingPackagesPage() {
                       <button
                         type="button"
                         onClick={() => openEdit(p)}
+                        disabled={saving}
                         className="text-sky-600 hover:underline"
                       >
                         Edit
@@ -272,6 +275,7 @@ export default function AdminLandingPackagesPage() {
                       <button
                         type="button"
                         onClick={() => handleDelete(p.id)}
+                        disabled={saving}
                         className="text-red-600 hover:underline"
                       >
                         Hapus

@@ -45,9 +45,12 @@ function toDatetimeLocalValue(value: string | null | undefined): string {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const y = d.getFullYear();
+  // Hindari nilai sentinel backend seperti 0001-01-01T00:00:00Z (invalid untuk input datetime-local).
+  if (y < 1000) return "";
+  const pad = (n: number, size = 2) => String(n).padStart(size, "0");
   // Use local time so value is valid for <input type="datetime-local">
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+  return `${pad(y, 4)}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
     d.getMinutes()
   )}`;
 }
