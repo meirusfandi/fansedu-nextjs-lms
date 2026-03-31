@@ -84,31 +84,31 @@ export default function LandingPage() {
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <h3 className="text-base font-semibold text-zinc-900">{p.name}</h3>
-                    {p.is_bundle ? (
+                    {p.isBundle ? (
                       <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">
                         Bundle
                       </span>
                     ) : null}
                   </div>
-                  {p.short_description ? (
-                    <p className="mt-2 flex-1 text-sm text-zinc-600">{p.short_description}</p>
+                  {p.shortDescription ? (
+                    <p className="mt-2 flex-1 text-sm text-zinc-600">{p.shortDescription}</p>
                   ) : (
                     <p className="mt-2 flex-1 text-sm text-zinc-500">—</p>
                   )}
                   <div className="mt-4">
-                    {p.price_early_bird != null ? (
+                    {p.priceEarlyBird != null ? (
                       <p className="text-sm text-emerald-700">
-                        Early bird: <span className="font-semibold">{formatIDR(p.price_early_bird)}</span>
+                        Early bird: <span className="font-semibold">{formatIDR(p.priceEarlyBird)}</span>
                       </p>
                     ) : null}
-                    <p className="text-lg font-bold text-zinc-900">{formatIDR(p.price_normal)}</p>
+                    <p className="text-lg font-bold text-zinc-900">{formatIDR(p.priceNormal)}</p>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
                       <span
                         className={`rounded-full px-2 py-0.5 font-medium ${
-                          p.is_open === false ? "bg-zinc-200 text-zinc-700" : "bg-emerald-100 text-emerald-800"
+                          p.isOpen === false ? "bg-zinc-200 text-zinc-700" : "bg-emerald-100 text-emerald-800"
                         }`}
                       >
-                        {p.is_open === false ? "Tutup" : "Buka"}
+                        {p.isOpen === false ? "Tutup" : "Buka"}
                       </span>
                       {p.durasi ? (
                         <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-700">

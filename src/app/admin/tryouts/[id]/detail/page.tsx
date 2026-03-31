@@ -46,13 +46,18 @@ function QuestionStatsBlock({
   stats: Awaited<ReturnType<typeof adminGetQuestionStats>>;
   participantsFallback: number;
 }) {
-  const peserta = stats?.participants_count ?? stats?.answered_count ?? (participantsFallback > 0 ? participantsFallback : null);
-  const benar = stats?.correct_count ?? 0;
-  const salah = stats?.wrong_count ?? 0;
+  const peserta = stats?.participantsCount ?? stats?.answeredCount ?? (participantsFallback > 0 ? participantsFallback : null);
+  const benar = stats?.correctCount ?? 0;
+  const salah = stats?.wrongCount ?? 0;
   const totalJawaban = benar + salah;
   const pctBenar = totalJawaban > 0 ? Math.round((benar / totalJawaban) * 100) : 0;
   const pctSalah = totalJawaban > 0 ? Math.round((salah / totalJawaban) * 100) : 0;
-  const fromBackend = stats != null && (stats.participants_count != null || stats.answered_count != null || stats.correct_count != null || stats.wrong_count != null);
+  const fromBackend =
+    stats != null &&
+    (stats.participantsCount != null ||
+      stats.answeredCount != null ||
+      stats.correctCount != null ||
+      stats.wrongCount != null);
 
   return (
     <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
@@ -160,24 +165,24 @@ export default function AdminTryoutDetailPage() {
       setTryout(tryoutRes);
       setLeaderboard(Array.isArray(leaderboardRes) ? leaderboardRes : []);
       const qList = Array.isArray(questionsRes) ? questionsRes : [];
-      const sorted = [...qList].sort((a, b) => a.sort_order - b.sort_order);
+      const sorted = [...qList].sort((a, b) => a.sortOrder - b.sortOrder);
 
       // Coba bulk stats dulu (satu request); kalau belum ada di backend, fallback per-soal
       const bulkStats = await adminGetAllQuestionStats(tryoutId).catch(() => null);
-      const participantsCount = bulkStats?.participants_count;
+      const participantsCount = bulkStats?.participantsCount;
 
       let withStats: QuestionWithStats[];
       if (bulkStats && Array.isArray(bulkStats.questions) && bulkStats.questions.length > 0) {
         const byId = new Map(
           bulkStats.questions.map((item) => [
-            item.question_id,
+            item.questionId,
             {
-              participants_count: participantsCount,
-              answered_count: item.answered_count,
-              correct_count: item.correct_count,
-              wrong_count: item.wrong_count,
-              correct_percent: item.correct_percent,
-              wrong_percent: item.wrong_percent,
+              participantsCount,
+              answeredCount: item.answeredCount,
+              correctCount: item.correctCount,
+              wrongCount: item.wrongCount,
+              correctPercent: item.correctPercent,
+              wrongPercent: item.wrongPercent,
             },
           ])
         );
@@ -244,7 +249,7 @@ export default function AdminTryoutDetailPage() {
               Detail event / tryout
             </h1>
             <p className="mt-1 text-sm text-zinc-500">
-              {tryout?.title ?? tryout?.short_title ?? "–"}
+              {tryout?.title ?? tryout?.shortTitle ?? "–"}
             </p>
           </div>
           <Link
@@ -275,19 +280,19 @@ export default function AdminTryoutDetailPage() {
               <div>
                 <p className="text-xs text-zinc-500">Buka – Tutup</p>
                 <p className="text-sm text-zinc-700">
-                  {formatDate(tryout.opens_at)} – {formatDate(tryout.closes_at)}
+                  {formatDate(tryout.opensAt)} – {formatDate(tryout.closesAt)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-zinc-500">Durasi / Level / Status</p>
                 <p className="text-sm text-zinc-700">
-                  {tryout.duration_minutes} mnt · {LEVEL_LABEL[tryout.level] ?? tryout.level} ·{" "}
+                  {tryout.durationMinutes} mnt · {LEVEL_LABEL[tryout.level] ?? tryout.level} ·{" "}
                   {STATUS_LABEL[tryout.status] ?? tryout.status}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-zinc-500">Jumlah soal</p>
-                <p className="text-sm text-zinc-700">{tryout.questions_count} soal</p>
+                <p className="text-sm text-zinc-700">{tryout.questionsCount} soal</p>
               </div>
             </div>
             {tryout.description && (
@@ -316,16 +321,16 @@ export default function AdminTryoutDetailPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {paginatedLeaderboard.map((entry, i) => (
-                    <tr key={entry.user_id ?? `${leaderboardPage}-${i}`} className="hover:bg-zinc-50/50">
+                    <tr key={entry.userId ?? `${leaderboardPage}-${i}`} className="hover:bg-zinc-50/50">
                       <td className="px-4 py-2 font-medium text-zinc-900">
                         {entry.rank ?? (leaderboardPage - 1) * PAGE_SIZE + i + 1}
                       </td>
                       <td className="px-4 py-2 text-zinc-700">
-                        {entry.user_name ?? entry.name ?? entry.nama ?? "–"}
+                        {entry.userName ?? entry.name ?? entry.nama ?? "–"}
                       </td>
-                      <td className="px-4 py-2 text-zinc-600">{entry.school_name ?? "–"}</td>
+                      <td className="px-4 py-2 text-zinc-600">{entry.schoolName ?? "–"}</td>
                       <td className="px-4 py-2 text-right font-medium text-zinc-900">
-                        {entry.score ?? entry.skor ?? entry.best_score ?? "–"}
+                        {entry.score ?? entry.skor ?? entry.bestScore ?? "–"}
                       </td>
                     </tr>
                   ))}
@@ -360,7 +365,7 @@ export default function AdminTryoutDetailPage() {
                     className="flex w-full items-center justify-between text-left"
                   >
                     <span className="font-medium text-zinc-900">
-                      Soal #{q.sort_order} · {TYPE_LABEL[q.type] ?? q.type} (max {q.max_score} poin)
+                      Soal #{q.sortOrder} · {TYPE_LABEL[q.type] ?? q.type} (max {q.maxScore} poin)
                     </span>
                     <span className="text-zinc-400">
                       {expandedQuestionId === q.id ? "▲" : "▼"}
@@ -375,7 +380,7 @@ export default function AdminTryoutDetailPage() {
                     <div className="mt-4 rounded-lg border border-zinc-100 bg-zinc-50/50 p-4">
                       <p className="mb-2 text-xs font-semibold uppercase text-zinc-500">Teks soal</p>
                       <div className="min-h-[2rem] text-sm text-zinc-900">
-                        <QuestionBody html={q.body ?? ""} imageUrl={q.image_url} />
+                        <QuestionBody html={q.body ?? ""} imageUrl={q.imageUrl} />
                       </div>
                       {q.options && q.options.length > 0 && (
                         <>
@@ -388,7 +393,7 @@ export default function AdminTryoutDetailPage() {
                         </>
                       )}
                       <p className="mt-3 text-xs text-zinc-500">
-                        Tipe: {TYPE_LABEL[q.type] ?? q.type} · Max skor: {q.max_score}
+                        Tipe: {TYPE_LABEL[q.type] ?? q.type} · Max skor: {q.maxScore}
                       </p>
                     </div>
                   )}

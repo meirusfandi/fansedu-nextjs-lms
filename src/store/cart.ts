@@ -8,7 +8,7 @@ export interface CartItem {
   id: string;
   title: string;
   description?: string | null;
-  subject_id?: string | null;
+  subjectId?: string | null;
 }
 
 interface CartStore {

@@ -12,27 +12,23 @@ import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/p
 import type { Payment } from "@/lib/api-types";
 
 function getPaymentCreatedAt(p: Payment): string | undefined {
-  return (p as Payment & { createdAt?: string }).createdAt ?? p.created_at;
+  return p.createdAt;
 }
 
 function getPaymentUserName(p: Payment): string {
-  const x = p as Payment & { userName?: string; name?: string };
-  return x.userName ?? p.user_name ?? x.name ?? "–";
+  return p.userName ?? "–";
 }
 
 function getPaymentUserEmail(p: Payment): string {
-  const x = p as Payment & { userEmail?: string; email?: string; userId?: string };
-  return x.userEmail ?? p.user_email ?? x.email ?? x.userId ?? p.user_id ?? "";
+  return p.userEmail ?? p.userId ?? "";
 }
 
 function getPaymentPayerRole(p: Payment): string {
-  const x = p as Payment & { payerRole?: string };
-  return x.payerRole ?? p.payer_role ?? (p.type?.includes("slot") ? "trainer" : "–");
+  return p.payerRole ?? (p.type?.includes("slot") ? "trainer" : "–");
 }
 
 function getPaymentProofUrl(p: Payment): string | null {
-  const x = p as Payment & { proofUrl?: string | null };
-  return (x.proofUrl ?? p.proof_url ?? null) as string | null;
+  return p.proofUrl ?? null;
 }
 
 export default function AdminPaymentPage() {

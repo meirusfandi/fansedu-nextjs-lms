@@ -57,16 +57,16 @@ function toDatetimeLocalValue(value: string | null | undefined): string {
 
 const emptyForm: AdminCreateTryoutRequest = {
   title: "",
-  short_title: "",
+  shortTitle: "",
   description: "",
-  duration_minutes: 90,
-  questions_count: 25,
+  durationMinutes: 90,
+  questionsCount: 25,
   level: "medium",
-  opens_at: "",
-  closes_at: "",
-  max_participants: 200,
+  opensAt: "",
+  closesAt: "",
+  maxParticipants: 200,
   status: "draft",
-  event_category: "tryout",
+  eventCategory: "tryout",
 };
 
 export default function AdminTryoutsPage() {
@@ -112,8 +112,8 @@ export default function AdminTryoutsPage() {
     const inAWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     setForm({
       ...emptyForm,
-      opens_at: now.toISOString().slice(0, 16),
-      closes_at: inAWeek.toISOString().slice(0, 16),
+      opensAt: now.toISOString().slice(0, 16),
+      closesAt: inAWeek.toISOString().slice(0, 16),
     });
     setEditingId(null);
     setSubmitError(null);
@@ -123,16 +123,16 @@ export default function AdminTryoutsPage() {
   const openEdit = (t: TryoutSession) => {
     setForm({
       title: t.title,
-      short_title: t.short_title ?? "",
+      shortTitle: t.shortTitle ?? "",
       description: t.description ?? "",
-      duration_minutes: t.duration_minutes ?? 90,
-      questions_count: t.questions_count ?? 25,
+      durationMinutes: t.durationMinutes ?? 90,
+      questionsCount: t.questionsCount ?? 25,
       level: t.level ?? "medium",
-      opens_at: toDatetimeLocalValue(t.opens_at),
-      closes_at: toDatetimeLocalValue(t.closes_at),
-      max_participants: t.max_participants ?? undefined,
+      opensAt: toDatetimeLocalValue(t.opensAt),
+      closesAt: toDatetimeLocalValue(t.closesAt),
+      maxParticipants: t.maxParticipants ?? undefined,
       status: t.status ?? "draft",
-      event_category: (t.event_category as "tryout" | "free_class" | "paid_class") ?? "tryout",
+      eventCategory: (t.eventCategory as "tryout" | "free_class" | "paid_class") ?? "tryout",
     });
     setEditingId(t.id);
     setSubmitError(null);
@@ -151,8 +151,8 @@ export default function AdminTryoutsPage() {
     setSubmitError(null);
     setSubmitLoading(true);
     try {
-      const opensDate = form.opens_at ? new Date(form.opens_at) : null;
-      const closesDate = form.closes_at ? new Date(form.closes_at) : null;
+      const opensDate = form.opensAt ? new Date(form.opensAt) : null;
+      const closesDate = form.closesAt ? new Date(form.closesAt) : null;
       const opensAt =
         opensDate && !Number.isNaN(opensDate.getTime())
           ? opensDate.toISOString()
@@ -170,8 +170,8 @@ export default function AdminTryoutsPage() {
         return;
       }
 
-      const duration = Number(form.duration_minutes);
-      const questionCount = Number(form.questions_count);
+      const duration = Number(form.durationMinutes);
+      const questionCount = Number(form.questionsCount);
       if (!Number.isFinite(duration) || duration <= 0) {
         setSubmitError("Durasi harus lebih dari 0.");
         return;
@@ -183,20 +183,20 @@ export default function AdminTryoutsPage() {
 
       const payload: AdminCreateTryoutRequest = {
         title: form.title.trim(),
-        duration_minutes: duration,
-        questions_count: questionCount,
+        durationMinutes: duration,
+        questionsCount: questionCount,
         level: form.level,
-        opens_at: opensAt,
-        closes_at: closesAt,
+        opensAt: opensAt,
+        closesAt: closesAt,
         status: form.status ?? "draft",
         // Kirim eksplisit agar update create/update konsisten.
-        short_title: form.short_title?.trim() ? form.short_title.trim() : null,
+        shortTitle: form.shortTitle?.trim() ? form.shortTitle.trim() : null,
         description: form.description?.trim() ? form.description.trim() : null,
-        max_participants:
-          form.max_participants != null && Number(form.max_participants) > 0
-            ? Number(form.max_participants)
+        maxParticipants:
+          form.maxParticipants != null && Number(form.maxParticipants) > 0
+            ? Number(form.maxParticipants)
             : null,
-        event_category: form.event_category ?? "tryout",
+        eventCategory: form.eventCategory ?? "tryout",
       };
       if (modalOpen === "add") {
         await adminCreateTryout(payload);
@@ -307,14 +307,14 @@ export default function AdminTryoutsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                          {EVENT_CATEGORY_LABEL[t.event_category ?? "tryout"] ?? t.event_category ?? "Tryout"}
+                          {EVENT_CATEGORY_LABEL[t.eventCategory ?? "tryout"] ?? t.eventCategory ?? "Tryout"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-zinc-600">
-                        {t.short_title ?? "–"}
+                        {t.shortTitle ?? "–"}
                       </td>
-                      <td className="px-4 py-3">{t.duration_minutes} mnt</td>
-                      <td className="px-4 py-3">{t.questions_count}</td>
+                      <td className="px-4 py-3">{t.durationMinutes} mnt</td>
+                      <td className="px-4 py-3">{t.questionsCount}</td>
                       <td className="px-4 py-3">
                         {LEVEL_LABEL[t.level] ?? t.level}
                       </td>
@@ -324,7 +324,7 @@ export default function AdminTryoutsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-zinc-500">
-                        {formatDate(t.opens_at)} – {formatDate(t.closes_at)}
+                        {formatDate(t.opensAt)} – {formatDate(t.closesAt)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <Link
@@ -420,11 +420,11 @@ export default function AdminTryoutsPage() {
                   Kategori Event *
                 </label>
                 <select
-                  value={form.event_category ?? "tryout"}
+                  value={form.eventCategory ?? "tryout"}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      event_category: e.target.value as "tryout" | "free_class" | "paid_class",
+                      eventCategory: e.target.value as "tryout" | "free_class" | "paid_class",
                     })
                   }
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
@@ -440,9 +440,9 @@ export default function AdminTryoutsPage() {
                 </label>
                 <input
                   type="text"
-                  value={form.short_title ?? ""}
+                  value={form.shortTitle ?? ""}
                   onChange={(e) =>
-                    setForm({ ...form, short_title: e.target.value || undefined })
+                    setForm({ ...form, shortTitle: e.target.value || undefined })
                   }
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
@@ -469,11 +469,11 @@ export default function AdminTryoutsPage() {
                     type="number"
                     min={1}
                     required
-                    value={form.duration_minutes ?? 90}
+                    value={form.durationMinutes ?? 90}
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        duration_minutes: Number(e.target.value) || 90,
+                        durationMinutes: Number(e.target.value) || 90,
                       })
                     }
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
@@ -487,11 +487,11 @@ export default function AdminTryoutsPage() {
                     type="number"
                     min={1}
                     required
-                    value={form.questions_count ?? 25}
+                    value={form.questionsCount ?? 25}
                     onChange={(e) =>
                       setForm({
                         ...form,
-                        questions_count: Number(e.target.value) || 25,
+                        questionsCount: Number(e.target.value) || 25,
                       })
                     }
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
@@ -545,8 +545,8 @@ export default function AdminTryoutsPage() {
                 <input
                   type="datetime-local"
                   required
-                  value={form.opens_at}
-                  onChange={(e) => setForm({ ...form, opens_at: e.target.value })}
+                  value={form.opensAt}
+                  onChange={(e) => setForm({ ...form, opensAt: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
@@ -557,9 +557,9 @@ export default function AdminTryoutsPage() {
                 <input
                   type="datetime-local"
                   required
-                  value={form.closes_at}
+                  value={form.closesAt}
                   onChange={(e) =>
-                    setForm({ ...form, closes_at: e.target.value })
+                    setForm({ ...form, closesAt: e.target.value })
                   }
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
@@ -571,11 +571,11 @@ export default function AdminTryoutsPage() {
                 <input
                   type="number"
                   min={0}
-                  value={form.max_participants ?? ""}
+                  value={form.maxParticipants ?? ""}
                   onChange={(e) =>
                     setForm({
                       ...form,
-                      max_participants: e.target.value
+                      maxParticipants: e.target.value
                         ? Number(e.target.value)
                         : undefined,
                     })

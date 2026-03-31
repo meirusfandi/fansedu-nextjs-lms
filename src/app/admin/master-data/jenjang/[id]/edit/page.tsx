@@ -16,7 +16,7 @@ export default function EditJenjangPendidikanPage() {
     name: "",
     slug: "",
     description: "",
-    sort_order: "",
+    sortOrder: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,8 +35,8 @@ export default function EditJenjangPendidikanPage() {
           name: level.name ?? "",
           slug: level.slug ?? "",
           description: level.description ?? "",
-          sort_order:
-            level.sort_order != null ? String(level.sort_order) : "",
+          sortOrder:
+            level.sortOrder != null ? String(level.sortOrder) : "",
         });
       })
       .catch((e) => {
@@ -61,11 +61,11 @@ export default function EditJenjangPendidikanPage() {
         name: string;
         slug: string;
         description?: string;
-        sort_order?: number;
+        sortOrder?: number;
       } = { name, slug };
       if (form.description.trim()) body.description = form.description.trim();
-      const sortNum = parseInt(form.sort_order, 10);
-      if (!Number.isNaN(sortNum)) body.sort_order = sortNum;
+      const sortNum = parseInt(form.sortOrder, 10);
+      if (!Number.isNaN(sortNum)) body.sortOrder = sortNum;
       await adminUpdateLevel(levelId, body);
       router.push("/admin/master-data/jenjang");
     } catch (err) {
@@ -187,9 +187,9 @@ export default function EditJenjangPendidikanPage() {
               <input
                 type="number"
                 min={0}
-                value={form.sort_order}
+                value={form.sortOrder}
                 onChange={(e) =>
-                  setForm({ ...form, sort_order: e.target.value })
+                  setForm({ ...form, sortOrder: e.target.value })
                 }
                 placeholder="1"
                 className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"

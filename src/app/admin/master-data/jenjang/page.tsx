@@ -113,7 +113,7 @@ export default function MasterDataJenjangPage() {
                       className="hover:bg-zinc-50"
                     >
                       <td className="px-4 py-3 text-zinc-600">
-                        {j.sort_order ?? "–"}
+                        {j.sortOrder ?? "–"}
                       </td>
                       <td className="px-4 py-3 font-medium text-zinc-900">
                         {j.name}

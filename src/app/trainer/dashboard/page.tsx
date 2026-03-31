@@ -7,7 +7,7 @@ import { CardStats } from "@/components/ui/CardStats";
 
 export default function TrainerDashboardPage() {
   const { data: status, isLoading, error } = useTrainerStatus();
-  const slotsAvailable = status ? Math.max(0, status.paid_slots - status.registered_students_count) : 0;
+  const slotsAvailable = status ? Math.max(0, status.paidSlots - status.registeredStudentsCount) : 0;
 
   if (error) {
     return (
@@ -29,8 +29,8 @@ export default function TrainerDashboardPage() {
       </div>
 
       <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <CardStats title="Slot dibayar" value={isLoading ? "..." : (status?.paid_slots ?? "–")} subtitle="Untuk mendaftarkan siswa" />
-        <CardStats title="Siswa terdaftar" value={isLoading ? "..." : (status?.registered_students_count ?? "–")} subtitle="Siswa yang sudah didaftarkan" />
+        <CardStats title="Slot dibayar" value={isLoading ? "..." : (status?.paidSlots ?? "–")} subtitle="Untuk mendaftarkan siswa" />
+        <CardStats title="Siswa terdaftar" value={isLoading ? "..." : (status?.registeredStudentsCount ?? "–")} subtitle="Siswa yang sudah didaftarkan" />
         <CardStats title="Slot tersedia" value={isLoading ? "..." : slotsAvailable} subtitle="Sisa slot untuk siswa baru" />
       </section>
 

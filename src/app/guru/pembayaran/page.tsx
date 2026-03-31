@@ -66,8 +66,8 @@ export default function GuruPembayaranPage() {
                 {paginated.map((p) => (
                   <tr key={p.id} className="hover:bg-zinc-50/80">
                     <td className="whitespace-nowrap px-4 py-3 text-zinc-600">
-                      {p.created_at
-                        ? new Date(p.created_at).toLocaleString("id-ID", {
+                      {p.createdAt
+                        ? new Date(p.createdAt).toLocaleString("id-ID", {
                             dateStyle: "short",
                             timeStyle: "short",
                           })
@@ -79,9 +79,9 @@ export default function GuruPembayaranPage() {
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-zinc-700">{paymentStatusLabel(p.status)}</td>
                     <td className="px-4 py-3">
-                      {p.proof_url ? (
+                      {p.proofUrl ? (
                         <a
-                          href={String(p.proof_url)}
+                          href={String(p.proofUrl)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sky-600 hover:underline"

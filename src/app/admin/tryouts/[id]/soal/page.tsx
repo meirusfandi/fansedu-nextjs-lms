@@ -22,17 +22,17 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const emptyQuestionForm: {
-  sort_order: string;
+  sortOrder: string;
   type: AdminCreateQuestionRequest["type"];
   body: string;
   optionsText: string;
-  max_score: string;
+  maxScore: string;
 } = {
-  sort_order: "1",
+  sortOrder: "1",
   type: "multiple_choice",
   body: "",
   optionsText: "",
-  max_score: "1",
+  maxScore: "1",
 };
 
 export default function AdminTryoutSoalPage() {
@@ -52,7 +52,7 @@ export default function AdminTryoutSoalPage() {
   const [page, setPage] = useState(1);
 
   const sortedQuestions = useMemo(
-    () => [...questions].sort((a, b) => a.sort_order - b.sort_order),
+    () => [...questions].sort((a, b) => a.sortOrder - b.sortOrder),
     [questions]
   );
   const paginatedQuestions = useMemo(
@@ -107,7 +107,7 @@ export default function AdminTryoutSoalPage() {
   const openAdd = () => {
     setForm({
       ...emptyQuestionForm,
-      sort_order: String((questions.length + 1)),
+      sortOrder: String((questions.length + 1)),
     });
     setEditingQuestionId(null);
     setModalOpen("add");
@@ -116,11 +116,11 @@ export default function AdminTryoutSoalPage() {
 
   const openEdit = (q: Question) => {
     setForm({
-      sort_order: String(q.sort_order),
+      sortOrder: String(q.sortOrder),
       type: q.type,
       body: q.body,
       optionsText: (q.options ?? []).join("\n"),
-      max_score: String(q.max_score),
+      maxScore: String(q.maxScore),
     });
     setEditingQuestionId(q.id);
     setModalOpen("edit");
@@ -154,8 +154,8 @@ export default function AdminTryoutSoalPage() {
     setSubmitError(null);
     setSubmitLoading(true);
     try {
-      const sortOrder = parseInt(form.sort_order, 10) || 1;
-      const maxScore = parseInt(form.max_score, 10) || 1;
+      const sortOrder = parseInt(form.sortOrder, 10) || 1;
+      const maxScore = parseInt(form.maxScore, 10) || 1;
       const options =
         form.type === "multiple_choice" || form.type === "true_false"
           ? parseOptions(form.optionsText)
@@ -163,19 +163,19 @@ export default function AdminTryoutSoalPage() {
 
       if (modalOpen === "add") {
         await adminCreateQuestion(tryoutId, {
-          sort_order: sortOrder,
+          sortOrder,
           type: form.type,
           body: form.body.trim(),
           options: options?.length ? options : undefined,
-          max_score: maxScore,
+          maxScore,
         });
       } else if (editingQuestionId) {
         await adminUpdateQuestion(tryoutId, editingQuestionId, {
-          sort_order: sortOrder,
+          sortOrder,
           type: form.type,
           body: form.body.trim(),
           options: options?.length ? options : undefined,
-          max_score: maxScore,
+          maxScore,
         });
       }
       closeModal();
@@ -261,14 +261,14 @@ export default function AdminTryoutSoalPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="rounded bg-zinc-200 px-1.5 py-0.5 text-xs font-medium text-zinc-700">
-                          #{q.sort_order}
+                          #{q.sortOrder}
                         </span>
                         <span className="text-xs text-zinc-500">
-                          {TYPE_LABEL[q.type] ?? q.type} · Skor: {q.max_score}
+                          {TYPE_LABEL[q.type] ?? q.type} · Skor: {q.maxScore}
                         </span>
                       </div>
                       <div className="mt-1">
-                        <QuestionBody html={q.body} imageUrl={q.image_url} asPreview />
+                        <QuestionBody html={q.body} imageUrl={q.imageUrl} asPreview />
                       </div>
                       {q.options && q.options.length > 0 && (
                         <ul className="mt-1 list-inside list-disc text-xs text-zinc-500">
@@ -330,9 +330,9 @@ export default function AdminTryoutSoalPage() {
                     type="number"
                     min={1}
                     required
-                    value={form.sort_order}
+                    value={form.sortOrder}
                     onChange={(e) =>
-                      setForm({ ...form, sort_order: e.target.value })
+                      setForm({ ...form, sortOrder: e.target.value })
                     }
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                   />
@@ -413,8 +413,8 @@ export default function AdminTryoutSoalPage() {
                 <input
                   type="number"
                   min={1}
-                  value={form.max_score}
-                  onChange={(e) => setForm({ ...form, max_score: e.target.value })}
+                  value={form.maxScore}
+                  onChange={(e) => setForm({ ...form, maxScore: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>

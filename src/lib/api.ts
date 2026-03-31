@@ -38,6 +38,7 @@ import type {
   Payment,
   PutAnswerRequest,
   Question,
+  QuestionStats,
   RegisterRequest,
   RegisterResponse,
   ResetPasswordRequest,
@@ -272,45 +273,28 @@ function isNotFoundOrMethodNotAllowed(e: unknown): boolean {
   return status === 404 || status === 405;
 }
 
-/** Normalisasi TryoutSession agar aman untuk snake_case / camelCase dari backend. */
+/** Normalisasi TryoutSession (JSON API camelCase). */
 function normalizeToTryoutSession(item: unknown): TryoutSession {
   const obj = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
   return {
     id: String(obj.id ?? ""),
     title: String(obj.title ?? ""),
-    short_title:
-      obj.short_title != null
-        ? String(obj.short_title)
-        : obj.shortTitle != null
-          ? String(obj.shortTitle)
-          : null,
+    shortTitle: obj.shortTitle != null ? String(obj.shortTitle) : null,
     description: obj.description != null ? String(obj.description) : null,
-    duration_minutes: Number(
-      obj.duration_minutes ?? obj.durationMinutes ?? 0
-    ),
-    questions_count: Number(
-      obj.questions_count ?? obj.questionsCount ?? 0
-    ),
+    durationMinutes: Number(obj.durationMinutes ?? 0),
+    questionsCount: Number(obj.questionsCount ?? 0),
     level: String(obj.level ?? "medium") as TryoutSession["level"],
-    opens_at: String(obj.opens_at ?? obj.opensAt ?? ""),
-    closes_at: String(obj.closes_at ?? obj.closesAt ?? ""),
-    max_participants:
-      obj.max_participants != null
-        ? Number(obj.max_participants)
-        : obj.maxParticipants != null
-          ? Number(obj.maxParticipants)
-          : null,
+    opensAt: String(obj.opensAt ?? ""),
+    closesAt: String(obj.closesAt ?? ""),
+    maxParticipants:
+      obj.maxParticipants != null ? Number(obj.maxParticipants) : null,
     status: String(obj.status ?? "draft") as TryoutSession["status"],
-    event_category:
-      obj.event_category != null
-        ? String(obj.event_category)
-        : obj.eventCategory != null
-          ? String(obj.eventCategory)
-          : null,
+    eventCategory:
+      obj.eventCategory != null ? String(obj.eventCategory) : null,
   };
 }
 
-/** Bersihkan payload tryout; request() akan ubah key menjadi snake_case global. */
+/** Bersihkan payload tryout sebelum dikirim; request() mengonversi key ke camelCase. */
 function toTryoutApiPayload(
   body: AdminCreateTryoutRequest | Partial<AdminCreateTryoutRequest>
 ): Record<string, unknown> {
@@ -320,6 +304,28 @@ function toTryoutApiPayload(
     if (payload[k] === undefined) delete payload[k];
   });
   return payload;
+}
+
+/** Satu soal: dipetakan ke Question setelah response dinormalisasi ke camelCase. */
+function normalizeQuestion(item: unknown): Question {
+  const obj = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const typeRaw = obj.type;
+  const type: Question["type"] =
+    typeRaw === "short" || typeRaw === "multiple_choice" || typeRaw === "true_false"
+      ? typeRaw
+      : "short";
+  return {
+    id: String(obj.id ?? ""),
+    tryoutSessionId: String(obj.tryoutSessionId ?? ""),
+    sortOrder: Number(obj.sortOrder ?? 0),
+    type,
+    body: String(obj.body ?? ""),
+    options: Array.isArray(obj.options)
+      ? (obj.options as unknown[]).map((x) => String(x))
+      : null,
+    maxScore: Number(obj.maxScore ?? 0),
+    imageUrl: obj.imageUrl != null ? String(obj.imageUrl) : null,
+  };
 }
 
 // --- Health ---
@@ -541,25 +547,31 @@ export async function trainerListPayments(): Promise<Payment[]> {
 }
 
 // --- Trainer (Guru) ---
-/** Status slot & siswa guru. 404/405 = { paid_slots: 0, registered_students_count: 0 }. includeStudents=true → GET /trainer/status?students=1 */
+/** Status slot & siswa guru. 404/405 = { paidSlots: 0, registeredStudentsCount: 0 }. includeStudents=true → GET /trainer/status?students=1 */
 export async function getTrainerStatus(includeStudents?: boolean): Promise<TrainerStatusResponse> {
   try {
     const path = includeStudents ? "/trainer/status?students=1" : "/trainer/status";
     const raw = await request<Record<string, unknown>>(path, { method: "GET" });
     if (!raw || typeof raw !== "object") {
-      return { paid_slots: 0, registered_students_count: 0 };
+      return { paidSlots: 0, registeredStudentsCount: 0 };
     }
     const data = (raw.data && typeof raw.data === "object") ? (raw.data as Record<string, unknown>) : raw;
-    const paid = typeof raw.paid_slots === "number" ? raw.paid_slots : typeof data.paid_slots === "number" ? data.paid_slots : Number(raw.slots_paid ?? data.slots_paid ?? 0) || 0;
-    const count = typeof raw.registered_students_count === "number"
-      ? raw.registered_students_count
-      : typeof data.registered_students_count === "number"
-        ? data.registered_students_count
-        : Number(raw.students_count ?? data.students_count ?? raw.registered_count ?? 0) || 0;
+    const paid =
+      typeof raw.paidSlots === "number"
+        ? raw.paidSlots
+        : typeof data.paidSlots === "number"
+          ? data.paidSlots
+          : Number(raw.slotsPaid ?? data.slotsPaid ?? 0) || 0;
+    const count =
+      typeof raw.registeredStudentsCount === "number"
+        ? raw.registeredStudentsCount
+        : typeof data.registeredStudentsCount === "number"
+          ? data.registeredStudentsCount
+          : Number(raw.studentsCount ?? data.studentsCount ?? raw.registeredCount ?? 0) || 0;
     const students = Array.isArray(raw.students) ? raw.students : Array.isArray(data.students) ? data.students : undefined;
     return {
-      paid_slots: paid,
-      registered_students_count: count,
+      paidSlots: paid,
+      registeredStudentsCount: count,
       students: Array.isArray(students) ? students.map((s: Record<string, unknown>) => ({
         id: String(s.id ?? ""),
         name: String(s.name ?? s.nama ?? ""),
@@ -567,17 +579,17 @@ export async function getTrainerStatus(includeStudents?: boolean): Promise<Train
       })) : undefined,
     };
   } catch (e) {
-    if (isNotFoundOrMethodNotAllowed(e)) return { paid_slots: 0, registered_students_count: 0 };
+    if (isNotFoundOrMethodNotAllowed(e)) return { paidSlots: 0, registeredStudentsCount: 0 };
     throw e;
   }
 }
 
 /** Bayar slot pendaftaran siswa (guru). POST /trainer/pay. */
-export async function trainerPaySlots(body: TrainerPayRequest): Promise<{ ok: boolean; paid_slots?: number }> {
+export async function trainerPaySlots(body: TrainerPayRequest): Promise<{ ok: boolean; paidSlots?: number }> {
   return request("/trainer/pay", { method: "POST", body });
 }
 
-/** Daftarkan siswa oleh guru. POST /trainer/students. Hanya bisa jika ada slot (paid_slots > registered_students_count). */
+/** Daftarkan siswa oleh guru. POST /trainer/students. Hanya bisa jika ada slot (paidSlots > registeredStudentsCount). */
 export async function trainerAddStudent(body: TrainerAddStudentRequest): Promise<{ id: string; email: string }> {
   return request("/trainer/students", { method: "POST", body });
 }
@@ -596,9 +608,16 @@ export async function getTrainerProfile(): Promise<TrainerProfileResponse | null
       const s = schoolRaw as Record<string, unknown>;
       school = {
         id: String(s.id ?? ""),
-        nama_sekolah: String(s.nama_sekolah ?? s.nama ?? s.school_name ?? ""),
+        namaSekolah: String(s.namaSekolah ?? s.nama ?? ""),
         npsn: s.npsn != null ? String(s.npsn) : null,
-        kabupaten_kota: s.kabupaten_kota != null ? String(s.kabupaten_kota) : s.kabupaten != null ? String(s.kabupaten) : s.kota != null ? String(s.kota) : null,
+        kabupatenKota:
+          s.kabupatenKota != null
+            ? String(s.kabupatenKota)
+            : s.kabupaten != null
+              ? String(s.kabupaten)
+              : s.kota != null
+                ? String(s.kota)
+                : null,
         telepon: s.telepon != null ? String(s.telepon) : s.phone != null ? String(s.phone) : null,
         alamat: s.alamat != null ? String(s.alamat) : s.address != null ? String(s.address) : null,
       };
@@ -729,11 +748,17 @@ export async function getAttemptQuestions(
   attemptId: string
 ): Promise<Question[]> {
   try {
-    const raw = await request<Question[] | { questions?: Question[]; data?: Question[] }>(`/attempts/${attemptId}/questions`, { method: "GET" });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.questions && Array.isArray(raw.questions)) return raw.questions;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    const raw = await request<
+      unknown[] | { questions?: unknown[]; data?: unknown[] }
+    >(`/attempts/${attemptId}/questions`, { method: "GET" });
+    let list: unknown[] = [];
+    if (Array.isArray(raw)) list = raw;
+    else if (raw && typeof raw === "object") {
+      const o = raw as { questions?: unknown[]; data?: unknown[] };
+      if (Array.isArray(o.questions)) list = o.questions;
+      else if (Array.isArray(o.data)) list = o.data;
+    }
+    return list.map(normalizeQuestion);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -779,20 +804,23 @@ function normalizeLeaderboard(list: unknown[]): LeaderboardEntry[] {
   return list.slice(0, 50).map((item, index) => {
     if (!item || typeof item !== "object") return { rank: index + 1 };
     const o = item as Record<string, unknown>;
-    const scoreVal = o.best_score != null ? Number(o.best_score) : o.score != null ? Number(o.score) : o.skor != null ? Number(o.skor) : undefined;
+    const scoreVal =
+      o.bestScore != null ? Number(o.bestScore) : o.score != null ? Number(o.score) : o.skor != null ? Number(o.skor) : undefined;
     return {
       rank: Number(o.rank ?? o.urutan ?? index + 1),
-      user_id: o.user_id != null ? String(o.user_id) : undefined,
-      user_name: o.user_name != null ? String(o.user_name) : o.name != null ? String(o.name) : o.nama != null ? String(o.nama) : undefined,
+      userId: o.userId != null ? String(o.userId) : undefined,
+      userName:
+        o.userName != null ? String(o.userName) : o.name != null ? String(o.name) : o.nama != null ? String(o.nama) : undefined,
       name: o.name != null ? String(o.name) : o.nama != null ? String(o.nama) : undefined,
       nama: o.nama != null ? String(o.nama) : undefined,
-      school_name: o.school_name != null ? String(o.school_name) : undefined,
+      schoolName: o.schoolName != null ? String(o.schoolName) : undefined,
       score: scoreVal,
       skor: scoreVal,
-      best_score: o.best_score != null ? Number(o.best_score) : undefined,
-      has_attempt: o.has_attempt === true,
-      tryout_title: o.tryout_title != null ? String(o.tryout_title) : o.tryout_name != null ? String(o.tryout_name) : undefined,
-      tryout_id: o.tryout_id != null ? String(o.tryout_id) : undefined,
+      bestScore: o.bestScore != null ? Number(o.bestScore) : undefined,
+      hasAttempt: o.hasAttempt === true,
+      tryoutTitle:
+        o.tryoutTitle != null ? String(o.tryoutTitle) : o.tryoutName != null ? String(o.tryoutName) : undefined,
+      tryoutId: o.tryoutId != null ? String(o.tryoutId) : undefined,
       ...o,
     } as LeaderboardEntry;
   });
@@ -813,11 +841,11 @@ export async function getStudentDashboard(): Promise<StudentDashboardResponse> {
   const raw = await request<Record<string, unknown>>("/student/dashboard", { method: "GET" });
   if (!raw || typeof raw !== "object") {
     return {
-      summary: { total_attempts: 0, avg_score: 0, avg_percentile: 0 },
-      open_tryouts: [],
-      recent_attempts: [],
-      strength_areas: [],
-      improvement_areas: [],
+      summary: { totalAttempts: 0, avgScore: 0, avgPercentile: 0 },
+      openTryouts: [],
+      recentAttempts: [],
+      strengthAreas: [],
+      improvementAreas: [],
       recommendation: "",
     };
   }
@@ -827,23 +855,45 @@ export async function getStudentDashboard(): Promise<StudentDashboardResponse> {
     return [];
   };
   const str = (v: unknown): string => (v != null && typeof v === "string" ? v : "");
-  const strength = raw.strength_areas ?? data.strength_areas ?? raw.kekuatan ?? data.kekuatan ?? raw.strengths ?? data.strengths ?? raw.strength;
-  const improvement = raw.improvement_areas ?? data.improvement_areas ?? raw.perlu_ditingkatkan ?? data.perlu_ditingkatkan ?? raw.improvements ?? data.improvements ?? raw.improvement;
-  const rec = raw.recommendation ?? data.recommendation ?? raw.rekomendasi ?? data.rekomendasi ?? raw.recommendation_text ?? data.recommendation_text ?? "";
-  const expiresAt = raw.expires_at ?? data.expires_at ?? raw.access_expires_at ?? data.access_expires_at ?? raw.subscription_expires_at ?? data.subscription_expires_at;
+  const strength =
+    raw.strengthAreas ?? data.strengthAreas ?? raw.kekuatan ?? data.kekuatan ?? raw.strengths ?? data.strengths ?? raw.strength;
+  const improvement =
+    raw.improvementAreas ??
+    data.improvementAreas ??
+    raw.perlu_ditingkatkan ??
+    data.perlu_ditingkatkan ??
+    raw.improvements ??
+    data.improvements ??
+    raw.improvement;
+  const rec =
+    raw.recommendation ??
+    data.recommendation ??
+    raw.rekomendasi ??
+    data.rekomendasi ??
+    raw.recommendationText ??
+    data.recommendationText ??
+    "";
+  const expiresAtVal =
+    raw.expiresAt ??
+    data.expiresAt ??
+    raw.accessExpiresAt ??
+    data.accessExpiresAt ??
+    raw.subscriptionExpiresAt ??
+    data.subscriptionExpiresAt;
   return {
     ...raw,
     summary: (raw.summary as StudentDashboardResponse["summary"]) ?? (data.summary as StudentDashboardResponse["summary"]) ?? {
-      total_attempts: 0,
-      avg_score: 0,
-      avg_percentile: 0,
+      totalAttempts: 0,
+      avgScore: 0,
+      avgPercentile: 0,
     },
-    open_tryouts: Array.isArray(raw.open_tryouts) ? raw.open_tryouts : Array.isArray(data.open_tryouts) ? data.open_tryouts : [],
-    recent_attempts: Array.isArray(raw.recent_attempts) ? raw.recent_attempts : Array.isArray(data.recent_attempts) ? data.recent_attempts : [],
-    strength_areas: arr(strength),
-    improvement_areas: arr(improvement),
+    openTryouts: Array.isArray(raw.openTryouts) ? raw.openTryouts : Array.isArray(data.openTryouts) ? data.openTryouts : [],
+    recentAttempts:
+      Array.isArray(raw.recentAttempts) ? raw.recentAttempts : Array.isArray(data.recentAttempts) ? data.recentAttempts : [],
+    strengthAreas: arr(strength),
+    improvementAreas: arr(improvement),
     recommendation: typeof rec === "string" ? rec : str(rec),
-    expires_at: typeof expiresAt === "string" ? expiresAt : undefined,
+    expiresAt: typeof expiresAtVal === "string" ? expiresAtVal : undefined,
   } as StudentDashboardResponse;
 }
 
@@ -1052,10 +1102,10 @@ export async function getAdminOverview(): Promise<AdminOverviewResponse | null> 
     const raw = await request<Record<string, unknown>>("/admin/overview", { method: "GET" });
     if (!raw || typeof raw !== "object") return null;
     return {
-      total_students: Number(raw.total_students ?? raw.total_student ?? 0),
-      active_tryouts: Number(raw.active_tryouts ?? raw.active_tryout ?? 0),
-      avg_score: Number(raw.avg_score ?? raw.average_score ?? 0),
-      total_certificates: Number(raw.total_certificates ?? raw.total_certificate ?? 0),
+      totalStudents: Number(raw.totalStudents ?? raw.totalStudent ?? 0),
+      activeTryouts: Number(raw.activeTryouts ?? raw.activeTryout ?? 0),
+      avgScore: Number(raw.avgScore ?? raw.averageScore ?? 0),
+      totalCertificates: Number(raw.totalCertificates ?? raw.totalCertificate ?? 0),
     };
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return null;
@@ -1088,13 +1138,13 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   const tryouts = tryoutsResult.status === "fulfilled" ? tryoutsResult.value : [];
 
   const totalStudents =
-    overview?.total_students ??
+    overview?.totalStudents ??
     users.filter((u) => u.role === "student").length;
   // Event aktif: utamakan hitung dari list tryout (status === "open"), fallback ke overview
   const openCount = tryouts.filter((t) => String(t.status).toLowerCase() === "open").length;
-  const activeTryouts = tryouts.length > 0 ? openCount : (overview?.active_tryouts ?? 0);
-  const avgScore = overview?.avg_score ?? 0;
-  const totalCertificates = overview?.total_certificates ?? 0;
+  const activeTryouts = tryouts.length > 0 ? openCount : (overview?.activeTryouts ?? 0);
+  const avgScore = overview?.avgScore ?? 0;
+  const totalCertificates = overview?.totalCertificates ?? 0;
 
   return {
     overview,
@@ -1166,22 +1216,16 @@ export async function getRawJson(path: string): Promise<unknown> {
 
 /** Normalisasi objek dari API ke bentuk Sekolah (field nama bisa beda). */
 function normalizeToSekolah(item: Record<string, unknown>): Sekolah {
-  const id = String(item.id ?? item.school_id ?? "");
-  const nama_sekolah =
-    String(
-      item.nama_sekolah ??
-        item.nama ??
-        item.name ??
-        item.school_name ??
-        ""
-    ).trim() || "—";
+  const id = String(item.id ?? item.schoolId ?? "");
+  const namaSekolah =
+    String(item.namaSekolah ?? item.nama ?? item.name ?? "").trim() || "—";
   return {
     id: id || crypto.randomUUID(),
-    nama_sekolah,
+    namaSekolah,
     npsn: item.npsn != null ? String(item.npsn) : null,
-    kabupaten_kota:
-      item.kabupaten_kota != null
-        ? String(item.kabupaten_kota)
+    kabupatenKota:
+      item.kabupatenKota != null
+        ? String(item.kabupatenKota)
         : item.kabupaten != null
           ? String(item.kabupaten)
           : item.kota != null
@@ -1291,12 +1335,16 @@ export async function adminListTryoutQuestions(
 ): Promise<Question[]> {
   try {
     const raw = await request<
-      Question[] | { questions?: Question[]; data?: Question[] }
+      unknown[] | { questions?: unknown[]; data?: unknown[] }
     >(`/admin/tryouts/${tryoutId}/questions`, { method: "GET" });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.questions && Array.isArray(raw.questions)) return raw.questions;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    let list: unknown[] = [];
+    if (Array.isArray(raw)) list = raw;
+    else if (raw && typeof raw === "object") {
+      const o = raw as { questions?: unknown[]; data?: unknown[] };
+      if (Array.isArray(o.questions)) list = o.questions;
+      else if (Array.isArray(o.data)) list = o.data;
+    }
+    return list.map(normalizeQuestion);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -1308,19 +1356,22 @@ export async function adminGetQuestion(
   tryoutId: string,
   questionId: string
 ): Promise<Question> {
-  return request(`/admin/tryouts/${tryoutId}/questions/${questionId}`, {
-    method: "GET",
-  });
+  const raw = await request<unknown>(
+    `/admin/tryouts/${tryoutId}/questions/${questionId}`,
+    { method: "GET" }
+  );
+  return normalizeQuestion(raw);
 }
 
 export async function adminCreateQuestion(
   tryoutId: string,
   body: AdminCreateQuestionRequest
 ): Promise<Question> {
-  return request(`/admin/tryouts/${tryoutId}/questions`, {
+  const raw = await request<unknown>(`/admin/tryouts/${tryoutId}/questions`, {
     method: "POST",
     body,
   });
+  return normalizeQuestion(raw);
 }
 
 /** Update question (PUT /admin/tryouts/{tryoutId}/questions/{questionId}). */
@@ -1329,10 +1380,11 @@ export async function adminUpdateQuestion(
   questionId: string,
   body: Partial<AdminCreateQuestionRequest>
 ): Promise<Question> {
-  return request(`/admin/tryouts/${tryoutId}/questions/${questionId}`, {
-    method: "PUT",
-    body,
-  });
+  const raw = await request<unknown>(
+    `/admin/tryouts/${tryoutId}/questions/${questionId}`,
+    { method: "PUT", body }
+  );
+  return normalizeQuestion(raw);
 }
 
 /** Delete question (DELETE /admin/tryouts/{tryoutId}/questions/{questionId}). */
@@ -1349,14 +1401,7 @@ export async function adminDeleteQuestion(
 export async function adminGetQuestionStats(
   tryoutId: string,
   questionId: string
-): Promise<{
-  participants_count?: number;
-  answered_count?: number;
-  correct_count?: number;
-  wrong_count?: number;
-  correct_percent?: number;
-  wrong_percent?: number;
-} | null> {
+): Promise<QuestionStats | null> {
   try {
     const raw = await request<Record<string, unknown>>(
       `/admin/tryouts/${tryoutId}/questions/${questionId}/stats`,
@@ -1364,12 +1409,12 @@ export async function adminGetQuestionStats(
     );
     if (!raw || typeof raw !== "object") return null;
     return {
-      participants_count: typeof raw.participants_count === "number" ? raw.participants_count : undefined,
-      answered_count: typeof raw.answered_count === "number" ? raw.answered_count : undefined,
-      correct_count: typeof raw.correct_count === "number" ? raw.correct_count : undefined,
-      wrong_count: typeof raw.wrong_count === "number" ? raw.wrong_count : undefined,
-      correct_percent: typeof raw.correct_percent === "number" ? raw.correct_percent : undefined,
-      wrong_percent: typeof raw.wrong_percent === "number" ? raw.wrong_percent : undefined,
+      participantsCount: typeof raw.participantsCount === "number" ? raw.participantsCount : undefined,
+      answeredCount: typeof raw.answeredCount === "number" ? raw.answeredCount : undefined,
+      correctCount: typeof raw.correctCount === "number" ? raw.correctCount : undefined,
+      wrongCount: typeof raw.wrongCount === "number" ? raw.wrongCount : undefined,
+      correctPercent: typeof raw.correctPercent === "number" ? raw.correctPercent : undefined,
+      wrongPercent: typeof raw.wrongPercent === "number" ? raw.wrongPercent : undefined,
     };
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return null;
@@ -1389,15 +1434,15 @@ export async function adminGetAllQuestionStats(
     if (!raw || typeof raw !== "object") return null;
     const questions = Array.isArray(raw.questions) ? raw.questions : [];
     const items = questions.map((q: Record<string, unknown>) => ({
-      question_id: String(q.question_id ?? q.questionId ?? ""),
-      answered_count: typeof q.answered_count === "number" ? q.answered_count : undefined,
-      correct_count: typeof q.correct_count === "number" ? q.correct_count : undefined,
-      wrong_count: typeof q.wrong_count === "number" ? q.wrong_count : undefined,
-      correct_percent: typeof q.correct_percent === "number" ? q.correct_percent : undefined,
-      wrong_percent: typeof q.wrong_percent === "number" ? q.wrong_percent : undefined,
+      questionId: String(q.questionId ?? ""),
+      answeredCount: typeof q.answeredCount === "number" ? q.answeredCount : undefined,
+      correctCount: typeof q.correctCount === "number" ? q.correctCount : undefined,
+      wrongCount: typeof q.wrongCount === "number" ? q.wrongCount : undefined,
+      correctPercent: typeof q.correctPercent === "number" ? q.correctPercent : undefined,
+      wrongPercent: typeof q.wrongPercent === "number" ? q.wrongPercent : undefined,
     }));
     return {
-      participants_count: typeof raw.participants_count === "number" ? raw.participants_count : undefined,
+      participantsCount: typeof raw.participantsCount === "number" ? raw.participantsCount : undefined,
       questions: items,
     };
   } catch (e) {
@@ -1603,11 +1648,11 @@ export async function adminListCoursesBySubject(
 
 export async function adminCreateCourseUnderSubject(
   subjectId: string,
-  body: { title: string; description?: string | null; sort_order?: number }
+  body: { title: string; description?: string | null; sortOrder?: number }
 ): Promise<Course> {
   return request(`/admin/subjects/${subjectId}/courses`, {
     method: "POST",
-    body: { ...body, subject_id: subjectId },
+    body: { ...body, subjectId },
   });
 }
 

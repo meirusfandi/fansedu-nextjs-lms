@@ -14,31 +14,31 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 type FormState = {
   name: string;
   slug: string;
-  short_description: string;
-  price_early_bird: string;
-  price_normal: string;
-  is_open: boolean;
-  is_bundle: boolean;
+  shortDescription: string;
+  priceEarlyBird: string;
+  priceNormal: string;
+  isOpen: boolean;
+  isBundle: boolean;
   durasi: string;
   materi: string;
   fasilitas: string;
   bonus: string;
-  linked_course_ids: string[];
+  linkedCourseIds: string[];
 };
 
 const emptyForm = (): FormState => ({
   name: "",
   slug: "",
-  short_description: "",
-  price_early_bird: "",
-  price_normal: "",
-  is_open: true,
-  is_bundle: false,
+  shortDescription: "",
+  priceEarlyBird: "",
+  priceNormal: "",
+  isOpen: true,
+  isBundle: false,
   durasi: "",
   materi: "",
   fasilitas: "",
   bonus: "",
-  linked_course_ids: [],
+  linkedCourseIds: [],
 });
 
 function parseLines(text: string): string[] | undefined {
@@ -103,16 +103,16 @@ export default function AdminLandingPackagesPage() {
     setForm({
       name: p.name ?? "",
       slug: p.slug ?? "",
-      short_description: p.short_description ?? "",
-      price_early_bird: p.price_early_bird != null ? String(p.price_early_bird) : "",
-      price_normal: p.price_normal != null ? String(p.price_normal) : "",
-      is_open: p.is_open !== false,
-      is_bundle: p.is_bundle === true,
+      shortDescription: p.shortDescription ?? "",
+      priceEarlyBird: p.priceEarlyBird != null ? String(p.priceEarlyBird) : "",
+      priceNormal: p.priceNormal != null ? String(p.priceNormal) : "",
+      isOpen: p.isOpen !== false,
+      isBundle: p.isBundle === true,
       durasi: p.durasi ?? "",
       materi: (p.materi ?? []).join("\n"),
       fasilitas: (p.fasilitas ?? []).join("\n"),
       bonus: (p.bonus ?? []).join("\n"),
-      linked_course_ids: p.linked_course_ids ?? [],
+      linkedCourseIds: p.linkedCourseIds ?? [],
     });
     setEditingId(p.id);
     setModalOpen("edit");
@@ -133,16 +133,16 @@ export default function AdminLandingPackagesPage() {
       const payload: AdminLandingPackageCreateRequest = {
         name,
         slug,
-        short_description: form.short_description.trim() || undefined,
-        price_early_bird: parseNumberOrUndefined(form.price_early_bird),
-        price_normal: parseNumberOrUndefined(form.price_normal),
-        is_open: form.is_open,
-        is_bundle: form.is_bundle,
+        shortDescription: form.shortDescription.trim() || undefined,
+        priceEarlyBird: parseNumberOrUndefined(form.priceEarlyBird),
+        priceNormal: parseNumberOrUndefined(form.priceNormal),
+        isOpen: form.isOpen,
+        isBundle: form.isBundle,
         durasi: form.durasi.trim() || undefined,
         materi: parseLines(form.materi),
         fasilitas: parseLines(form.fasilitas),
         bonus: parseLines(form.bonus),
-        linked_course_ids: normalizeIds(form.linked_course_ids),
+        linkedCourseIds: normalizeIds(form.linkedCourseIds),
       };
       if (modalOpen === "add") {
         await adminLandingCreatePackage(payload);
@@ -239,28 +239,28 @@ export default function AdminLandingPackagesPage() {
                   <tr key={p.id} className="hover:bg-zinc-50/80">
                     <td className="px-4 py-3">
                       <p className="font-medium text-zinc-900">{p.name}</p>
-                      {p.short_description ? (
-                        <p className="line-clamp-2 text-xs text-zinc-500">{p.short_description}</p>
+                      {p.shortDescription ? (
+                        <p className="line-clamp-2 text-xs text-zinc-500">{p.shortDescription}</p>
                       ) : null}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-zinc-600">{p.slug ?? "–"}</td>
                     <td className="px-4 py-3 text-zinc-800">
-                      {p.price_early_bird != null ? (
+                      {p.priceEarlyBird != null ? (
                         <span className="mr-2 inline-flex rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                          EB: {p.price_early_bird.toLocaleString("id-ID")}
+                          EB: {p.priceEarlyBird.toLocaleString("id-ID")}
                         </span>
                       ) : null}
-                      {p.price_normal != null ? (
+                      {p.priceNormal != null ? (
                         <span className="inline-flex rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                          Normal: {p.price_normal.toLocaleString("id-ID")}
+                          Normal: {p.priceNormal.toLocaleString("id-ID")}
                         </span>
                       ) : (
                         <span className="text-zinc-500">–</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-zinc-700">
-                      {p.is_open === false ? "Tutup" : "Buka"}
-                      {p.is_bundle ? <span className="ml-2 text-xs text-zinc-500">Bundle</span> : null}
+                      {p.isOpen === false ? "Tutup" : "Buka"}
+                      {p.isBundle ? <span className="ml-2 text-xs text-zinc-500">Bundle</span> : null}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right">
                       <button
@@ -319,8 +319,8 @@ export default function AdminLandingPackagesPage() {
                 <label className="block text-xs font-medium text-zinc-600">Short description</label>
                 <textarea
                   rows={2}
-                  value={form.short_description}
-                  onChange={(e) => setForm((f) => ({ ...f, short_description: e.target.value }))}
+                  value={form.shortDescription}
+                  onChange={(e) => setForm((f) => ({ ...f, shortDescription: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                 />
               </div>
@@ -329,8 +329,8 @@ export default function AdminLandingPackagesPage() {
                   <label className="block text-xs font-medium text-zinc-600">Harga early bird</label>
                   <input
                     inputMode="numeric"
-                    value={form.price_early_bird}
-                    onChange={(e) => setForm((f) => ({ ...f, price_early_bird: e.target.value }))}
+                    value={form.priceEarlyBird}
+                    onChange={(e) => setForm((f) => ({ ...f, priceEarlyBird: e.target.value }))}
                     placeholder="499000"
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   />
@@ -339,8 +339,8 @@ export default function AdminLandingPackagesPage() {
                   <label className="block text-xs font-medium text-zinc-600">Harga normal</label>
                   <input
                     inputMode="numeric"
-                    value={form.price_normal}
-                    onChange={(e) => setForm((f) => ({ ...f, price_normal: e.target.value }))}
+                    value={form.priceNormal}
+                    onChange={(e) => setForm((f) => ({ ...f, priceNormal: e.target.value }))}
                     placeholder="799000"
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   />
@@ -350,20 +350,20 @@ export default function AdminLandingPackagesPage() {
                 <label className="flex items-center gap-2 text-sm text-zinc-800">
                   <input
                     type="checkbox"
-                    checked={form.is_open}
-                    onChange={(e) => setForm((f) => ({ ...f, is_open: e.target.checked }))}
+                    checked={form.isOpen}
+                    onChange={(e) => setForm((f) => ({ ...f, isOpen: e.target.checked }))}
                     className="rounded border-zinc-300"
                   />
-                  Paket dibuka (is_open)
+                  Paket dibuka (isOpen)
                 </label>
                 <label className="flex items-center gap-2 text-sm text-zinc-800">
                   <input
                     type="checkbox"
-                    checked={form.is_bundle}
-                    onChange={(e) => setForm((f) => ({ ...f, is_bundle: e.target.checked }))}
+                    checked={form.isBundle}
+                    onChange={(e) => setForm((f) => ({ ...f, isBundle: e.target.checked }))}
                     className="rounded border-zinc-300"
                   />
-                  Bundle (is_bundle)
+                  Bundle (isBundle)
                 </label>
               </div>
               <div>
@@ -406,10 +406,10 @@ export default function AdminLandingPackagesPage() {
                 <label className="block text-xs font-medium text-zinc-600">Linked courses</label>
                 <select
                   multiple
-                  value={form.linked_course_ids}
+                  value={form.linkedCourseIds}
                   onChange={(e) => {
                     const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                    setForm((f) => ({ ...f, linked_course_ids: selected }));
+                    setForm((f) => ({ ...f, linkedCourseIds: selected }));
                   }}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
                   size={Math.min(10, Math.max(4, coursesSorted.length))}

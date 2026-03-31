@@ -20,11 +20,11 @@ export default function GuruPengaturanPage() {
   const [profileFetched, setProfileFetched] = useState(false);
   const [schoolInfo, setSchoolInfo] = useState<{
     id?: string;
-    nama_sekolah: string;
+    namaSekolah: string;
     alamat?: string | null;
     telepon?: string | null;
     npsn?: string | null;
-    kabupaten_kota?: string | null;
+    kabupatenKota?: string | null;
   } | null>(null);
   const [schoolLinkLoading, setSchoolLinkLoading] = useState(false);
   const [schoolList, setSchoolList] = useState<Sekolah[]>([]);
@@ -32,19 +32,19 @@ export default function GuruPengaturanPage() {
   const [schoolSearchQuery, setSchoolSearchQuery] = useState("");
   const [showCreateSchool, setShowCreateSchool] = useState(false);
   const [createSchoolForm, setCreateSchoolForm] = useState({
-    nama_sekolah: "",
+    namaSekolah: "",
     npsn: "",
     alamat: "",
-    kabupaten_kota: "",
+    kabupatenKota: "",
     telepon: "",
   });
   const [createSchoolLoading, setCreateSchoolLoading] = useState(false);
   const [schoolPage, setSchoolPage] = useState(1);
 
   const [passwordForm, setPasswordForm] = useState({
-    current_password: "",
-    new_password: "",
-    new_password_confirm: "",
+    currentPassword: "",
+    newPassword: "",
+    newPasswordConfirm: "",
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
@@ -69,11 +69,11 @@ export default function GuruPengaturanPage() {
         if (p?.school) {
           setSchoolInfo({
             id: p.school.id,
-            nama_sekolah: p.school.nama_sekolah,
+            namaSekolah: p.school.namaSekolah,
             alamat: p.school.alamat,
             telepon: p.school.telepon,
             npsn: p.school.npsn,
-            kabupaten_kota: p.school.kabupaten_kota,
+            kabupatenKota: p.school.kabupatenKota,
           });
         } else {
           setSchoolInfo(null);
@@ -139,11 +139,11 @@ export default function GuruPengaturanPage() {
         if (p?.school) {
           setSchoolInfo({
             id: p.school.id,
-            nama_sekolah: p.school.nama_sekolah,
+            namaSekolah: p.school.namaSekolah,
             alamat: p.school.alamat,
             telepon: p.school.telepon,
             npsn: p.school.npsn,
-            kabupaten_kota: p.school.kabupaten_kota,
+            kabupatenKota: p.school.kabupatenKota,
           });
         } else setSchoolInfo(null);
       })
@@ -154,7 +154,7 @@ export default function GuruPengaturanPage() {
     setSchoolLinkLoading(true);
     setProfileError(null);
     setProfileSuccess(null);
-    updateTrainerProfile({ school_id: school.id })
+    updateTrainerProfile({ schoolId: school.id })
       .then(() => {
         setProfileSuccess("Sekolah berhasil dikaitkan.");
         setSchoolSearchQuery("");
@@ -166,7 +166,7 @@ export default function GuruPengaturanPage() {
 
   const handleCreateSchool = async (e: FormEvent) => {
     e.preventDefault();
-    const nama = createSchoolForm.nama_sekolah.trim();
+    const nama = createSchoolForm.namaSekolah.trim();
     if (!nama) {
       setProfileError("Nama sekolah wajib diisi.");
       return;
@@ -176,16 +176,16 @@ export default function GuruPengaturanPage() {
     setProfileSuccess(null);
     try {
       const created = await createTrainerSchool({
-        nama_sekolah: nama,
+        namaSekolah: nama,
         npsn: createSchoolForm.npsn.trim() || undefined,
         alamat: createSchoolForm.alamat.trim() || undefined,
-        kabupaten_kota: createSchoolForm.kabupaten_kota.trim() || undefined,
+        kabupatenKota: createSchoolForm.kabupatenKota.trim() || undefined,
         telepon: createSchoolForm.telepon.trim() || undefined,
       });
-      await updateTrainerProfile({ school_id: created.id });
+      await updateTrainerProfile({ schoolId: created.id });
       setProfileSuccess("Sekolah baru berhasil dibuat dan dikaitkan.");
       setShowCreateSchool(false);
-      setCreateSchoolForm({ nama_sekolah: "", npsn: "", alamat: "", kabupaten_kota: "", telepon: "" });
+      setCreateSchoolForm({ namaSekolah: "", npsn: "", alamat: "", kabupatenKota: "", telepon: "" });
       adminListSekolah().then(setSchoolList);
       refetchProfile();
     } catch (err) {
@@ -197,7 +197,7 @@ export default function GuruPengaturanPage() {
 
   const filteredSchools = schoolSearchQuery.trim()
     ? schoolList.filter((s) =>
-        s.nama_sekolah.toLowerCase().includes(schoolSearchQuery.toLowerCase())
+        s.namaSekolah.toLowerCase().includes(schoolSearchQuery.toLowerCase())
       )
     : schoolList;
 
@@ -221,7 +221,7 @@ export default function GuruPengaturanPage() {
     setProfileError(null);
     setProfileSuccess(null);
     try {
-      await updateTrainerProfile({ school_id: "" });
+      await updateTrainerProfile({ schoolId: "" });
       setProfileSuccess("Sekolah berhasil dilepas.");
       setSchoolInfo(null);
       refetchProfile();
@@ -236,22 +236,22 @@ export default function GuruPengaturanPage() {
     e.preventDefault();
     setPasswordError(null);
     setPasswordSuccess(null);
-    if (passwordForm.new_password !== passwordForm.new_password_confirm) {
+    if (passwordForm.newPassword !== passwordForm.newPasswordConfirm) {
       setPasswordError("Kata sandi baru dan konfirmasi tidak cocok.");
       return;
     }
-    if (passwordForm.new_password.length < 6) {
+    if (passwordForm.newPassword.length < 6) {
       setPasswordError("Kata sandi baru minimal 6 karakter.");
       return;
     }
     setPasswordLoading(true);
     try {
       await changePassword({
-        current_password: passwordForm.current_password,
-        new_password: passwordForm.new_password,
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
       });
       setPasswordSuccess("Kata sandi berhasil diubah.");
-      setPasswordForm({ current_password: "", new_password: "", new_password_confirm: "" });
+      setPasswordForm({ currentPassword: "", newPassword: "", newPasswordConfirm: "" });
     } catch (err) {
       setPasswordError((err as Error).message || "Gagal mengubah kata sandi. Periksa kata sandi saat ini.");
     } finally {
@@ -311,7 +311,7 @@ export default function GuruPengaturanPage() {
               <dl className="mt-4 space-y-2 text-sm">
                 <div>
                   <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Nama sekolah</dt>
-                  <dd className="mt-0.5 font-medium text-zinc-900">{schoolInfo.nama_sekolah || "—"}</dd>
+                  <dd className="mt-0.5 font-medium text-zinc-900">{schoolInfo.namaSekolah || "—"}</dd>
                 </div>
                 {schoolInfo.npsn != null && schoolInfo.npsn !== "" && (
                   <div>
@@ -319,10 +319,10 @@ export default function GuruPengaturanPage() {
                     <dd className="mt-0.5 text-zinc-700">{schoolInfo.npsn}</dd>
                   </div>
                 )}
-                {schoolInfo.kabupaten_kota != null && schoolInfo.kabupaten_kota !== "" && (
+                {schoolInfo.kabupatenKota != null && schoolInfo.kabupatenKota !== "" && (
                   <div>
                     <dt className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">Kabupaten/Kota</dt>
-                    <dd className="mt-0.5 text-zinc-700">{schoolInfo.kabupaten_kota}</dd>
+                    <dd className="mt-0.5 text-zinc-700">{schoolInfo.kabupatenKota}</dd>
                   </div>
                 )}
                 {schoolInfo.alamat != null && schoolInfo.alamat !== "" && (
@@ -374,9 +374,9 @@ export default function GuruPengaturanPage() {
                         disabled={schoolLinkLoading}
                         className="w-full px-3 py-2.5 text-left text-sm hover:bg-zinc-50 disabled:opacity-50"
                       >
-                        <span className="font-medium text-zinc-900">{s.nama_sekolah}</span>
-                        {s.kabupaten_kota && (
-                          <span className="ml-2 text-zinc-500">— {s.kabupaten_kota}</span>
+                        <span className="font-medium text-zinc-900">{s.namaSekolah}</span>
+                        {s.kabupatenKota && (
+                          <span className="ml-2 text-zinc-500">— {s.kabupatenKota}</span>
                         )}
                       </button>
                     </li>
@@ -412,8 +412,8 @@ export default function GuruPengaturanPage() {
                     <input
                       type="text"
                       required
-                      value={createSchoolForm.nama_sekolah}
-                      onChange={(e) => setCreateSchoolForm((f) => ({ ...f, nama_sekolah: e.target.value }))}
+                      value={createSchoolForm.namaSekolah}
+                      onChange={(e) => setCreateSchoolForm((f) => ({ ...f, namaSekolah: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                       placeholder="Contoh: SMA Negeri 1 Jakarta"
                     />
@@ -432,8 +432,8 @@ export default function GuruPengaturanPage() {
                     <label className="block text-xs font-medium text-zinc-600">Kabupaten/Kota</label>
                     <input
                       type="text"
-                      value={createSchoolForm.kabupaten_kota}
-                      onChange={(e) => setCreateSchoolForm((f) => ({ ...f, kabupaten_kota: e.target.value }))}
+                      value={createSchoolForm.kabupatenKota}
+                      onChange={(e) => setCreateSchoolForm((f) => ({ ...f, kabupatenKota: e.target.value }))}
                       className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                       placeholder="Opsional"
                     />
@@ -487,40 +487,40 @@ export default function GuruPengaturanPage() {
           )}
           <form onSubmit={handleSubmitPassword} className="mt-4 space-y-3">
             <div>
-              <label htmlFor="current_password" className="block text-xs font-medium text-zinc-600">Kata sandi saat ini</label>
+              <label htmlFor="currentPassword" className="block text-xs font-medium text-zinc-600">Kata sandi saat ini</label>
               <input
-                id="current_password"
+                id="currentPassword"
                 type="password"
                 required
                 autoComplete="current-password"
-                value={passwordForm.current_password}
-                onChange={(e) => setPasswordForm((f) => ({ ...f, current_password: e.target.value }))}
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm((f) => ({ ...f, currentPassword: e.target.value }))}
                 className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 placeholder="••••••••"
               />
             </div>
             <div>
-              <label htmlFor="new_password" className="block text-xs font-medium text-zinc-600">Kata sandi baru</label>
+              <label htmlFor="newPassword" className="block text-xs font-medium text-zinc-600">Kata sandi baru</label>
               <input
-                id="new_password"
+                id="newPassword"
                 type="password"
                 required
                 autoComplete="new-password"
-                value={passwordForm.new_password}
-                onChange={(e) => setPasswordForm((f) => ({ ...f, new_password: e.target.value }))}
+                value={passwordForm.newPassword}
+                onChange={(e) => setPasswordForm((f) => ({ ...f, newPassword: e.target.value }))}
                 className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 placeholder="Min. 6 karakter"
               />
             </div>
             <div>
-              <label htmlFor="new_password_confirm" className="block text-xs font-medium text-zinc-600">Konfirmasi kata sandi baru</label>
+              <label htmlFor="newPasswordConfirm" className="block text-xs font-medium text-zinc-600">Konfirmasi kata sandi baru</label>
               <input
-                id="new_password_confirm"
+                id="newPasswordConfirm"
                 type="password"
                 required
                 autoComplete="new-password"
-                value={passwordForm.new_password_confirm}
-                onChange={(e) => setPasswordForm((f) => ({ ...f, new_password_confirm: e.target.value }))}
+                value={passwordForm.newPasswordConfirm}
+                onChange={(e) => setPasswordForm((f) => ({ ...f, newPasswordConfirm: e.target.value }))}
                 className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 placeholder="Ulangi kata sandi baru"
               />

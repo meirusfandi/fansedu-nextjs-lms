@@ -125,7 +125,7 @@ export default function AdminDashboardPage() {
   const sortedTryouts = useMemo(
     () =>
       [...(data?.tryouts ?? [])].sort(
-        (a, b) => new Date(b.closes_at).getTime() - new Date(a.closes_at).getTime()
+        (a, b) => new Date(b.closesAt).getTime() - new Date(a.closesAt).getTime()
       ),
     [data?.tryouts]
   );
@@ -329,14 +329,14 @@ export default function AdminDashboardPage() {
                           className="block rounded-xl border border-zinc-100 p-3 transition hover:border-zinc-200 hover:bg-zinc-50/50"
                         >
                           <span className="block font-medium text-zinc-900">
-                            {t.title || t.short_title || "Event"}
+                            {t.title || t.shortTitle || "Event"}
                           </span>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="text-xs text-zinc-500">{t.questions_count} soal</span>
+                            <span className="text-xs text-zinc-500">{t.questionsCount} soal</span>
                             <StatusBadge status={t.status} />
                           </div>
                           <p className="mt-1.5 text-xs text-zinc-400">
-                            Tutup: {formatRelativeDate(t.closes_at)}
+                            Tutup: {formatRelativeDate(t.closesAt)}
                           </p>
                         </Link>
                       </li>

@@ -3,7 +3,7 @@ import type { Payment } from "@/lib/api-types";
 /** Tampilkan nominal (amount_cents = sen, atau amount = rupiah utuh — sesuaikan dengan backend). */
 export function formatPaymentMoney(p: Payment): string {
   const amountCents =
-    (p as Payment & { amountCents?: number }).amountCents ?? p.amount_cents;
+    (p as Payment & { amountCents?: number }).amountCents ?? p.amountCents;
   if (amountCents != null && Number.isFinite(amountCents)) {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",

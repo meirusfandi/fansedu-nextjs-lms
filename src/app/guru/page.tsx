@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { getAuthUserName, getTrainerStatus, getFriendlyApiErrorMessage } from "@/lib/api";
 
 export default function GuruDashboardPage() {
-  const [status, setStatus] = useState<{ paid_slots: number; registered_students_count: number } | null>(null);
+  const [status, setStatus] = useState<{ paidSlots: number; registeredStudentsCount: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("Guru");
@@ -21,11 +21,11 @@ export default function GuruDashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const slotsAvailable = status ? Math.max(0, status.paid_slots - status.registered_students_count) : 0;
+  const slotsAvailable = status ? Math.max(0, status.paidSlots - status.registeredStudentsCount) : 0;
 
   const cards = [
-    { label: "Slot dibayar", value: status?.paid_slots ?? "–", href: "/guru/kelola-siswa", color: "sky" },
-    { label: "Siswa terdaftar", value: status?.registered_students_count ?? "–", href: "/guru/kelola-siswa", color: "emerald" },
+    { label: "Slot dibayar", value: status?.paidSlots ?? "–", href: "/guru/kelola-siswa", color: "sky" },
+    { label: "Siswa terdaftar", value: status?.registeredStudentsCount ?? "–", href: "/guru/kelola-siswa", color: "emerald" },
     { label: "Slot tersedia", value: slotsAvailable, href: "/guru/kelola-siswa", color: "amber" },
   ];
 

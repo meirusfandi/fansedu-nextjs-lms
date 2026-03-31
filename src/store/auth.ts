@@ -26,7 +26,7 @@ function userToAuthUser(u: User): AuthUser {
     name: u.name,
     email: u.email,
     role: u.role,
-    avatar_url: u.avatar_url,
+    avatarUrl: u.avatarUrl,
   };
 }
 

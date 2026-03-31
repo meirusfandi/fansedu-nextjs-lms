@@ -36,8 +36,8 @@ export default function AdminUsersPage() {
     email: "",
     password: "",
     role: "trainer" as UserRole,
-    subject_id: "",
-    school_id: "",
+    subjectId: "",
+    schoolId: "",
   });
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [schools, setSchools] = useState<Sekolah[]>([]);
@@ -86,8 +86,8 @@ export default function AdminUsersPage() {
       email: "",
       password: "",
       role: "trainer",
-      subject_id: "",
-      school_id: "",
+      subjectId: "",
+      schoolId: "",
     });
     setSelectedUser(null);
     setSubmitError(null);
@@ -121,8 +121,8 @@ export default function AdminUsersPage() {
         email: full.email,
         password: "",
         role: normalizeUserRole(full.role),
-        subject_id: full.subject_id ?? "",
-        school_id: full.school_id ?? "",
+        subjectId: full.subjectId ?? "",
+        schoolId: full.schoolId ?? "",
       });
       setSelectedUser(full);
     } catch (err) {
@@ -132,8 +132,8 @@ export default function AdminUsersPage() {
         email: u.email,
         password: "",
         role: normalizeUserRole(u.role),
-        subject_id: u.subject_id ?? "",
-        school_id: u.school_id ?? "",
+        subjectId: u.subjectId ?? "",
+        schoolId: u.schoolId ?? "",
       });
     } finally {
       setDetailLoading(false);
@@ -159,8 +159,8 @@ export default function AdminUsersPage() {
           // Backend create saat ini hanya menerima student/trainer.
           // Jika admin dipilih di UI, fallback ke trainer agar request tetap valid.
           role: form.role === "admin" ? "trainer" : form.role,
-          subject_id: form.subject_id.trim() || null,
-          school_id: form.school_id.trim() || null,
+          subjectId: form.subjectId.trim() || null,
+          schoolId: form.schoolId.trim() || null,
         });
       } else if (modalMode === "edit" && selectedUser) {
         const body: {
@@ -168,14 +168,14 @@ export default function AdminUsersPage() {
           email?: string;
           password?: string;
           role?: "student" | "trainer" | "admin";
-          subject_id?: string | null;
-          school_id?: string | null;
+          subjectId?: string | null;
+          schoolId?: string | null;
         } = {
           name: form.name.trim(),
           email: form.email.trim(),
           role: form.role,
-          subject_id: form.subject_id.trim() || null,
-          school_id: form.school_id.trim() || null,
+          subjectId: form.subjectId.trim() || null,
+          schoolId: form.schoolId.trim() || null,
         };
         if (form.password.trim()) body.password = form.password;
         await adminUpdateUser(selectedUser.id, body);
@@ -336,26 +336,26 @@ export default function AdminUsersPage() {
                         {ROLE_LABEL[selectedUser.role] ?? selectedUser.role}
                       </p>
                     </div>
-                    {(selectedUser.subject_id || selectedUser.subject_name) && (
+                    {(selectedUser.subjectId || selectedUser.subjectName) && (
                       <div>
                         <p className="text-xs font-medium text-zinc-500">Bidang / Subject</p>
                         <p className="text-zinc-900">
-                          {selectedUser.subject_name ?? subjects.find((s) => s.id === selectedUser.subject_id)?.name ?? selectedUser.subject_id}
+                          {selectedUser.subjectName ?? subjects.find((s) => s.id === selectedUser.subjectId)?.name ?? selectedUser.subjectId}
                         </p>
                       </div>
                     )}
-                    {(selectedUser.school_id || selectedUser.school_name) && (
+                    {(selectedUser.schoolId || selectedUser.schoolName) && (
                       <div>
                         <p className="text-xs font-medium text-zinc-500">Sekolah</p>
                         <p className="text-zinc-900">
-                          {selectedUser.school_name ?? schools.find((s) => s.id === selectedUser.school_id)?.nama_sekolah ?? selectedUser.school_id}
+                          {selectedUser.schoolName ?? schools.find((s) => s.id === selectedUser.schoolId)?.namaSekolah ?? selectedUser.schoolId}
                         </p>
                       </div>
                     )}
-                    {selectedUser.avatar_url && (
+                    {selectedUser.avatarUrl && (
                       <div>
                         <p className="text-xs font-medium text-zinc-500">Avatar</p>
-                        <p className="break-all text-zinc-600">{selectedUser.avatar_url}</p>
+                        <p className="break-all text-zinc-600">{selectedUser.avatarUrl}</p>
                       </div>
                     )}
                   </div>
@@ -452,8 +452,8 @@ export default function AdminUsersPage() {
                     <div>
                       <label className="block text-xs font-medium text-zinc-600">Bidang / Subject</label>
                       <select
-                        value={form.subject_id}
-                        onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
+                        value={form.subjectId}
+                        onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
                         className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                       >
                         <option value="">— Pilih subject (opsional)</option>
@@ -467,14 +467,14 @@ export default function AdminUsersPage() {
                     <div>
                       <label className="block text-xs font-medium text-zinc-600">Sekolah</label>
                       <select
-                        value={form.school_id}
-                        onChange={(e) => setForm({ ...form, school_id: e.target.value })}
+                        value={form.schoolId}
+                        onChange={(e) => setForm({ ...form, schoolId: e.target.value })}
                         className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                       >
                         <option value="">— Pilih sekolah (opsional)</option>
                         {schools.map((s) => (
                           <option key={s.id} value={s.id}>
-                            {s.nama_sekolah}
+                            {s.namaSekolah}
                           </option>
                         ))}
                       </select>

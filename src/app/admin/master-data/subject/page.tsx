@@ -308,7 +308,7 @@ export default function MasterDataSubjectPage() {
           name: bidangForm.name.trim(),
           slug: bidangForm.slug.trim() || undefined,
           description: bidangForm.description.trim() || undefined,
-          level_id: levelId,
+          levelId: levelId,
         });
       } else if (editingSubjectId) {
         await adminUpdateSubject(editingSubjectId, {

@@ -1,4 +1,4 @@
-/** API types for FansEdu LMS v1 (matches Go backend) */
+/** API types for FansEdu LMS v1 (camelCase JSON — backend Go). */
 
 export type UserRole = "admin" | "student" | "trainer";
 
@@ -16,38 +16,38 @@ export interface Level {
   name: string;
   slug?: string | null;
   description?: string | null;
-  sort_order?: number | null;
-  icon_url?: string | null;
+  sortOrder?: number | null;
+  iconUrl?: string | null;
 }
 
 export interface AdminCreateLevelRequest {
   name: string;
   slug?: string | null;
   description?: string | null;
-  sort_order?: number | null;
-  icon_url?: string | null;
+  sortOrder?: number | null;
+  iconUrl?: string | null;
 }
 
 export interface AdminUpdateLevelRequest {
   name?: string;
   slug?: string | null;
   description?: string | null;
-  sort_order?: number | null;
+  sortOrder?: number | null;
 }
 
-/** Sesuai response backend: { id, name, email, role }. avatar_url opsional. */
+/** Sesuai response backend: { id, name, email, role }. avatarUrl opsional. */
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
-  avatar_url?: string | null;
-  subject_id?: string | null;
-  school_id?: string | null;
+  avatarUrl?: string | null;
+  subjectId?: string | null;
+  schoolId?: string | null;
   /** Nama subject/bidang (dari API atau lookup) */
-  subject_name?: string | null;
+  subjectName?: string | null;
   /** Nama sekolah (dari API atau lookup) */
-  school_name?: string | null;
+  schoolName?: string | null;
 }
 
 // --- Auth ---
@@ -78,9 +78,9 @@ export interface RegisterResponse {
 /** Status guru/trainer: slot bayar vs siswa terdaftar. Dari GET /trainer/status atau setara. */
 export interface TrainerStatusResponse {
   /** Jumlah slot yang sudah dibayar (boleh dipakai untuk mendaftarkan siswa). */
-  paid_slots: number;
-  /** Jumlah siswa yang sudah didaftarkan (maksimal paid_slots). */
-  registered_students_count: number;
+  paidSlots: number;
+  /** Jumlah siswa yang sudah didaftarkan (maksimal paidSlots). */
+  registeredStudentsCount: number;
   /** Daftar siswa yang didaftarkan oleh guru ini (opsional). */
   students?: { id: string; name: string; email: string }[];
 }
@@ -110,15 +110,15 @@ export interface TrainerProfileResponse {
 export interface TrainerProfileUpdateRequest {
   name?: string;
   /** ID sekolah untuk dikaitkan; string kosong untuk melepas sekolah. */
-  school_id?: string | null;
+  schoolId?: string | null;
 }
 
 /** Request buat sekolah oleh guru. POST /trainer/schools. */
 export interface TrainerCreateSchoolRequest {
-  nama_sekolah: string;
+  namaSekolah: string;
   npsn?: string | null;
   alamat?: string | null;
-  kabupaten_kota?: string | null;
+  kabupatenKota?: string | null;
   telepon?: string | null;
 }
 
@@ -128,13 +128,13 @@ export interface ForgotPasswordRequest {
 
 export interface ResetPasswordRequest {
   token: string;
-  new_password: string;
+  newPassword: string;
 }
 
 /** Ubah kata sandi (user sudah login). Backend: PUT /auth/change-password atau POST /trainer/change-password. */
 export interface ChangePasswordRequest {
-  current_password: string;
-  new_password: string;
+  currentPassword: string;
+  newPassword: string;
 }
 
 // --- Tryouts ---
@@ -146,23 +146,23 @@ export type EventCategorySlug = "tryout" | "free_class" | "paid_class";
 export interface TryoutSession {
   id: string;
   title: string;
-  short_title?: string | null;
+  shortTitle?: string | null;
   description?: string | null;
-  duration_minutes: number;
-  questions_count: number;
+  durationMinutes: number;
+  questionsCount: number;
   level: TryoutLevel;
-  opens_at: string;
-  closes_at: string;
-  max_participants?: number | null;
+  opensAt: string;
+  closesAt: string;
+  maxParticipants?: number | null;
   status: TryoutStatus;
   /** Kategori event: tryout, free_class, paid_class. Dari Master Data Event. */
-  event_category?: EventCategorySlug | string | null;
+  eventCategory?: EventCategorySlug | string | null;
 }
 
 export interface StartTryoutResponse {
-  attempt_id: string;
-  expires_at: string;
-  time_left_seconds: number;
+  attemptId: string;
+  expiresAt: string;
+  timeLeftSeconds: number;
 }
 
 // --- Questions ---
@@ -170,60 +170,60 @@ export type QuestionType = "short" | "multiple_choice" | "true_false";
 
 export interface Question {
   id: string;
-  tryout_session_id: string;
-  sort_order: number;
+  tryoutSessionId: string;
+  sortOrder: number;
   type: QuestionType;
   /** Teks/HTML soal. Dapat berisi tag HTML, <pre><code> untuk kode, <img> untuk gambar. */
   body: string;
   options: string[] | null;
-  max_score: number;
+  maxScore: number;
   /** URL gambar (opsional, dari backend). Gambar juga bisa disisipkan di body sebagai <img>. */
-  image_url?: string | null;
+  imageUrl?: string | null;
 }
 
 /** Statistik per soal (dari backend jika ada). GET /admin/tryouts/:id/questions/:qid/stats atau field stats pada question. */
 export interface QuestionStats {
-  participants_count?: number;
-  answered_count?: number;
-  correct_count?: number;
-  wrong_count?: number;
-  correct_percent?: number;
-  wrong_percent?: number;
+  participantsCount?: number;
+  answeredCount?: number;
+  correctCount?: number;
+  wrongCount?: number;
+  correctPercent?: number;
+  wrongPercent?: number;
 }
 
 /** Satu entri statistik soal dalam response bulk GET /admin/tryouts/:id/questions/stats */
 export interface QuestionStatsItem {
-  question_id: string;
-  answered_count?: number;
-  correct_count?: number;
-  wrong_count?: number;
-  correct_percent?: number;
-  wrong_percent?: number;
+  questionId: string;
+  answeredCount?: number;
+  correctCount?: number;
+  wrongCount?: number;
+  correctPercent?: number;
+  wrongPercent?: number;
 }
 
 /** Response GET /admin/tryouts/:tryoutId/questions/stats (statistik semua soal sekaligus) */
 export interface TryoutQuestionStatsBulkResponse {
-  participants_count?: number;
+  participantsCount?: number;
   questions: QuestionStatsItem[];
 }
 
 // --- Attempts ---
 export interface PutAnswerRequest {
-  answer_text?: string | null;
-  selected_option?: string | null;
-  is_marked?: boolean;
+  answerText?: string | null;
+  selectedOption?: string | null;
+  isMarked?: boolean;
 }
 
 export interface AttemptFeedback {
   summary?: string | null;
   recap?: string | null;
-  strength_areas?: string[] | null;
-  improvement_areas?: string[] | null;
-  recommendation_text?: string | null;
+  strengthAreas?: string[] | null;
+  improvementAreas?: string[] | null;
+  recommendationText?: string | null;
 }
 
 export interface SubmitAttemptResponse {
-  attempt_id: string;
+  attemptId: string;
   score: number;
   percentile: number;
   feedback: AttemptFeedback;
@@ -231,28 +231,28 @@ export interface SubmitAttemptResponse {
 
 export interface Attempt {
   id: string;
-  user_id: string;
-  tryout_session_id: string;
-  started_at: string;
-  submitted_at: string | null;
+  userId: string;
+  tryoutSessionId: string;
+  startedAt: string;
+  submittedAt: string | null;
   status: "in_progress" | "submitted" | "expired";
   score: number | null;
-  max_score: number | null;
+  maxScore: number | null;
   percentile: number | null;
-  time_seconds_spent: number | null;
+  timeSecondsSpent: number | null;
 }
 
 /** Satu soal dalam review attempt (jawaban benar/salah). */
 export interface AttemptReviewItem {
-  question_id: string;
+  questionId: string;
   body: string;
   type?: string;
   options?: string[] | null;
-  correct_answer?: string | null;
-  user_answer?: string | null;
-  is_correct?: boolean;
-  sort_order?: number;
-  image_url?: string | null;
+  correctAnswer?: string | null;
+  userAnswer?: string | null;
+  isCorrect?: boolean;
+  sortOrder?: number;
+  imageUrl?: string | null;
 }
 
 export interface AttemptReviewResponse {
@@ -262,27 +262,27 @@ export interface AttemptReviewResponse {
 
 export interface Certificate {
   id: string;
-  user_id: string;
-  tryout_session_id: string | null;
-  course_id: string | null;
-  issued_at: string;
+  userId: string;
+  tryoutSessionId: string | null;
+  courseId: string | null;
+  issuedAt: string;
 }
 
 // --- Dashboard umum (GET /dashboard) ---
-/** Satu entri leaderboard dari API (rank, user_name, school_name, best_score, has_attempt). */
+/** Satu entri leaderboard dari API (rank, userName, schoolName, bestScore, hasAttempt). */
 export interface LeaderboardEntry {
   rank?: number;
-  user_id?: string;
-  user_name?: string;
+  userId?: string;
+  userName?: string;
   name?: string;
   nama?: string;
-  school_name?: string;
+  schoolName?: string;
   score?: number;
   skor?: number;
-  best_score?: number;
-  has_attempt?: boolean;
-  tryout_title?: string;
-  tryout_id?: string;
+  bestScore?: number;
+  hasAttempt?: boolean;
+  tryoutTitle?: string;
+  tryoutId?: string;
   [key: string]: unknown;
 }
 
@@ -294,24 +294,24 @@ export interface DashboardResponse {
 
 // --- Student dashboard ---
 export interface StudentDashboardSummary {
-  total_attempts: number;
-  avg_score: number;
-  avg_percentile: number;
+  totalAttempts: number;
+  avgScore: number;
+  avgPercentile: number;
 }
 
 /** Nama siswa dari DB bisa dikembalikan di dashboard sebagai user/student.name atau user/student.nama.
- * Backend bisa mengirim strength_areas/kekuatan, improvement_areas/perlu_ditingkatkan, recommendation/rekomendasi. */
+ * Backend bisa mengirim strengthAreas/kekuatan, improvementAreas/perlu_ditingkatkan, recommendation/rekomendasi. */
 export interface StudentDashboardResponse {
   summary: StudentDashboardSummary;
-  open_tryouts: TryoutSession[];
-  recent_attempts: (Attempt & { tryout_title?: string })[];
-  strength_areas: string[];
-  improvement_areas: string[];
+  openTryouts: TryoutSession[];
+  recentAttempts: (Attempt & { tryoutTitle?: string })[];
+  strengthAreas: string[];
+  improvementAreas: string[];
   recommendation: string;
   user?: { name?: string; nama?: string };
   student?: { name?: string; nama?: string };
   /** Tanggal expired akses/langganan siswa (ISO string). Jika ada dan sudah lewat, frontend akan logout & redirect ke login. */
-  expires_at?: string;
+  expiresAt?: string;
 }
 
 // --- Subjects (Bidang) ---
@@ -320,9 +320,9 @@ export interface Subject {
   name: string;
   slug?: string | null;
   description?: string | null;
-  sort_order?: number | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  sortOrder?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 // --- Courses ---
@@ -330,26 +330,26 @@ export interface Course {
   id: string;
   title: string;
   description?: string | null;
-  created_by: string | null;
-  subject_id?: string | null;
-  sort_order?: number | null;
+  createdBy: string | null;
+  subjectId?: string | null;
+  sortOrder?: number | null;
 }
 
 export interface CourseEnrollment {
   id: string;
-  user_id: string;
-  course_id: string;
+  userId: string;
+  courseId: string;
   status: "enrolled" | "in_progress" | "completed";
-  enrolled_at: string;
-  completed_at: string | null;
+  enrolledAt: string;
+  completedAt: string | null;
 }
 
 // --- Master Data Sekolah ---
 export interface Sekolah {
   id: string;
-  nama_sekolah: string;
+  namaSekolah: string;
   npsn?: string | null;
-  kabupaten_kota?: string | null;
+  kabupatenKota?: string | null;
   telepon?: string | null;
   alamat?: string | null;
 }
@@ -357,45 +357,45 @@ export interface Sekolah {
 // --- Admin ---
 /** Response GET /admin/overview. Backend bisa mengembalikan field dengan nama lain. */
 export interface AdminOverviewResponse {
-  total_students?: number;
-  active_tryouts?: number;
-  avg_score?: number;
-  total_certificates?: number;
-  /** Nama alternatif dari backend */
-  total_student?: number;
-  total_certificate?: number;
-  active_tryout?: number;
-  average_score?: number;
+  totalStudents?: number;
+  activeTryouts?: number;
+  avgScore?: number;
+  totalCertificates?: number;
+  /** Nama alternatif dari backend (legacy) */
+  totalStudent?: number;
+  totalCertificate?: number;
+  activeTryout?: number;
+  averageScore?: number;
 }
 
 export interface AdminCreateTryoutRequest {
   title: string;
-  short_title?: string | null;
+  shortTitle?: string | null;
   description?: string | null;
-  duration_minutes: number;
-  questions_count: number;
+  durationMinutes: number;
+  questionsCount: number;
   level: TryoutLevel;
-  opens_at: string;
-  closes_at: string;
-  max_participants?: number | null;
+  opensAt: string;
+  closesAt: string;
+  maxParticipants?: number | null;
   status?: TryoutStatus;
   /** Kategori event: tryout, free_class, paid_class. */
-  event_category?: EventCategorySlug | string | null;
+  eventCategory?: EventCategorySlug | string | null;
 }
 
 export interface AdminCreateQuestionRequest {
-  sort_order: number;
+  sortOrder: number;
   type: QuestionType;
   body: string;
   options?: string[] | null;
-  max_score?: number;
+  maxScore?: number;
 }
 
 export interface AdminCreateCourseRequest {
   title: string;
   description?: string | null;
-  subject_id?: string | null;
-  sort_order?: number | null;
+  subjectId?: string | null;
+  sortOrder?: number | null;
 }
 
 export interface AdminCreateUserRequest {
@@ -403,8 +403,8 @@ export interface AdminCreateUserRequest {
   email: string;
   password: string;
   role: "student" | "trainer";
-  subject_id?: string | null;
-  school_id?: string | null;
+  subjectId?: string | null;
+  schoolId?: string | null;
 }
 
 export interface AdminUpdateUserRequest {
@@ -412,8 +412,8 @@ export interface AdminUpdateUserRequest {
   email?: string;
   password?: string;
   role?: "student" | "trainer" | "admin";
-  subject_id?: string | null;
-  school_id?: string | null;
+  subjectId?: string | null;
+  schoolId?: string | null;
 }
 
 // --- Landing packages (public + admin landing manage) ---
@@ -421,35 +421,35 @@ export type LandingPackage = {
   id: string;
   name: string;
   slug?: string | null;
-  short_description?: string | null;
-  price_early_bird?: number | null;
-  price_normal?: number | null;
-  is_open?: boolean | null;
-  is_bundle?: boolean | null;
+  shortDescription?: string | null;
+  priceEarlyBird?: number | null;
+  priceNormal?: number | null;
+  isOpen?: boolean | null;
+  isBundle?: boolean | null;
   durasi?: string | null;
   materi?: string[] | null;
   fasilitas?: string[] | null;
   bonus?: string[] | null;
   /** Dari backend publik bisa berupa objek course lengkap, admin bisa hanya ids. */
-  linked_courses?: unknown[] | null;
-  linked_course_ids?: string[] | null;
-  created_at?: string | null;
-  updated_at?: string | null;
+  linkedCourses?: unknown[] | null;
+  linkedCourseIds?: string[] | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 export type AdminLandingPackageCreateRequest = {
   name: string;
   slug: string;
-  short_description?: string;
-  price_early_bird?: number;
-  price_normal?: number;
-  is_open?: boolean;
-  is_bundle?: boolean;
+  shortDescription?: string;
+  priceEarlyBird?: number;
+  priceNormal?: number;
+  isOpen?: boolean;
+  isBundle?: boolean;
   durasi?: string;
   materi?: string[];
   fasilitas?: string[];
   bonus?: string[];
-  linked_course_ids?: string[];
+  linkedCourseIds?: string[];
 };
 
 export type AdminLandingPackageUpdateRequest = Partial<AdminLandingPackageCreateRequest>;
@@ -458,53 +458,53 @@ export interface AdminCreateSubjectRequest {
   name: string;
   slug?: string | null;
   description?: string | null;
-  sort_order?: number | null;
-  level_id?: string | null;
+  sortOrder?: number | null;
+  levelId?: string | null;
 }
 
 export interface AdminIssueCertificateRequest {
-  user_id: string;
-  tryout_session_id?: string | null;
-  course_id?: string | null;
+  userId: string;
+  tryoutSessionId?: string | null;
+  courseId?: string | null;
 }
 
 // --- Admin Tryout Analysis ---
 /** Analisis & grafik per tryout (per soal). GET /admin/tryouts/:tryoutId/analysis */
 export interface AdminTryoutAnalysis {
-  tryout_id?: string;
+  tryoutId?: string;
   questions?: Array<{
-    question_id?: string;
-    sort_order?: number;
-    answered_count?: number;
-    correct_count?: number;
-    wrong_count?: number;
-    correct_percent?: number;
+    questionId?: string;
+    sortOrder?: number;
+    answeredCount?: number;
+    correctCount?: number;
+    wrongCount?: number;
+    correctPercent?: number;
     [key: string]: unknown;
   }>;
-  participants_count?: number;
+  participantsCount?: number;
   [key: string]: unknown;
 }
 
 /** Siswa yang submit tryout. GET /admin/tryouts/:tryoutId/students */
 export interface AdminTryoutStudent {
   id?: string;
-  user_id?: string;
-  attempt_id?: string;
+  userId?: string;
+  attemptId?: string;
   name?: string;
   email?: string;
-  school_name?: string;
+  schoolName?: string;
   score?: number;
-  submitted_at?: string;
+  submittedAt?: string;
   [key: string]: unknown;
 }
 
 /** Analisis AI per attempt. GET /admin/tryouts/:tryoutId/attempts/:attemptId/ai-analysis */
 export interface AdminTryoutAttemptAiAnalysis {
-  attempt_id?: string;
-  user_id?: string;
+  attemptId?: string;
+  userId?: string;
   summary?: string;
-  strength_areas?: string[];
-  improvement_areas?: string[];
+  strengthAreas?: string[];
+  improvementAreas?: string[];
   recommendation?: string;
   [key: string]: unknown;
 }
@@ -512,11 +512,11 @@ export interface AdminTryoutAttemptAiAnalysis {
 // --- Notifications (GET /notifications, PATCH /notifications/:id/read) ---
 export interface Notification {
   id: string;
-  user_id?: string;
+  userId?: string;
   title?: string;
   body?: string;
-  read_at?: string | null;
-  created_at?: string;
+  readAt?: string | null;
+  createdAt?: string;
   type?: string;
   [key: string]: unknown;
 }
@@ -527,61 +527,61 @@ export type PaymentStatus = "pending" | "confirmed" | "completed" | "rejected" |
 
 export interface Payment {
   id: string;
-  user_id?: string;
+  userId?: string;
   /** Nama pengguna yang melakukan pembayaran (jika backend mengirim di list admin). */
-  user_name?: string;
-  user_email?: string;
+  userName?: string;
+  userEmail?: string;
   /** student | trainer — siapa yang membayar (untuk tampilan admin). */
-  payer_role?: string;
-  amount_cents?: number;
+  payerRole?: string;
+  amountCents?: number;
   amount?: number;
   type?: string;
   status?: PaymentStatus;
-  reference_id?: string | null;
-  proof_url?: string | null;
+  referenceId?: string | null;
+  proofUrl?: string | null;
   /** Catatan admin / alasan penolakan */
   notes?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
   [key: string]: unknown;
 }
 
 export interface CreatePaymentRequest {
-  amount_cents: number;
+  amountCents: number;
   type: string;
-  reference_id: string;
-  proof_url?: string;
+  referenceId: string;
+  proofUrl?: string;
 }
 
 // --- Course messages & discussions (untuk user yang ter-enroll) ---
 export interface CourseMessage {
   id: string;
-  course_id?: string;
-  user_id?: string;
-  user_name?: string;
+  courseId?: string;
+  userId?: string;
+  userName?: string;
   message: string;
-  created_at?: string;
+  createdAt?: string;
   [key: string]: unknown;
 }
 
 export interface CourseDiscussion {
   id: string;
-  course_id?: string;
-  user_id?: string;
+  courseId?: string;
+  userId?: string;
   title: string;
   body?: string;
-  created_at?: string;
-  reply_count?: number;
+  createdAt?: string;
+  replyCount?: number;
   [key: string]: unknown;
 }
 
 export interface DiscussionReply {
   id: string;
-  discussion_id?: string;
-  user_id?: string;
-  user_name?: string;
+  discussionId?: string;
+  userId?: string;
+  userName?: string;
   body: string;
-  created_at?: string;
+  createdAt?: string;
   [key: string]: unknown;
 }
 

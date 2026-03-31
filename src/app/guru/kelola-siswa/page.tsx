@@ -6,8 +6,8 @@ import { getTrainerStatus, trainerPaySlots, trainerAddStudent, getFriendlyApiErr
 
 export default function GuruKelolaSiswaPage() {
   const [trainerStatus, setTrainerStatus] = useState<{
-    paid_slots: number;
-    registered_students_count: number;
+    paidSlots: number;
+    registeredStudentsCount: number;
     students?: { id: string; name: string; email: string }[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,11 +37,11 @@ export default function GuruKelolaSiswaPage() {
   useEffect(() => {
     getTrainerStatus(true)
       .then(setTrainerStatus)
-      .catch(() => setTrainerStatus({ paid_slots: 0, registered_students_count: 0 }))
+      .catch(() => setTrainerStatus({ paidSlots: 0, registeredStudentsCount: 0 }))
       .finally(() => setLoading(false));
   }, []);
 
-  const slotsAvailable = trainerStatus ? Math.max(0, trainerStatus.paid_slots - trainerStatus.registered_students_count) : 0;
+  const slotsAvailable = trainerStatus ? Math.max(0, trainerStatus.paidSlots - trainerStatus.registeredStudentsCount) : 0;
   const canAddStudent = slotsAvailable > 0;
 
   return (
@@ -65,11 +65,11 @@ export default function GuruKelolaSiswaPage() {
             <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div className="rounded-xl border border-zinc-100 bg-zinc-50/50 px-4 py-3">
                 <p className="text-[11px] font-medium text-zinc-500">Slot dibayar</p>
-                <p className="mt-0.5 text-xl font-bold text-zinc-900">{trainerStatus?.paid_slots ?? 0}</p>
+                <p className="mt-0.5 text-xl font-bold text-zinc-900">{trainerStatus?.paidSlots ?? 0}</p>
               </div>
               <div className="rounded-xl border border-zinc-100 bg-zinc-50/50 px-4 py-3">
                 <p className="text-[11px] font-medium text-zinc-500">Siswa terdaftar</p>
-                <p className="mt-0.5 text-xl font-bold text-zinc-900">{trainerStatus?.registered_students_count ?? 0}</p>
+                <p className="mt-0.5 text-xl font-bold text-zinc-900">{trainerStatus?.registeredStudentsCount ?? 0}</p>
               </div>
               <div className="rounded-xl border border-sky-100 bg-sky-50/50 px-4 py-3">
                 <p className="text-[11px] font-medium text-sky-700">Slot tersisa</p>

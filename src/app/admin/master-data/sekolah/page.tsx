@@ -190,13 +190,13 @@ export default function MasterDataSekolahPage() {
                       className="hover:bg-zinc-50"
                     >
                       <td className="px-4 py-3 font-medium text-zinc-900">
-                        {s.nama_sekolah}
+                        {s.namaSekolah}
                       </td>
                       <td className="px-4 py-3 text-zinc-600">
                         {s.npsn ?? "–"}
                       </td>
                       <td className="px-4 py-3 text-zinc-600">
-                        {s.kabupaten_kota ?? "–"}
+                        {s.kabupatenKota ?? "–"}
                       </td>
                       <td className="px-4 py-3 text-zinc-600">
                         {s.telepon ?? "–"}

@@ -20,7 +20,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: DashboardRole;
-  avatar_url?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface AuthState {

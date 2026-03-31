@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useState } from "react";
 
 const defaultInfo = {
-  nama_sekolah: "",
+  namaSekolah: "",
   npsn: "",
   alamat: "",
   kelurahan: "",
   kecamatan: "",
-  kabupaten_kota: "",
+  kabupatenKota: "",
   provinsi: "",
-  kode_pos: "",
+  kodePos: "",
   telepon: "",
   email: "",
   website: "",
@@ -63,8 +63,8 @@ export default function TambahDataSekolahPage() {
                 <input
                   type="text"
                   required
-                  value={info.nama_sekolah}
-                  onChange={(e) => setInfo({ ...info, nama_sekolah: e.target.value })}
+                  value={info.namaSekolah}
+                  onChange={(e) => setInfo({ ...info, namaSekolah: e.target.value })}
                   placeholder="Nama lengkap sekolah"
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
@@ -130,8 +130,8 @@ export default function TambahDataSekolahPage() {
                   </label>
                   <input
                     type="text"
-                    value={info.kabupaten_kota}
-                    onChange={(e) => setInfo({ ...info, kabupaten_kota: e.target.value })}
+                    value={info.kabupatenKota}
+                    onChange={(e) => setInfo({ ...info, kabupatenKota: e.target.value })}
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                   />
                 </div>
@@ -153,8 +153,8 @@ export default function TambahDataSekolahPage() {
                 </label>
                 <input
                   type="text"
-                  value={info.kode_pos}
-                  onChange={(e) => setInfo({ ...info, kode_pos: e.target.value })}
+                  value={info.kodePos}
+                  onChange={(e) => setInfo({ ...info, kodePos: e.target.value })}
                   placeholder="12345"
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />

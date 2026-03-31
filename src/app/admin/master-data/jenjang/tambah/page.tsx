@@ -11,8 +11,8 @@ export default function TambahJenjangPendidikanPage() {
     name: "",
     slug: "",
     description: "",
-    sort_order: "",
-    icon_url: "",
+    sortOrder: "",
+    iconUrl: "",
   });
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -32,13 +32,13 @@ export default function TambahJenjangPendidikanPage() {
         name: string;
         slug: string;
         description?: string;
-        sort_order?: number;
-        icon_url?: string;
+        sortOrder?: number;
+        iconUrl?: string;
       } = { name, slug };
       if (form.description.trim()) body.description = form.description.trim();
-      const sortNum = parseInt(form.sort_order, 10);
-      if (!Number.isNaN(sortNum)) body.sort_order = sortNum;
-      if (form.icon_url.trim()) body.icon_url = form.icon_url.trim();
+      const sortNum = parseInt(form.sortOrder, 10);
+      if (!Number.isNaN(sortNum)) body.sortOrder = sortNum;
+      if (form.iconUrl.trim()) body.iconUrl = form.iconUrl.trim();
       await adminCreateLevel(body);
       router.push("/admin/master-data/jenjang");
     } catch (err) {
@@ -138,8 +138,8 @@ export default function TambahJenjangPendidikanPage() {
               <input
                 type="number"
                 min={0}
-                value={form.sort_order}
-                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+                value={form.sortOrder}
+                onChange={(e) => setForm({ ...form, sortOrder: e.target.value })}
                 placeholder="1"
                 className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
               />
@@ -151,8 +151,8 @@ export default function TambahJenjangPendidikanPage() {
               </label>
               <input
                 type="url"
-                value={form.icon_url}
-                onChange={(e) => setForm({ ...form, icon_url: e.target.value })}
+                value={form.iconUrl}
+                onChange={(e) => setForm({ ...form, iconUrl: e.target.value })}
                 placeholder="https://example.com/smp.svg"
                 className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
               />
