@@ -2,14 +2,21 @@
 
 import { QuestionBody } from "@/components/QuestionBody";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
+import { TryoutAttemptReviewModal } from "@/components/tryout/TryoutAttemptReviewModal";
 import {
   adminGetTryout,
   adminListTryoutQuestions,
   adminGetQuestionStats,
   adminGetAllQuestionStats,
+  adminGetTryoutStudents,
+  adminGetTryoutAttemptReview,
+  adminPutTryoutAttemptAnswerReview,
+  adminPutTryoutAttemptReviewBatch,
+  adminPostTryoutAttemptAutoGrade,
+  adminPostTryoutAutoGradeSubmitted,
   getTryoutLeaderboard,
 } from "@/lib/api";
-import type { LeaderboardEntry, Question, TryoutSession } from "@/lib/api-types";
+import type { AdminTryoutStudent, LeaderboardEntry, Question, TryoutSession } from "@/lib/api-types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -121,11 +128,19 @@ export default function AdminTryoutDetailPage() {
   const [tryout, setTryout] = useState<TryoutSession | null>(null);
   const [questions, setQuestions] = useState<QuestionWithStats[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [students, setStudents] = useState<AdminTryoutStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [leaderboardPage, setLeaderboardPage] = useState(1);
   const [questionPage, setQuestionPage] = useState(1);
+  const [reviewStudent, setReviewStudent] = useState<AdminTryoutStudent | null>(null);
+  const [bulkAutoGradeLoading, setBulkAutoGradeLoading] = useState(false);
+  const [bulkAutoGradeClearComments, setBulkAutoGradeClearComments] = useState(false);
+  const [bulkAutoGradeResult, setBulkAutoGradeResult] = useState<string | null>(null);
+  const [refreshingStudents, setRefreshingStudents] = useState(false);
+  const [waOpen, setWaOpen] = useState<null | { name: string; score: number; rank: number }>(null);
+  const [waPhone, setWaPhone] = useState("");
 
   const paginatedLeaderboard = useMemo(
     () => leaderboard.slice((leaderboardPage - 1) * PAGE_SIZE, leaderboardPage * PAGE_SIZE),
@@ -134,6 +149,77 @@ export default function AdminTryoutDetailPage() {
   const paginatedQuestions = useMemo(
     () => questions.slice((questionPage - 1) * PAGE_SIZE, questionPage * PAGE_SIZE),
     [questions, questionPage]
+  );
+
+  const formatScore = (v: unknown): number | null => {
+    if (v == null) return null;
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const buildIntensiveOfferScript = (p: { name: string; score: number; rank: number }) => {
+    const { name, score, rank } = p;
+    const tryoutTitle = tryout?.title ?? "Tryout";
+    const prefix =
+      `Halo ${name}, aku dari FansEdu. Terima kasih sudah ikut ${tryoutTitle}. ` +
+      `Kamu berada di peringkat #${rank} dengan nilai ${score}.`;
+    if (score < 50) {
+      return (
+        `${prefix}\n\n` +
+        "Nilai ini artinya fondasinya masih perlu diperkuat dulu, dan itu wajar banget. " +
+        "Kami ada *Kelas Intensif* yang fokus ke:\n" +
+        "- pemetaan materi yang belum kuat\n" +
+        "- latihan soal bertahap (mudah → menengah)\n" +
+        "- pembahasan detail + strategi pengerjaan\n\n" +
+        "Kalau kamu mau, aku bisa kirim jadwal & program yang paling cocok biar nilai kamu naik cepat. " +
+        "Boleh aku tahu target kamu (mis. 65/75/80+) untuk tryout berikutnya?"
+      );
+    }
+    if (score <= 75) {
+      return (
+        `${prefix}\n\n` +
+        "Bagus, tinggal naik level sedikit lagi supaya stabil di skor tinggi. " +
+        "Di *Kelas Intensif* kami fokus ke:\n" +
+        "- evaluasi topik yang masih bocor\n" +
+        "- latihan soal model TO + time management\n" +
+        "- tips strategi cepat & minim kesalahan\n\n" +
+        "Aku bisa kirim promo kelas intensif (batch terdekat) dan rekomendasi paket latihan sesuai kebutuhanmu. " +
+        "Kamu lebih pengin fokus *naikin skor* atau *stabilin konsisten* dulu?"
+      );
+    }
+    return (
+      `${prefix}\n\n` +
+      "Keren! Nilai kamu sudah di atas 75. Untuk makin maksimal, *Kelas Intensif* kami fokus ke:\n" +
+      "- soal HOTS & variasi jebakan\n" +
+      "- strategi cepat untuk maintain akurasi\n" +
+      "- simulasi TO + review kelemahan minor\n\n" +
+      "Kalau kamu mau, aku kirim info promo kelas intensif + jadwal batch terdekat untuk ngejar target 85–95. " +
+      "Kamu targetnya berapa untuk TO berikutnya?"
+    );
+  };
+
+  const openWaDialog = (p: { name: string; score: number; rank: number }) => {
+    setWaOpen(p);
+    setWaPhone("");
+  };
+
+  const waMessage = waOpen ? buildIntensiveOfferScript(waOpen) : "";
+  const waLink = useMemo(() => {
+    const phone = waPhone.replace(/[^\d]/g, "");
+    if (!phone) return null;
+    const text = encodeURIComponent(waMessage);
+    return `https://wa.me/${phone}?text=${text}`;
+  }, [waPhone, waMessage]);
+  const manualReviewCandidates = useMemo(() => students, [students]);
+
+  const tryoutReviewApi = useMemo(
+    () => ({
+      getAttemptReview: adminGetTryoutAttemptReview,
+      putAnswerReview: adminPutTryoutAttemptAnswerReview,
+      putReviewBatch: adminPutTryoutAttemptReviewBatch,
+      postAutoGrade: adminPostTryoutAttemptAutoGrade,
+    }),
+    []
   );
 
   useEffect(() => {
@@ -157,13 +243,15 @@ export default function AdminTryoutDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const [tryoutRes, questionsRes, leaderboardRes] = await Promise.all([
+      const [tryoutRes, questionsRes, leaderboardRes, studentsRes] = await Promise.all([
         adminGetTryout(tryoutId).catch(() => null),
         adminListTryoutQuestions(tryoutId),
         getTryoutLeaderboard(tryoutId).catch(() => []),
+        adminGetTryoutStudents(tryoutId).catch(() => []),
       ]);
       setTryout(tryoutRes);
       setLeaderboard(Array.isArray(leaderboardRes) ? leaderboardRes : []);
+      setStudents(Array.isArray(studentsRes) ? studentsRes : []);
       const qList = Array.isArray(questionsRes) ? questionsRes : [];
       const sorted = [...qList].sort((a, b) => a.sortOrder - b.sortOrder);
 
@@ -200,14 +288,88 @@ export default function AdminTryoutDetailPage() {
       setError((e as Error).message ?? "Gagal memuat data");
       setQuestions([]);
       setLeaderboard([]);
+      setStudents([]);
     } finally {
       setLoading(false);
+    }
+  }, [tryoutId]);
+
+  /** Setelah auto-grade / simpan review: ambil ulang tryout, siswa, leaderboard — tanpa setLoading (tanpa “reload” halaman). */
+  const refreshTryoutSummaryFromApi = useCallback(async () => {
+    if (!tryoutId) return;
+    try {
+      const [tryoutRes, studentsRes, leaderboardRes] = await Promise.all([
+        adminGetTryout(tryoutId).catch(() => null),
+        adminGetTryoutStudents(tryoutId).catch(() => []),
+        getTryoutLeaderboard(tryoutId).catch(() => []),
+      ]);
+      if (tryoutRes != null) setTryout(tryoutRes);
+      setStudents(Array.isArray(studentsRes) ? studentsRes : []);
+      setLeaderboard(Array.isArray(leaderboardRes) ? leaderboardRes : []);
+    } catch {
+      /* pertahankan state yang ada */
     }
   }, [tryoutId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    setReviewStudent((prev) => {
+      if (!prev?.attemptId) return prev;
+      const aid = String(prev.attemptId).trim();
+      const updated = students.find(
+        (s) => s.attemptId != null && String(s.attemptId).trim() === aid
+      );
+      return updated ?? prev;
+    });
+  }, [students]);
+
+  const runBulkAutoGrade = async () => {
+    if (!tryoutId || bulkAutoGradeLoading) return;
+    if (
+      !confirm(
+        "Jalankan auto-grade untuk semua attempt yang sudah submitted pada tryout ini?"
+      )
+    ) {
+      return;
+    }
+    setBulkAutoGradeLoading(true);
+    setBulkAutoGradeResult(null);
+    setError(null);
+    try {
+      const res = await adminPostTryoutAutoGradeSubmitted(tryoutId, {
+        clearReviewerComments: bulkAutoGradeClearComments ? true : undefined,
+      });
+      const total = Number(res?.total ?? 0);
+      const succeeded = Number(res?.succeeded ?? 0);
+      const failed = Number(res?.failed ?? 0);
+      setBulkAutoGradeResult(
+        `Auto-grade selesai: total ${total}, berhasil ${succeeded}, gagal ${failed}.`
+      );
+      await refreshTryoutSummaryFromApi();
+    } catch (e) {
+      setError((e as Error).message ?? "Gagal menjalankan auto-grade semua submitted.");
+    } finally {
+      setBulkAutoGradeLoading(false);
+    }
+  };
+
+  const refreshStudentsScores = async () => {
+    if (!tryoutId || refreshingStudents) return;
+    setRefreshingStudents(true);
+    setError(null);
+    try {
+      const studentsRes = await adminGetTryoutStudents(tryoutId).catch(() => []);
+      setStudents(Array.isArray(studentsRes) ? studentsRes : []);
+      setBulkAutoGradeResult("Sinkron nilai siswa selesai dari endpoint /students.");
+    } catch (e) {
+      setError((e as Error).message ?? "Gagal sinkron nilai siswa.");
+    } finally {
+      setRefreshingStudents(false);
+    }
+  };
 
   if (!tryoutId) {
     return (
@@ -317,6 +479,7 @@ export default function AdminTryoutDetailPage() {
                     <th className="px-4 py-2 text-left font-medium text-zinc-500">Nama</th>
                     <th className="px-4 py-2 text-left font-medium text-zinc-500">Sekolah</th>
                     <th className="px-4 py-2 text-right font-medium text-zinc-500">Skor</th>
+                    <th className="px-4 py-2 text-right font-medium text-zinc-500">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
@@ -330,7 +493,43 @@ export default function AdminTryoutDetailPage() {
                       </td>
                       <td className="px-4 py-2 text-zinc-600">{entry.schoolName ?? "–"}</td>
                       <td className="px-4 py-2 text-right font-medium text-zinc-900">
-                        {entry.score ?? entry.skor ?? entry.bestScore ?? "–"}
+                        {(() => {
+                          const s = entry.score ?? entry.skor ?? entry.bestScore;
+                          return s != null && Number.isFinite(Number(s)) ? Number(s) : "–";
+                        })()}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {(() => {
+                          const rank = (entry.rank ?? (leaderboardPage - 1) * PAGE_SIZE + i + 1) as number;
+                          const name = String(entry.userName ?? entry.name ?? entry.nama ?? "Siswa");
+                          const score = formatScore(entry.score ?? entry.skor ?? entry.bestScore);
+                          const student = entry.userId
+                            ? students.find((s) => String(s.userId ?? "").trim() === String(entry.userId ?? "").trim())
+                            : null;
+                          const canReview = Boolean(student?.attemptId);
+                          return (
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={!canReview}
+                                onClick={() => student && setReviewStudent(student)}
+                                className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                                title={canReview ? "Buka review jawaban attempt" : "Attempt belum ditemukan di list students"}
+                              >
+                                Review manual
+                              </button>
+                              <button
+                                type="button"
+                                disabled={score == null}
+                                onClick={() => score != null && openWaDialog({ name, score, rank })}
+                                className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                                title={score == null ? "Skor belum ada" : "Buka script WA"}
+                              >
+                                Kirim WA
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))}
@@ -347,6 +546,8 @@ export default function AdminTryoutDetailPage() {
             />
           )}
         </section>
+
+        {/* Penilaian Manual: sudah tersedia di leaderboard (kolom Aksi). */}
 
         {/* Daftar soal + detail */}
         <section className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
@@ -387,10 +588,22 @@ export default function AdminTryoutDetailPage() {
                           <p className="mt-3 text-xs font-semibold uppercase text-zinc-500">Opsi jawaban</p>
                           <ul className="mt-1 list-inside list-disc text-sm text-zinc-700">
                             {q.options.map((opt, i) => (
-                              <li key={i}>{opt}</li>
+                              <li
+                                key={`${opt.key}-${i}`}
+                                className={opt.correct ? "font-medium text-emerald-800" : ""}
+                              >
+                                <span className="font-mono text-xs">{opt.key}.</span> {opt.label}
+                                {opt.correct ? " (kunci)" : ""}
+                              </li>
                             ))}
                           </ul>
                         </>
+                      )}
+                      {q.type === "short" && q.correctText && (
+                        <p className="mt-2 text-xs text-zinc-600">
+                          <span className="font-semibold text-zinc-500">Kunci isian: </span>
+                          {q.correctText}
+                        </p>
                       )}
                       <p className="mt-3 text-xs text-zinc-500">
                         Tipe: {TYPE_LABEL[q.type] ?? q.type} · Max skor: {q.maxScore}
@@ -410,6 +623,90 @@ export default function AdminTryoutDetailPage() {
             />
           )}
         </section>
+
+      {reviewStudent && tryoutId && (
+        <TryoutAttemptReviewModal
+          tryoutId={tryoutId}
+          student={reviewStudent}
+          onClose={() => setReviewStudent(null)}
+          onSaved={refreshTryoutSummaryFromApi}
+          api={tryoutReviewApi}
+        />
+      )}
+
+      {waOpen && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900">Kirim pesan WhatsApp</h3>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  Script otomatis untuk {waOpen.name} · peringkat #{waOpen.rank} · nilai {waOpen.score}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWaOpen(null)}
+                className="rounded border border-zinc-200 px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100"
+              >
+                Tutup
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div>
+                <label className="text-xs font-medium text-zinc-600">Nomor WA (format internasional, hanya angka)</label>
+                <input
+                  value={waPhone}
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder="contoh: 6281234567890"
+                  className="mt-1 w-full rounded border border-zinc-200 px-3 py-2 text-sm"
+                />
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Kosongkan jika hanya ingin copy script.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-zinc-600">Script pesan</label>
+                <textarea
+                  readOnly
+                  value={waMessage}
+                  rows={10}
+                  className="mt-1 w-full rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(waMessage);
+                  } catch {
+                    // fallback: no-op
+                  }
+                }}
+                className="rounded border border-zinc-200 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-100"
+              >
+                Copy script
+              </button>
+              <a
+                href={waLink ?? "#"}
+                target="_blank"
+                rel="noreferrer"
+                className={`rounded bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 ${
+                  waLink ? "" : "pointer-events-none opacity-50"
+                }`}
+                title={waLink ? "Buka WhatsApp" : "Isi nomor WA dulu"}
+              >
+                Buka WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

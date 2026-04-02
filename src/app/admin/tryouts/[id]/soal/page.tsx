@@ -27,13 +27,32 @@ const emptyQuestionForm: {
   body: string;
   optionsText: string;
   maxScore: string;
+  /** Key opsi benar (A, B, …) untuk PG/BS */
+  correctOption: string;
+  /** Kunci isian singkat; varian benar dipisah | */
+  correctText: string;
 } = {
   sortOrder: "1",
   type: "multiple_choice",
   body: "",
   optionsText: "",
   maxScore: "1",
+  correctOption: "",
+  correctText: "",
 };
+
+function optionsLinesFromQuestion(q: Question): string {
+  const o = q.options;
+  if (!o?.length) return "";
+  return o.map((x) => x.label).join("\n");
+}
+
+function defaultCorrectKey(q: Question): string {
+  const co = q.correctOption?.trim();
+  if (co) return co.toUpperCase();
+  const hit = q.options?.find((x) => x.correct);
+  return hit?.key ? String(hit.key).toUpperCase() : "";
+}
 
 export default function AdminTryoutSoalPage() {
   const params = useParams();
@@ -46,6 +65,7 @@ export default function AdminTryoutSoalPage() {
 
   const [modalOpen, setModalOpen] = useState<"add" | "edit" | null>(null);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [editingOriginal, setEditingOriginal] = useState<Question | null>(null);
   const [form, setForm] = useState(emptyQuestionForm);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -107,9 +127,10 @@ export default function AdminTryoutSoalPage() {
   const openAdd = () => {
     setForm({
       ...emptyQuestionForm,
-      sortOrder: String((questions.length + 1)),
+      sortOrder: String(questions.length + 1),
     });
     setEditingQuestionId(null);
+    setEditingOriginal(null);
     setModalOpen("add");
     setSubmitError(null);
   };
@@ -119,10 +140,13 @@ export default function AdminTryoutSoalPage() {
       sortOrder: String(q.sortOrder),
       type: q.type,
       body: q.body,
-      optionsText: (q.options ?? []).join("\n"),
+      optionsText: optionsLinesFromQuestion(q),
       maxScore: String(q.maxScore),
+      correctOption: defaultCorrectKey(q),
+      correctText: q.correctText ?? "",
     });
     setEditingQuestionId(q.id);
+    setEditingOriginal(q);
     setModalOpen("edit");
     setSubmitError(null);
   };
@@ -130,6 +154,7 @@ export default function AdminTryoutSoalPage() {
   const closeModal = () => {
     setModalOpen(null);
     setEditingQuestionId(null);
+    setEditingOriginal(null);
     setForm(emptyQuestionForm);
     setSubmitError(null);
   };
@@ -139,6 +164,36 @@ export default function AdminTryoutSoalPage() {
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean);
+  };
+
+  const mcOptionKeys = useMemo(() => {
+    let lines = parseOptions(form.optionsText);
+    if (form.type === "true_false" && lines.length === 0) {
+      lines = ["Benar", "Salah"];
+    }
+    return lines.map((_, i) => String.fromCharCode(65 + i));
+  }, [form.optionsText, form.type]);
+
+  const buildQuestionPatch = (
+    original: Question | null,
+    next: AdminCreateQuestionRequest
+  ): Partial<AdminCreateQuestionRequest> => {
+    if (!original) return next;
+    const patch: Partial<AdminCreateQuestionRequest> = {};
+    if (next.sortOrder !== original.sortOrder) patch.sortOrder = next.sortOrder;
+    if (next.type !== original.type) patch.type = next.type;
+    if (next.body !== original.body) patch.body = next.body;
+    if ((next.maxScore ?? 0) !== original.maxScore) patch.maxScore = next.maxScore;
+    if ((next.correctOption ?? null) !== (original.correctOption ?? null)) {
+      patch.correctOption = next.correctOption;
+    }
+    if ((next.correctText ?? null) !== (original.correctText ?? null)) {
+      patch.correctText = next.correctText;
+    }
+    const oldOpt = JSON.stringify(original.options ?? []);
+    const newOpt = JSON.stringify(next.options ?? []);
+    if (oldOpt !== newOpt) patch.options = next.options;
+    return patch;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -156,27 +211,61 @@ export default function AdminTryoutSoalPage() {
     try {
       const sortOrder = parseInt(form.sortOrder, 10) || 1;
       const maxScore = parseInt(form.maxScore, 10) || 1;
-      const options =
-        form.type === "multiple_choice" || form.type === "true_false"
-          ? parseOptions(form.optionsText)
-          : undefined;
+      const ct = form.correctText.trim();
 
-      if (modalOpen === "add") {
-        await adminCreateQuestion(tryoutId, {
+      if (form.type === "short") {
+        const base: AdminCreateQuestionRequest = {
           sortOrder,
           type: form.type,
           body: form.body.trim(),
-          options: options?.length ? options : undefined,
           maxScore,
+          ...(ct ? { correctText: ct } : {}),
+        };
+        if (modalOpen === "add") {
+          await adminCreateQuestion(tryoutId, base);
+        } else if (editingQuestionId) {
+          const patch = buildQuestionPatch(editingOriginal, base);
+          if (Object.keys(patch).length > 0) {
+            await adminUpdateQuestion(tryoutId, editingQuestionId, patch);
+          }
+        }
+      } else {
+        let lines = parseOptions(form.optionsText);
+        if (form.type === "true_false" && lines.length < 2) {
+          lines = ["Benar", "Salah"];
+        }
+        if (lines.length < 2) {
+          setSubmitError("Untuk pilihan ganda / benar-salah: isi minimal dua opsi (satu per baris).");
+          setSubmitLoading(false);
+          return;
+        }
+        const key = form.correctOption.trim().toUpperCase();
+        const expectedKeys = lines.map((_, i) => String.fromCharCode(65 + i));
+        if (!key || !expectedKeys.includes(key)) {
+          setSubmitError("Pilih kunci jawaban (A, B, …) yang sesuai dengan opsi.");
+          setSubmitLoading(false);
+          return;
+        }
+        const options = lines.map((label, i) => {
+          const k = String.fromCharCode(65 + i);
+          return { key: k, label, correct: k === key };
         });
-      } else if (editingQuestionId) {
-        await adminUpdateQuestion(tryoutId, editingQuestionId, {
+        const mcPayload: AdminCreateQuestionRequest = {
           sortOrder,
           type: form.type,
           body: form.body.trim(),
-          options: options?.length ? options : undefined,
           maxScore,
-        });
+          options,
+          correctOption: key,
+        };
+        if (modalOpen === "add") {
+          await adminCreateQuestion(tryoutId, mcPayload);
+        } else if (editingQuestionId) {
+          const patch = buildQuestionPatch(editingOriginal, mcPayload);
+          if (Object.keys(patch).length > 0) {
+            await adminUpdateQuestion(tryoutId, editingQuestionId, patch);
+          }
+        }
       }
       closeModal();
       loadData();
@@ -273,9 +362,20 @@ export default function AdminTryoutSoalPage() {
                       {q.options && q.options.length > 0 && (
                         <ul className="mt-1 list-inside list-disc text-xs text-zinc-500">
                           {q.options.map((opt, i) => (
-                            <li key={i}>{opt}</li>
+                            <li
+                              key={`${opt.key}-${i}`}
+                              className={opt.correct ? "font-medium text-emerald-700" : ""}
+                            >
+                              <span className="font-mono">{opt.key}.</span> {opt.label}
+                              {opt.correct ? " (kunci)" : ""}
+                            </li>
                           ))}
                         </ul>
+                      )}
+                      {q.type === "short" && q.correctText && (
+                        <p className="mt-1 text-[11px] text-zinc-500">
+                          Kunci isian: <span className="text-zinc-700">{q.correctText}</span>
+                        </p>
                       )}
                     </div>
                     <div className="flex shrink-0 gap-2">
@@ -386,23 +486,70 @@ export default function AdminTryoutSoalPage() {
               </div>
 
               {(form.type === "multiple_choice" || form.type === "true_false") && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600">
+                      Opsi (satu per baris) {form.type === "true_false" ? "— default Benar/Salah jika dikosongkan" : ""}
+                    </label>
+                    <textarea
+                      rows={form.type === "true_false" ? 2 : 5}
+                      value={form.optionsText}
+                      onChange={(e) =>
+                        setForm({ ...form, optionsText: e.target.value })
+                      }
+                      placeholder={
+                        form.type === "true_false"
+                          ? "Benar\nSalah"
+                          : "Opsi A\nOpsi B\nOpsi C\nOpsi D"
+                      }
+                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600">
+                      Kunci jawaban (key) *
+                    </label>
+                    <select
+                      required
+                      value={form.correctOption}
+                      onChange={(e) =>
+                        setForm({ ...form, correctOption: e.target.value })
+                      }
+                      className="mt-1 w-full max-w-xs rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                    >
+                      <option value="">— Pilih —</option>
+                      {mcOptionKeys.map((k) => (
+                        <option key={k} value={k}>
+                          {k}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      A = baris pertama, B = kedua, dst. Dikirim ke API sebagai{" "}
+                      <code className="rounded bg-zinc-100 px-0.5">correctOption</code> dan{" "}
+                      <code className="rounded bg-zinc-100 px-0.5">options[].correct</code>.
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {form.type === "short" && (
                 <div>
                   <label className="block text-xs font-medium text-zinc-600">
-                    Opsi (satu per baris) {form.type === "true_false" ? "— mis. Benar, Salah" : ""}
+                    Kunci isian singkat (untuk auto-grade)
                   </label>
-                  <textarea
-                    rows={form.type === "true_false" ? 2 : 5}
-                    value={form.optionsText}
-                    onChange={(e) =>
-                      setForm({ ...form, optionsText: e.target.value })
-                    }
-                    placeholder={
-                      form.type === "true_false"
-                        ? "Benar\nSalah"
-                        : "Opsi A\nOpsi B\nOpsi C\nOpsi D"
-                    }
+                  <input
+                    type="text"
+                    value={form.correctText}
+                    onChange={(e) => setForm({ ...form, correctText: e.target.value })}
+                    placeholder="contoh: Jakarta atau DKI Jakarta|Jakarta"
                     className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                   />
+                  <p className="mt-1 text-[11px] text-zinc-500">
+                    Beberapa jawaban benar dipisahkan dengan <code className="rounded bg-zinc-100 px-0.5">|</code>.
+                    Kosongkan jika belum mau mengisi; saat edit, dikosongkan tidak mengirim field (kunci di DB tidak
+                    diubah).
+                  </p>
                 </div>
               )}
 

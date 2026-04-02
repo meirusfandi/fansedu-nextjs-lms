@@ -7,6 +7,7 @@ import type {
   AdminCreateCourseRequest,
   AdminCreateLevelRequest,
   AdminCreateQuestionRequest,
+  AdminUpdateQuestionRequest,
   AdminCreateSubjectRequest,
   AdminCreateTryoutRequest,
   AdminCreateUserRequest,
@@ -18,6 +19,7 @@ import type {
   AdminUpdateLevelRequest,
   AdminUpdateUserRequest,
   Attempt,
+  AttemptAnswerReviewSaveResponse,
   AttemptReviewItem,
   AttemptReviewResponse,
   Certificate,
@@ -56,6 +58,7 @@ import type {
   TrainerCreateSchoolRequest,
   TrainerStatusResponse,
   TryoutQuestionStatsBulkResponse,
+  TryoutAutoGradeSubmittedResponse,
   TryoutSession,
   User,
   UserRole,
@@ -294,6 +297,21 @@ function normalizeToTryoutSession(item: unknown): TryoutSession {
   };
 }
 
+function pickFiniteNumber(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return undefined;
+}
+
+function pickBestScoreValue(candidates: unknown[]): number | undefined {
+  const nums = candidates.map(pickFiniteNumber).filter((n): n is number => n != null);
+  if (nums.length === 0) return undefined;
+  // Hindari "terjebak" score default 0 bila ada kandidat nilai final > 0.
+  const positives = nums.filter((n) => n > 0);
+  if (positives.length > 0) return positives[0];
+  return nums[0];
+}
+
 /** Bersihkan payload tryout sebelum dikirim; request() mengonversi key ke camelCase. */
 function toTryoutApiPayload(
   body: AdminCreateTryoutRequest | Partial<AdminCreateTryoutRequest>
@@ -306,6 +324,26 @@ function toTryoutApiPayload(
   return payload;
 }
 
+/** Opsi dari API: objek { key, label, correct } atau legacy array string. */
+function normalizeQuestionOptionsFromRaw(raw: unknown): Question["options"] {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  return raw.map((item, i) => {
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      const o = item as Record<string, unknown>;
+      return {
+        key: String(o.key ?? String.fromCharCode(65 + i)),
+        label: String(o.label ?? o.text ?? ""),
+        correct: o.correct === true,
+      };
+    }
+    return {
+      key: String.fromCharCode(65 + i),
+      label: String(item),
+      correct: false,
+    };
+  });
+}
+
 /** Satu soal: dipetakan ke Question setelah response dinormalisasi ke camelCase. */
 function normalizeQuestion(item: unknown): Question {
   const obj = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
@@ -314,16 +352,21 @@ function normalizeQuestion(item: unknown): Question {
     typeRaw === "short" || typeRaw === "multiple_choice" || typeRaw === "true_false"
       ? typeRaw
       : "short";
+  const co = obj.correctOption ?? obj.correct_option;
+  const ct = obj.correctText ?? obj.correct_text;
+  const correctOption =
+    co != null && String(co).trim() !== "" ? String(co).trim() : null;
+  const correctText = ct != null && String(ct).trim() !== "" ? String(ct) : null;
   return {
     id: String(obj.id ?? ""),
     tryoutSessionId: String(obj.tryoutSessionId ?? ""),
     sortOrder: Number(obj.sortOrder ?? 0),
     type,
     body: String(obj.body ?? ""),
-    options: Array.isArray(obj.options)
-      ? (obj.options as unknown[]).map((x) => String(x))
-      : null,
+    options: normalizeQuestionOptionsFromRaw(obj.options),
     maxScore: Number(obj.maxScore ?? 0),
+    correctOption,
+    correctText,
     imageUrl: obj.imageUrl != null ? String(obj.imageUrl) : null,
   };
 }
@@ -724,7 +767,7 @@ export async function getTryoutLeaderboard(tryoutId: string): Promise<Leaderboar
       { method: "GET", auth: false }
     );
     const list = Array.isArray(raw) ? raw : (raw as { leaderboard?: LeaderboardEntry[] })?.leaderboard ?? (raw as { data?: LeaderboardEntry[] })?.data ?? [];
-    return normalizeLeaderboard(list);
+    return normalizeLeaderboard(list as unknown[]);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -800,13 +843,29 @@ export async function getDashboard(): Promise<DashboardResponse> {
   }
 }
 
+function pickLeaderboardScore(o: Record<string, unknown>): number | undefined {
+  return pickBestScoreValue([
+    o.bestScore,
+    o.finalScore,
+    o.totalScore,
+    o.attemptScore,
+    o.points,
+    o.nilai,
+    o.score,
+    o.skor,
+  ]);
+}
+
 function normalizeLeaderboard(list: unknown[]): LeaderboardEntry[] {
   return list.slice(0, 50).map((item, index) => {
     if (!item || typeof item !== "object") return { rank: index + 1 };
     const o = item as Record<string, unknown>;
-    const scoreVal =
-      o.bestScore != null ? Number(o.bestScore) : o.score != null ? Number(o.score) : o.skor != null ? Number(o.skor) : undefined;
+    const scoreVal = pickLeaderboardScore(o);
+    const bestNum =
+      o.bestScore != null && Number.isFinite(Number(o.bestScore)) ? Number(o.bestScore) : scoreVal;
+    /** Spread dulu baru field dinormalisasi agar `...o` tidak menimpa score dengan 0 dari API. */
     return {
+      ...o,
       rank: Number(o.rank ?? o.urutan ?? index + 1),
       userId: o.userId != null ? String(o.userId) : undefined,
       userName:
@@ -816,12 +875,11 @@ function normalizeLeaderboard(list: unknown[]): LeaderboardEntry[] {
       schoolName: o.schoolName != null ? String(o.schoolName) : undefined,
       score: scoreVal,
       skor: scoreVal,
-      bestScore: o.bestScore != null ? Number(o.bestScore) : undefined,
+      bestScore: bestNum,
       hasAttempt: o.hasAttempt === true,
       tryoutTitle:
         o.tryoutTitle != null ? String(o.tryoutTitle) : o.tryoutName != null ? String(o.tryoutName) : undefined,
       tryoutId: o.tryoutId != null ? String(o.tryoutId) : undefined,
-      ...o,
     } as LeaderboardEntry;
   });
 }
@@ -980,9 +1038,8 @@ export async function getAttemptReview(attemptId: string): Promise<AttemptReview
   for (const path of paths) {
     try {
       const raw = await request<AttemptReviewResponse | AttemptReviewItem[]>(path, { method: "GET" });
-      if (Array.isArray(raw)) return raw as AttemptReviewItem[];
-      const list = (raw as AttemptReviewResponse).items ?? (raw as AttemptReviewResponse).questions ?? [];
-      return Array.isArray(list) ? (list as AttemptReviewItem[]) : [];
+      const arr = Array.isArray(raw) ? raw : (raw as AttemptReviewResponse).items ?? (raw as AttemptReviewResponse).questions ?? [];
+      return Array.isArray(arr) ? normalizeAttemptReviewList(arr) : [];
     } catch (e) {
       if (isNotFoundOrMethodNotAllowed(e)) continue;
       throw e;
@@ -1182,17 +1239,473 @@ export async function adminGetTryoutAnalysis(tryoutId: string): Promise<AdminTry
   return request(`/admin/tryouts/${tryoutId}/analysis`, { method: "GET" });
 }
 
+function normalizeAdminTryoutStudentItem(item: unknown): AdminTryoutStudent {
+  const o = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const user = o.user && typeof o.user === "object" ? (o.user as Record<string, unknown>) : null;
+  const student = o.student && typeof o.student === "object" ? (o.student as Record<string, unknown>) : null;
+  const profile =
+    o.profile && typeof o.profile === "object" ? (o.profile as Record<string, unknown>) : null;
+  const person = user ?? student ?? profile;
+  const name =
+    o.name ??
+    o.userName ??
+    o.studentName ??
+    o.fullName ??
+    person?.name ??
+    person?.userName ??
+    person?.studentName ??
+    person?.fullName ??
+    (o.user && typeof o.user === "string" ? o.user : undefined);
+  const email =
+    o.email ??
+    o.userEmail ??
+    o.studentEmail ??
+    person?.email ??
+    person?.userEmail ??
+    person?.studentEmail;
+  const attemptObj = o.attempt && typeof o.attempt === "object" ? (o.attempt as Record<string, unknown>) : null;
+  /** Sama seperti urutan sebelumnya; nilai non-kosong + trim. `...o` di akhir dulu menimpa ini — sekarang override tetap menang. */
+  const attemptIdResolved = (() => {
+    const pick = (v: unknown) => {
+      if (v == null) return undefined;
+      const s = String(v).trim();
+      return s === "" ? undefined : s;
+    };
+    return (
+      pick(o.attemptId) ??
+      pick(o.latestAttemptId) ??
+      pick(o.lastAttemptId) ??
+      pick(attemptObj?.id) ??
+      pick(attemptObj?.attemptId) ??
+      pick(o.id)
+    );
+  })();
+  return {
+    ...o,
+    id: o.id != null ? String(o.id) : undefined,
+    userId:
+      o.userId != null
+        ? String(o.userId)
+        : o.studentId != null
+          ? String(o.studentId)
+          : person?.id != null
+            ? String(person.id)
+            : undefined,
+    attemptId: attemptIdResolved,
+    name: name != null ? String(name) : undefined,
+    email: email != null ? String(email) : undefined,
+    schoolName:
+      o.schoolName != null
+        ? String(o.schoolName)
+        : o.school != null && typeof o.school === "string"
+          ? String(o.school)
+          : person?.schoolName != null
+            ? String(person.schoolName)
+            : person?.school != null && typeof person.school === "string"
+              ? String(person.school)
+              : undefined,
+    score: pickBestScoreValue([
+      attemptObj?.score,
+      attemptObj?.finalScore,
+      attemptObj?.totalScore,
+      o.finalScore,
+      o.totalScore,
+      o.bestScore,
+      o.score,
+      o.skor,
+    ]),
+    submittedAt:
+      o.submittedAt != null
+        ? String(o.submittedAt)
+        : o.submitTime != null
+          ? String(o.submitTime)
+          : attemptObj?.submittedAt != null
+            ? String(attemptObj.submittedAt)
+            : attemptObj?.submitTime != null
+              ? String(attemptObj.submitTime)
+              : undefined,
+  };
+}
+
+function parseTryoutStudentsResponse(raw: unknown): AdminTryoutStudent[] {
+  if (Array.isArray(raw)) return raw.map(normalizeAdminTryoutStudentItem);
+  const obj = raw && typeof raw === "object" ? (raw as { students?: unknown[]; data?: unknown[] }) : {};
+  const nestedData =
+    obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)
+      ? (obj.data as { students?: unknown[]; items?: unknown[] })
+      : null;
+  const list = Array.isArray(obj.students)
+    ? obj.students
+    : Array.isArray(obj.data)
+      ? obj.data
+      : Array.isArray(nestedData?.students)
+        ? nestedData.students
+        : Array.isArray(nestedData?.items)
+          ? nestedData.items
+          : [];
+  return list.map(normalizeAdminTryoutStudentItem);
+}
+
 /** Daftar siswa yang submit tryout. GET /admin/tryouts/:tryoutId/students */
 export async function adminGetTryoutStudents(tryoutId: string): Promise<AdminTryoutStudent[]> {
   try {
-    const raw = await request<
-      AdminTryoutStudent[] | { students?: AdminTryoutStudent[]; data?: AdminTryoutStudent[] }
-    >(`/admin/tryouts/${tryoutId}/students`, { method: "GET" });
-    if (Array.isArray(raw)) return raw;
-    const obj = raw && typeof raw === "object" ? (raw as { students?: AdminTryoutStudent[]; data?: AdminTryoutStudent[] }) : {};
-    return Array.isArray(obj.students) ? obj.students : Array.isArray(obj.data) ? obj.data : [];
+    const raw = await request<unknown>(`/admin/tryouts/${tryoutId}/students`, { method: "GET" });
+    return parseTryoutStudentsResponse(raw);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Daftar siswa (trainer, tryout sesuai subject). GET /trainer/tryouts/:tryoutId/students */
+export async function trainerGetTryoutStudents(tryoutId: string): Promise<AdminTryoutStudent[]> {
+  try {
+    const raw = await request<unknown>(`/trainer/tryouts/${tryoutId}/students`, { method: "GET" });
+    return parseTryoutStudentsResponse(raw);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Tampilan jawaban: backend review bisa kirim userAnswer, answerText, selectedOption, objek, dll. */
+function coerceAnswerDisplay(v: unknown): string | null {
+  if (v == null) return null;
+  if (typeof v === "string") {
+    const t = v.trim();
+    return t === "" ? null : t;
+  }
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (Array.isArray(v)) {
+    const parts = v.map((x) => coerceAnswerDisplay(x)).filter((s): s is string => s != null);
+    return parts.length > 0 ? parts.join(", ") : null;
+  }
+  if (typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    const nested =
+      coerceAnswerDisplay(o.text) ??
+      coerceAnswerDisplay(o.value) ??
+      coerceAnswerDisplay(o.label) ??
+      coerceAnswerDisplay(o.answer) ??
+      coerceAnswerDisplay(o.content);
+    if (nested != null) return nested;
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return null;
+    }
+  }
+  return String(v);
+}
+
+function pickUserAnswerFromReviewRow(r: Record<string, unknown>): string | null {
+  const keys = [
+    "userAnswer",
+    "user_answer",
+    "answerText",
+    "answer_text",
+    "studentAnswer",
+    "student_answer",
+    "submittedAnswer",
+    "submitted_answer",
+    "selectedOption",
+    "selected_option",
+    "chosenOption",
+    "chosen_option",
+    "response",
+    "value",
+    "content",
+    "answer",
+  ];
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== null) {
+      const s = coerceAnswerDisplay(r[k]);
+      if (s != null) return s;
+    }
+  }
+  return null;
+}
+
+function pickCorrectAnswerFromReviewRow(r: Record<string, unknown>): string | null {
+  const keys = [
+    "correctAnswer",
+    "correct_answer",
+    "correctText",
+    "correct_text",
+    "correctOption",
+    "correct_option",
+    "answerKey",
+    "answer_key",
+    "expectedAnswer",
+    "expected_answer",
+    "solution",
+    "key",
+    "rightAnswer",
+    "right_answer",
+  ];
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== null) {
+      const s = coerceAnswerDisplay(r[k]);
+      if (s != null) return s;
+    }
+  }
+  return null;
+}
+
+function pickManualScoreField(raw: Record<string, unknown>): number | null | undefined {
+  const v = raw.manualScore ?? raw.manual_score;
+  if (v === null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return undefined;
+}
+
+function pickOptionalNumber(raw: Record<string, unknown>, camel: string, snake: string): number | null | undefined {
+  const v = raw[camel] ?? raw[snake];
+  if (v === null) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return undefined;
+}
+
+function normalizeAttemptReviewItem(item: unknown): AttemptReviewItem | null {
+  if (!item || typeof item !== "object") return null;
+  const r = item as Record<string, unknown>;
+  const qid = r.questionId ?? r.question_id;
+  if (qid == null || String(qid) === "") return null;
+  const manualScore = pickManualScoreField(r);
+  const reviewerRaw = r.reviewerComment ?? r.reviewer_comment;
+  const userAns = pickUserAnswerFromReviewRow(r);
+  const correctAns = pickCorrectAnswerFromReviewRow(r);
+  const isCorrectRaw = r.isCorrect ?? r.is_correct;
+  const sortRaw = r.sortOrder ?? r.sort_order;
+  const img = r.imageUrl ?? r.image_url;
+  return {
+    questionId: String(qid),
+    body: String(r.body ?? r.questionBody ?? ""),
+    type: r.type != null ? String(r.type) : undefined,
+    options: Array.isArray(r.options)
+      ? (r.options as unknown[]).map((x, i) =>
+          x && typeof x === "object" && !Array.isArray(x)
+            ? String((x as Record<string, unknown>).label ?? (x as Record<string, unknown>).text ?? "")
+            : String(x)
+        )
+      : null,
+    correctAnswer: correctAns != null ? String(correctAns) : null,
+    userAnswer: userAns != null ? String(userAns) : null,
+    isCorrect: typeof isCorrectRaw === "boolean" ? isCorrectRaw : undefined,
+    sortOrder: typeof sortRaw === "number" ? sortRaw : undefined,
+    imageUrl: img != null ? String(img) : null,
+    reviewerComment: reviewerRaw != null ? String(reviewerRaw) : null,
+    manualScore,
+    autoScore: pickOptionalNumber(r, "autoScore", "auto_score"),
+  };
+}
+
+function normalizeAttemptReviewList(items: unknown[]): AttemptReviewItem[] {
+  return items.map(normalizeAttemptReviewItem).filter((x): x is AttemptReviewItem => x != null);
+}
+
+async function fetchTryoutAttemptReview(path: string, attemptIdFallback?: string): Promise<AttemptReviewItem[]> {
+  try {
+    const raw = await request<AttemptReviewResponse | AttemptReviewItem[]>(path, { method: "GET" });
+    const arr = Array.isArray(raw) ? raw : (raw.items ?? raw.questions ?? []);
+    return Array.isArray(arr) ? normalizeAttemptReviewList(arr) : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e) && attemptIdFallback) {
+      return getAttemptReview(attemptIdFallback);
+    }
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Kisi review satu attempt (semua soal + jawaban siswa). GET .../attempts/:attemptId/review */
+export async function adminGetTryoutAttemptReview(
+  tryoutId: string,
+  attemptId: string
+): Promise<AttemptReviewItem[]> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  const aid = encodeURIComponent(String(attemptId).trim());
+  return fetchTryoutAttemptReview(`/admin/tryouts/${tid}/attempts/${aid}/review`, attemptId);
+}
+
+/** Sama untuk trainer (tryout harus sesuai subjectId user). */
+export async function trainerGetTryoutAttemptReview(
+  tryoutId: string,
+  attemptId: string
+): Promise<AttemptReviewItem[]> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  const aid = encodeURIComponent(String(attemptId).trim());
+  try {
+    return await fetchTryoutAttemptReview(`/trainer/tryouts/${tid}/attempts/${aid}/review`, attemptId);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) {
+      return fetchTryoutAttemptReview(`/guru/tryouts/${tid}/attempts/${aid}/review`, attemptId);
+    }
+    throw e;
+  }
+}
+
+export type TryoutAnswerReviewBody = {
+  reviewerComment?: string;
+  manualScore?: number | null;
+};
+
+export type TryoutAnswerReviewBatchItem = {
+  questionId: string;
+  reviewerComment?: string;
+  manualScore?: number | null;
+};
+
+export type TryoutAnswerReviewBatchBody = {
+  answers: TryoutAnswerReviewBatchItem[];
+};
+
+/** Simpan review / skor manual per jawaban. PUT .../answers/:questionId/review (body camelCase). */
+export async function adminPutTryoutAttemptAnswerReview(
+  tryoutId: string,
+  attemptId: string,
+  questionId: string,
+  body: TryoutAnswerReviewBody
+): Promise<AttemptAnswerReviewSaveResponse> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  const aid = encodeURIComponent(String(attemptId).trim());
+  const qid = encodeURIComponent(String(questionId).trim());
+  return request(`/admin/tryouts/${tid}/attempts/${aid}/answers/${qid}/review`, { method: "PUT", body });
+}
+
+export async function trainerPutTryoutAttemptAnswerReview(
+  tryoutId: string,
+  attemptId: string,
+  questionId: string,
+  body: TryoutAnswerReviewBody
+): Promise<AttemptAnswerReviewSaveResponse> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  const aid = encodeURIComponent(String(attemptId).trim());
+  const qid = encodeURIComponent(String(questionId).trim());
+  try {
+    return await request(`/trainer/tryouts/${tid}/attempts/${aid}/answers/${qid}/review`, {
+      method: "PUT",
+      body,
+    });
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) {
+      return request(`/guru/tryouts/${tid}/attempts/${aid}/answers/${qid}/review`, {
+        method: "PUT",
+        body,
+      });
+    }
+    throw e;
+  }
+}
+
+/** Simpan review banyak soal sekaligus (1x request). PUT .../attempts/:attemptId/review */
+export async function adminPutTryoutAttemptReviewBatch(
+  tryoutId: string,
+  attemptId: string,
+  body: TryoutAnswerReviewBatchBody
+): Promise<AttemptAnswerReviewSaveResponse> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  const aid = encodeURIComponent(String(attemptId).trim());
+  return request(`/admin/tryouts/${tid}/attempts/${aid}/review`, { method: "PUT", body });
+}
+
+export async function trainerPutTryoutAttemptReviewBatch(
+  tryoutId: string,
+  attemptId: string,
+  body: TryoutAnswerReviewBatchBody
+): Promise<AttemptAnswerReviewSaveResponse> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  const aid = encodeURIComponent(String(attemptId).trim());
+  return request(`/trainer/tryouts/${tid}/attempts/${aid}/review`, { method: "PUT", body });
+}
+
+export type TryoutAttemptAutoGradeBody = {
+  clearReviewerComments?: boolean;
+};
+
+/** Jalankan ulang penilaian otomatis (hapus manual_score pada attempt). POST .../auto-grade */
+export async function adminPostTryoutAttemptAutoGrade(
+  tryoutId: string,
+  attemptId: string,
+  body: TryoutAttemptAutoGradeBody = {}
+): Promise<unknown> {
+  const tid = String(tryoutId).trim();
+  const aid = String(attemptId).trim();
+  const payload: Record<string, boolean> = {};
+  if (body.clearReviewerComments === true) payload.clearReviewerComments = true;
+  return request(`/admin/tryouts/${encodeURIComponent(tid)}/attempts/${encodeURIComponent(aid)}/auto-grade`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+/** Auto-grade semua attempt submitted di satu tryout. POST .../auto-grade-submitted */
+export async function adminPostTryoutAutoGradeSubmitted(
+  tryoutId: string,
+  body: TryoutAttemptAutoGradeBody = {}
+): Promise<TryoutAutoGradeSubmittedResponse> {
+  const tid = String(tryoutId).trim();
+  const payload: Record<string, boolean> = {};
+  if (body.clearReviewerComments === true) payload.clearReviewerComments = true;
+  return request(`/admin/tryouts/${encodeURIComponent(tid)}/auto-grade-submitted`, {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function trainerPostTryoutAttemptAutoGrade(
+  tryoutId: string,
+  attemptId: string,
+  body: TryoutAttemptAutoGradeBody = {}
+): Promise<unknown> {
+  const tid = String(tryoutId).trim();
+  const aid = String(attemptId).trim();
+  const payload: Record<string, boolean> = {};
+  if (body.clearReviewerComments === true) payload.clearReviewerComments = true;
+  try {
+    return await request(
+      `/trainer/tryouts/${encodeURIComponent(tid)}/attempts/${encodeURIComponent(aid)}/auto-grade`,
+      {
+        method: "POST",
+        body: payload,
+      }
+    );
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) {
+      return request(`/guru/tryouts/${encodeURIComponent(tid)}/attempts/${encodeURIComponent(aid)}/auto-grade`, {
+        method: "POST",
+        body: payload,
+      });
+    }
+    throw e;
+  }
+}
+
+/** Daftar tryout untuk trainer. GET /trainer/tryouts — 404/405 = []. */
+export async function trainerListTryouts(): Promise<TryoutSession[]> {
+  try {
+    const raw = await request<
+      unknown[] | { tryouts?: unknown[]; data?: unknown[] }
+    >("/trainer/tryouts", { method: "GET" });
+    if (Array.isArray(raw)) return raw.map(normalizeToTryoutSession);
+    const list = raw?.tryouts ?? raw?.data ?? [];
+    return Array.isArray(list) ? list.map(normalizeToTryoutSession) : [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Detail tryout untuk trainer. GET /trainer/tryouts/:id */
+export async function trainerGetTryout(tryoutId: string): Promise<TryoutSession | null> {
+  try {
+    const raw = await request<unknown>(`/trainer/tryouts/${tryoutId}`, { method: "GET" });
+    return normalizeToTryoutSession(raw);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
     throw e;
   }
 }
@@ -1378,7 +1891,7 @@ export async function adminCreateQuestion(
 export async function adminUpdateQuestion(
   tryoutId: string,
   questionId: string,
-  body: Partial<AdminCreateQuestionRequest>
+  body: AdminUpdateQuestionRequest
 ): Promise<Question> {
   const raw = await request<unknown>(
     `/admin/tryouts/${tryoutId}/questions/${questionId}`,

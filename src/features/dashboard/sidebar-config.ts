@@ -39,6 +39,7 @@ export const trainerSidebarSections: NavSection[] = [
       { href: "/trainer/classes/create", label: "Buat Kelas" },
       { href: "/trainer/questions", label: "Bank Soal" },
       { href: "/trainer/quizzes", label: "Kuis" },
+      { href: "/trainer/tryouts", label: "Tryouts" },
     ],
   },
   {

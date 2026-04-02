@@ -168,6 +168,13 @@ export interface StartTryoutResponse {
 // --- Questions ---
 export type QuestionType = "short" | "multiple_choice" | "true_false";
 
+/** Opsi PG/BS — selaras QuestionUpdateRequest / QuestionCreateRequest backend (camelCase JSON). */
+export interface QuestionOption {
+  key: string;
+  label: string;
+  correct?: boolean;
+}
+
 export interface Question {
   id: string;
   tryoutSessionId: string;
@@ -175,8 +182,13 @@ export interface Question {
   type: QuestionType;
   /** Teks/HTML soal. Dapat berisi tag HTML, <pre><code> untuk kode, <img> untuk gambar. */
   body: string;
-  options: string[] | null;
+  /** Opsi untuk PG/BS; dari API sebagai { key, label, correct }. */
+  options: QuestionOption[] | null;
   maxScore: number;
+  /** Kunci PG: key opsi benar (mis. "B"). */
+  correctOption?: string | null;
+  /** Kunci isian singkat; beberapa jawaban benar dipisah | (grading backend). */
+  correctText?: string | null;
   /** URL gambar (opsional, dari backend). Gambar juga bisa disisipkan di body sebagai <img>. */
   imageUrl?: string | null;
 }
@@ -253,11 +265,44 @@ export interface AttemptReviewItem {
   isCorrect?: boolean;
   sortOrder?: number;
   imageUrl?: string | null;
+  /** Komentar reviewer (PUT .../review, camelCase). */
+  reviewerComment?: string | null;
+  /** Override skor manual; null dari API = tidak ada override; omit = gunakan otomatis. */
+  manualScore?: number | null;
+  /** Skor otomatis sebelum override (jika dikembalikan API). */
+  autoScore?: number | null;
 }
 
 export interface AttemptReviewResponse {
   items?: AttemptReviewItem[];
   questions?: AttemptReviewItem[];
+}
+
+/** Response PUT review per jawaban: score = total attempt setelah recalc. */
+export interface AttemptAnswerReviewSaveResponse {
+  score?: number | null;
+  manualScore?: number | null;
+  questionMaxScore?: number | null;
+  manualScoreClamped?: number | null;
+  reviewerComment?: string | null;
+  [key: string]: unknown;
+}
+
+export interface TryoutAutoGradeSubmittedResultItem {
+  attemptId?: string;
+  userId?: string;
+  score?: number | null;
+  error?: string | null;
+  [key: string]: unknown;
+}
+
+/** Response POST /admin/tryouts/:id/auto-grade-submitted */
+export interface TryoutAutoGradeSubmittedResponse {
+  total?: number;
+  succeeded?: number;
+  failed?: number;
+  results?: TryoutAutoGradeSubmittedResultItem[];
+  [key: string]: unknown;
 }
 
 export interface Certificate {
@@ -383,13 +428,19 @@ export interface AdminCreateTryoutRequest {
   eventCategory?: EventCategorySlug | string | null;
 }
 
+/** POST/PUT soal admin — backend merge field yang dikirim saja (partial update). Jangan kirim null untuk mengosongkan kunci. */
 export interface AdminCreateQuestionRequest {
   sortOrder: number;
   type: QuestionType;
   body: string;
-  options?: string[] | null;
   maxScore?: number;
+  options?: QuestionOption[] | null;
+  correctOption?: string | null;
+  /** Isian singkat: varian benar dipisah | */
+  correctText?: string | null;
 }
+
+export type AdminUpdateQuestionRequest = Partial<AdminCreateQuestionRequest>;
 
 export interface AdminCreateCourseRequest {
   title: string;
