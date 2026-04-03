@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useEffect, useState } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 /**
  * Tryout siswa dipindahkan ke fansedu-landing-page (hash router LMS).
