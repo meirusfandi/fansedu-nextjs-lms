@@ -8,6 +8,7 @@ import {
   adminLandingUpdatePackage,
   adminListCourses,
   getFriendlyApiErrorMessage,
+  isCoursePublishedForLinking,
 } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -177,10 +178,31 @@ export default function AdminLandingPackagesPage() {
   };
 
   const sorted = useMemo(() => [...items].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")), [items]);
-  const coursesSorted = useMemo(
-    () => [...courses].sort((a, b) => (a.title ?? "").localeCompare(b.title ?? "")),
-    [courses]
-  );
+
+  /** Pilihan = kelas publish; tambah entri khusus jika paket sudah punya link ke kelas non-publish (agar bisa dilepas). */
+  const linkedCoursePickerOptions = useMemo(() => {
+    const published = courses
+      .filter(isCoursePublishedForLinking)
+      .sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
+    const pubIds = new Set(published.map((c) => c.id));
+    const orphanIds = form.linkedCourseIds.filter((id) => !pubIds.has(id));
+    const orphans = orphanIds
+      .map((id) => courses.find((c) => c.id === id))
+      .filter((c): c is Course => Boolean(c))
+      .map((c) => ({
+        id: c.id,
+        label: `${c.title} (belum publish — publish kelas atau hapus dari paket)`,
+      }));
+    const main = published.map((c) => ({ id: c.id, label: c.title }));
+    const merged = [...orphans, ...main].sort((a, b) => a.label.localeCompare(b.label));
+    if (merged.length === 0 && form.linkedCourseIds.length > 0) {
+      return form.linkedCourseIds.map((id) => ({
+        id,
+        label: `${id.slice(0, 8)}… (tidak tersedia di daftar — hapus dari paket)`,
+      }));
+    }
+    return merged;
+  }, [courses, form.linkedCourseIds]);
 
   return (
     <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
@@ -403,7 +425,12 @@ export default function AdminLandingPackagesPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-zinc-600">Linked courses</label>
+                <label className="block text-xs font-medium text-zinc-600">Kelas terhubung</label>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  Hanya menampilkan kelas dari daftar admin yang statusnya <strong>published</strong> (atau{" "}
+                  <strong>active</strong>). Pastikan backend mengirim field <code className="rounded bg-zinc-100 px-0.5">status</code>{" "}
+                  pada GET courses.
+                </p>
                 <select
                   multiple
                   value={form.linkedCourseIds}
@@ -412,13 +439,19 @@ export default function AdminLandingPackagesPage() {
                     setForm((f) => ({ ...f, linkedCourseIds: selected }));
                   }}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
-                  size={Math.min(10, Math.max(4, coursesSorted.length))}
+                  size={Math.min(10, Math.max(4, linkedCoursePickerOptions.length || 1))}
                 >
-                  {coursesSorted.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.title}
+                  {linkedCoursePickerOptions.length === 0 ? (
+                    <option value="" disabled>
+                      Tidak ada kelas publish — publish salah satu kelas di Master Data terlebih dahulu
                     </option>
-                  ))}
+                  ) : (
+                    linkedCoursePickerOptions.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))
+                  )}
                 </select>
                 <p className="mt-1 text-xs text-zinc-500">
                   Tahan <kbd className="rounded border border-zinc-200 bg-white px-1">Cmd</kbd> (Mac) /{" "}

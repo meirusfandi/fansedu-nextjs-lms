@@ -371,6 +371,46 @@ export interface Subject {
 }
 
 // --- Courses ---
+/** Format jalur kelas: pertemuan (PDF/PR/live) vs lintasan tryout terhubung. */
+export type CourseTrackType = "meetings" | "tryout";
+
+/** Satu pertemuan (1–8) — GET/PUT /admin/courses/:id/program. */
+export interface CourseMeeting {
+  meetingNumber: number;
+  title?: string | null;
+  detailText?: string | null;
+  pdfUrl?: string | null;
+  prTitle?: string | null;
+  prDescription?: string | null;
+  liveClassUrl?: string | null;
+}
+
+/** Isi program kelas (biasanya dibungkus `{ data: ... }` di GET). */
+export interface CourseProgramPayload {
+  trackType: CourseTrackType;
+  meetings: CourseMeeting[];
+  pretestTryoutSessionId?: string | null;
+}
+
+/** PUT /admin/courses/:id/linked-tryouts */
+export interface AdminCourseLinkedTryoutsRequest {
+  linkedTryoutIds: string[];
+}
+
+/** GET /admin/courses/:id/manage — petunjuk endpoint terkait. */
+export interface AdminCourseManageResponse {
+  course?: Course & Record<string, unknown>;
+  relatedEndpoints?: {
+    getProgram?: string;
+    putProgram?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+/** Status publikasi kelas dari admin API (nilai pasti tergantung backend). */
+export type CoursePublicationStatus = "draft" | "published" | "archived" | string;
+
 export interface Course {
   id: string;
   title: string;
@@ -378,6 +418,9 @@ export interface Course {
   createdBy: string | null;
   subjectId?: string | null;
   sortOrder?: number | null;
+  trackType?: CourseTrackType | null;
+  /** draft | published | archived — dipakai untuk filter linked courses, dll. */
+  status?: CoursePublicationStatus | null;
 }
 
 export interface CourseEnrollment {
@@ -447,6 +490,12 @@ export interface AdminCreateCourseRequest {
   description?: string | null;
   subjectId?: string | null;
   sortOrder?: number | null;
+  /** Memicu sync program + rebuild journey bila dikombinasikan dengan meetings / pretest / tryout (backend). */
+  trackType?: CourseTrackType | null;
+  meetings?: CourseMeeting[] | null;
+  pretestTryoutSessionId?: string | null;
+  /** Urutan latihan tryout → course_tryouts. */
+  linkedTryoutIds?: string[] | null;
 }
 
 export interface AdminCreateUserRequest {

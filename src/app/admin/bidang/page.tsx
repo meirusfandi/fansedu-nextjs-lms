@@ -6,7 +6,7 @@ import { useEffect } from "react";
 export default function AdminBidangRedirectPage() {
   const router = useRouter();
   useEffect(() => {
-    router.replace("/admin/master-data/subject");
+    router.replace("/admin/master-data/kelas");
   }, [router]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50">

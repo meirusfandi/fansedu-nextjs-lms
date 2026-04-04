@@ -4,6 +4,8 @@
  */
 
 import type {
+  AdminCourseLinkedTryoutsRequest,
+  AdminCourseManageResponse,
   AdminCreateCourseRequest,
   AdminCreateLevelRequest,
   AdminCreateQuestionRequest,
@@ -25,6 +27,10 @@ import type {
   Certificate,
   Course,
   CourseEnrollment,
+  CourseMeeting,
+  CourseProgramPayload,
+  CoursePublicationStatus,
+  CourseTrackType,
   ChangePasswordRequest,
   CreatePaymentRequest,
   CourseDiscussion,
@@ -1970,14 +1976,53 @@ export async function adminCreateCourse(
   return request("/admin/courses", { method: "POST", body });
 }
 
+function normalizeAdminCourseItem(item: unknown): Course {
+  const o = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const tt = o.trackType ?? o.track_type;
+  const trackType: CourseTrackType | undefined =
+    tt === "tryout" ? "tryout" : tt === "meetings" ? "meetings" : undefined;
+  const st = o.status ?? o.courseStatus ?? o.course_status ?? o.publicationStatus ?? o.publication_status;
+  const status: CoursePublicationStatus | null =
+    st != null && String(st).trim() !== "" ? String(st) : null;
+  return {
+    id: String(o.id ?? ""),
+    title: String(o.title ?? ""),
+    description: o.description != null ? String(o.description) : null,
+    createdBy:
+      o.createdBy != null ? String(o.createdBy) : o.created_by != null ? String(o.created_by) : null,
+    subjectId:
+      o.subjectId != null ? String(o.subjectId) : o.subject_id != null ? String(o.subject_id) : null,
+    sortOrder:
+      typeof o.sortOrder === "number"
+        ? o.sortOrder
+        : typeof o.sort_order === "number"
+          ? o.sort_order
+          : null,
+    trackType,
+    status,
+  };
+}
+
+function normalizeAdminCourseList(items: unknown[]): Course[] {
+  if (!Array.isArray(items)) return [];
+  return items.map(normalizeAdminCourseItem).filter((c) => c.id.length > 0);
+}
+
+/** True jika kelas boleh ditawarkan sebagai linked course (hanya yang sudah publish). */
+export function isCoursePublishedForLinking(c: Pick<Course, "status">): boolean {
+  const s = String(c.status ?? "").toLowerCase().trim();
+  return s === "published" || s === "active";
+}
+
 /** List courses. GET /admin/courses. 404/405 = []. */
 export async function adminListCourses(): Promise<Course[]> {
   try {
     const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>("/admin/courses", { method: "GET" });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.courses && Array.isArray(raw.courses)) return raw.courses;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    let list: unknown[] = [];
+    if (Array.isArray(raw)) list = raw as unknown[];
+    else if (raw?.courses && Array.isArray(raw.courses)) list = raw.courses as unknown[];
+    else if (raw?.data && Array.isArray(raw.data)) list = raw.data as unknown[];
+    return normalizeAdminCourseList(list);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -2125,6 +2170,17 @@ export async function adminListSubjects(): Promise<Subject[]> {
   }
 }
 
+/** Satu subject/kelas. GET /admin/subjects/:id — 404 = null jika route belum ada di backend. */
+export async function adminGetSubject(subjectId: string): Promise<Subject | null> {
+  const sid = encodeURIComponent(subjectId);
+  try {
+    return await request<Subject>(`/admin/subjects/${sid}`, { method: "GET" });
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
+}
+
 export async function adminCreateSubject(
   body: AdminCreateSubjectRequest
 ): Promise<Subject> {
@@ -2149,10 +2205,11 @@ export async function adminListCoursesBySubject(
 ): Promise<Course[]> {
   try {
     const raw = await request<Course[] | { courses?: Course[]; data?: Course[] }>(`/admin/subjects/${subjectId}/courses`, { method: "GET" });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.courses && Array.isArray(raw.courses)) return raw.courses;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    let list: unknown[] = [];
+    if (Array.isArray(raw)) list = raw as unknown[];
+    else if (raw?.courses && Array.isArray(raw.courses)) list = raw.courses as unknown[];
+    else if (raw?.data && Array.isArray(raw.data)) list = raw.data as unknown[];
+    return normalizeAdminCourseList(list);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -2161,9 +2218,10 @@ export async function adminListCoursesBySubject(
 
 export async function adminCreateCourseUnderSubject(
   subjectId: string,
-  body: { title: string; description?: string | null; sortOrder?: number }
+  body: AdminCreateCourseRequest
 ): Promise<Course> {
-  return request(`/admin/subjects/${subjectId}/courses`, {
+  const sid = encodeURIComponent(subjectId);
+  return request(`/admin/subjects/${sid}/courses`, {
     method: "POST",
     body: { ...body, subjectId },
   });
@@ -2178,4 +2236,102 @@ export async function adminUpdateCourse(
 
 export async function adminDeleteCourse(courseId: string): Promise<void> {
   return request(`/admin/courses/${courseId}`, { method: "DELETE" });
+}
+
+function unwrapApiData<T extends Record<string, unknown>>(raw: unknown): T | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.data && typeof r.data === "object" && !Array.isArray(r.data)) {
+    return r.data as T;
+  }
+  return r as T;
+}
+
+function normalizeCourseMeetingRow(o: unknown): CourseMeeting {
+  const x = o && typeof o === "object" ? (o as Record<string, unknown>) : {};
+  const n = x.meetingNumber;
+  const num =
+    typeof n === "number" && Number.isFinite(n)
+      ? n
+      : Number(n) > 0
+        ? Number(n)
+        : 0;
+  return {
+    meetingNumber: num,
+    title: x.title != null ? String(x.title) : "",
+    detailText: x.detailText != null ? String(x.detailText) : "",
+    pdfUrl: x.pdfUrl != null ? String(x.pdfUrl) : "",
+    prTitle: x.prTitle != null ? String(x.prTitle) : "",
+    prDescription: x.prDescription != null ? String(x.prDescription) : "",
+    liveClassUrl: x.liveClassUrl != null ? String(x.liveClassUrl) : "",
+  };
+}
+
+function ensureEightMeetings(meetings: CourseMeeting[]): CourseMeeting[] {
+  const byNum = new Map<number, CourseMeeting>();
+  meetings.forEach((m) => {
+    const n = m.meetingNumber;
+    if (typeof n === "number" && n >= 1 && n <= 8) byNum.set(n, m);
+  });
+  return Array.from({ length: 8 }, (_, i) => {
+    const meetingNumber = i + 1;
+    const existing = byNum.get(meetingNumber);
+    if (existing) return { ...existing, meetingNumber };
+    return {
+      meetingNumber,
+      title: "",
+      detailText: "",
+      pdfUrl: "",
+      prTitle: "",
+      prDescription: "",
+      liveClassUrl: "",
+    };
+  });
+}
+
+/** Satu course. GET /admin/courses/:courseId */
+export async function adminGetCourse(courseId: string): Promise<Course> {
+  const cid = encodeURIComponent(courseId);
+  return request<Course>(`/admin/courses/${cid}`, { method: "GET" });
+}
+
+/** Ringkasan kelola course + relatedEndpoints (getProgram, putProgram, dll.). */
+export async function adminGetCourseManage(courseId: string): Promise<AdminCourseManageResponse> {
+  const cid = encodeURIComponent(courseId);
+  return request<AdminCourseManageResponse>(`/admin/courses/${cid}/manage`, { method: "GET" });
+}
+
+/** Program kelas: track, 1–8 pertemuan, pre-test tryout. GET /admin/courses/:courseId/program */
+export async function adminGetCourseProgram(courseId: string): Promise<CourseProgramPayload> {
+  const cid = encodeURIComponent(courseId);
+  const raw = await request<unknown>(`/admin/courses/${cid}/program`, { method: "GET" });
+  const obj = unwrapApiData<Record<string, unknown>>(raw) ?? (raw as Record<string, unknown>);
+  const meetingsRaw = Array.isArray(obj.meetings) ? obj.meetings : [];
+  const tt = obj.trackType;
+  const trackType: CourseTrackType = tt === "tryout" ? "tryout" : "meetings";
+  const pre = obj.pretestTryoutSessionId;
+  return {
+    trackType,
+    meetings: ensureEightMeetings(meetingsRaw.map(normalizeCourseMeetingRow)),
+    pretestTryoutSessionId:
+      pre != null && String(pre).trim() !== "" ? String(pre).trim() : null,
+  };
+}
+
+/** Simpan program + rebuild learning journey. PUT /admin/courses/:courseId/program */
+export async function adminPutCourseProgram(
+  courseId: string,
+  body: CourseProgramPayload
+): Promise<{ message?: string }> {
+  const cid = encodeURIComponent(courseId);
+  return request(`/admin/courses/${cid}/program`, { method: "PUT", body });
+}
+
+/** Urutan tryout terhubung ke kelas. PUT /admin/courses/:courseId/linked-tryouts */
+export async function adminPutCourseLinkedTryouts(
+  courseId: string,
+  body: AdminCourseLinkedTryoutsRequest
+): Promise<Record<string, unknown>> {
+  const cid = encodeURIComponent(courseId);
+  return request(`/admin/courses/${cid}/linked-tryouts`, { method: "PUT", body });
 }

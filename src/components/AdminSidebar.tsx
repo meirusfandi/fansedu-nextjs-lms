@@ -38,7 +38,7 @@ function NavLink({
 const MASTER_DATA_SUB = [
   { href: "/admin/master-data/setting", label: "Setting" },
   { href: "/admin/master-data/role", label: "Role" },
-  { href: "/admin/master-data/subject", label: "Subject" },
+  { href: "/admin/master-data/kelas", label: "Kelas" },
   { href: "/admin/master-data/sekolah", label: "Sekolah" },
   { href: "/admin/master-data/jenjang", label: "Jenjang Pendidikan" },
   { href: "/admin/master-data/event", label: "Event" },
@@ -51,6 +51,7 @@ export function AdminSidebar({ currentPath = "", onLogout }: AdminSidebarProps) 
   const isUsers = currentPath.startsWith("/admin/users");
   const isKelas = currentPath.startsWith("/admin/kelas");
   const isEvents = currentPath.startsWith("/admin/tryouts");
+  const isQuestionBank = currentPath.startsWith("/admin/question-bank");
   const isPayment = currentPath.startsWith("/admin/payment");
   const isReport = currentPath.startsWith("/admin/report");
 
@@ -98,6 +99,7 @@ export function AdminSidebar({ currentPath = "", onLogout }: AdminSidebarProps) 
           <NavLink href="/admin/users" label="Management User" isActive={isUsers} />
           <NavLink href="/admin/kelas" label="Management Kelas" isActive={isKelas} />
           <NavLink href="/admin/tryouts" label="Event" isActive={isEvents} />
+          <NavLink href="/admin/question-bank" label="Bank soal" isActive={isQuestionBank} />
           <NavLink href="/admin/payment" label="Payment" isActive={isPayment} />
           <NavLink href="/admin/report" label="Report" isActive={isReport} />
         </div>
