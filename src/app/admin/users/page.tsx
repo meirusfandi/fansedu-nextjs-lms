@@ -233,7 +233,7 @@ export default function AdminUsersPage() {
             <div className="p-8 text-center text-sm text-zinc-500">
               <p>Belum ada user ditampilkan.</p>
               <p className="mt-2 text-xs">
-                Pastikan backend <code className="rounded bg-zinc-200 px-1">GET /api/v1/admin/users</code> mengembalikan semua user. Klik &quot;Tambah User&quot; untuk menambah akun baru.
+                Jika seharusnya ada data, periksa koneksi dan hak akses. Klik &quot;Tambah User&quot; untuk menambah akun baru.
               </p>
             </div>
           ) : (
@@ -450,7 +450,7 @@ export default function AdminUsersPage() {
                       </select>
                       {modalMode === "add" && (
                         <p className="mt-1 text-xs text-zinc-500">
-                          Catatan: endpoint create user backend saat ini menerima role <strong>student</strong> atau{" "}
+                          Catatan: pembuatan akun saat ini mendukung role <strong>student</strong> atau{" "}
                           <strong>trainer</strong>. Jika pilih Admin, akan dibuat sebagai Trainer.
                         </p>
                       )}

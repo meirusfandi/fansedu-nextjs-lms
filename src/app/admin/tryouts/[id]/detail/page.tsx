@@ -112,7 +112,8 @@ function QuestionStatsBlock({
       )}
       {!fromBackend && peserta != null && (
         <p className="mt-2 text-[11px] text-zinc-400">
-          Jumlah peserta dari leaderboard. Untuk angka benar/salah per soal, sambungkan endpoint GET /admin/tryouts/:id/questions/:questionId/stats di backend.
+          Jumlah peserta dari leaderboard. Statistik benar/salah per soal memerlukan data tambahan dari server jika
+          tersedia.
         </p>
       )}
     </div>
@@ -363,7 +364,7 @@ export default function AdminTryoutDetailPage() {
     try {
       const studentsRes = await adminGetTryoutStudents(tryoutId).catch(() => []);
       setStudents(Array.isArray(studentsRes) ? studentsRes : []);
-      setBulkAutoGradeResult("Sinkron nilai siswa selesai dari endpoint /students.");
+      setBulkAutoGradeResult("Sinkron nilai siswa selesai.");
     } catch (e) {
       setError((e as Error).message ?? "Gagal sinkron nilai siswa.");
     } finally {

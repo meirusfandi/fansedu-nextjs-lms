@@ -16,9 +16,7 @@ export default function GuruLaporanPage() {
         <p className="text-sm font-medium text-zinc-600">
           Halaman laporan akan menampilkan rekap skor tryout, kehadiran, dan progress siswa per kelas.
         </p>
-        <p className="mt-1 text-xs text-zinc-500">
-          Terhubung dengan backend (mis. GET /trainer/reports) saat endpoint tersedia.
-        </p>
+        <p className="mt-1 text-xs text-zinc-500">Data laporan akan tampil saat fitur ini aktif di server.</p>
         <Link
           href="/guru"
           className="mt-4 inline-block rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700"

@@ -2,59 +2,81 @@
 
 import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
-import { useAdminLocalClasses } from "@/features/admin/useAdminLocalClasses";
-import { getFriendlyApiErrorMessage } from "@/lib/api";
 import {
-  createVoucher,
-  deleteVoucher,
-  fetchVouchers,
-  isVoucherCurrentlyValid,
-  newVoucherId,
-  updateVoucher,
-} from "@/lib/vouchers-client";
-import type { Voucher } from "@/lib/vouchers/types";
+  adminCreateVoucher,
+  adminDeleteVoucher,
+  adminGetVoucher,
+  adminListVouchers,
+  adminUpdateVoucher,
+  getFriendlyApiErrorMessage,
+} from "@/lib/api";
+import type { AdminCreateVoucherRequest, AdminUpdateVoucherRequest, AdminVoucher } from "@/lib/api-types";
+import {
+  datetimeLocalToIsoOrNull,
+  formatDiscountDisplay,
+  isAdminVoucherCurrentlyValid,
+  isoToDatetimeLocal,
+} from "@/lib/voucher-utils";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-function formatRp(n: number): string {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(
-    n
-  );
-}
-
-function toDateInputValue(isoOrDate: string): string {
-  if (!isoOrDate) return "";
-  const d = new Date(isoOrDate);
-  if (Number.isNaN(d.getTime())) {
-    const m = /^(\d{4}-\d{2}-\d{2})/.exec(isoOrDate);
-    return m ? m[1] : "";
-  }
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${mo}-${day}`;
-}
-
-const emptyForm = {
-  code: "",
-  name: "",
-  nominal: "",
-  expiresAt: "",
-  active: true,
-  applicableClassIds: [] as string[],
+type FormState = {
+  code: string;
+  discountType: "percent" | "fixed";
+  discountValue: string;
+  validFrom: string;
+  validUntil: string;
+  maxUses: string;
+  isActive: boolean;
+  requiresClaim: boolean;
+  appliesToCourses: boolean;
+  appliesToPackages: boolean;
+  /** Edit: kirim validUntil: "" ke backend untuk hapus batas akhir */
+  clearValidUntilEnd: boolean;
 };
+
+function emptyForm(): FormState {
+  return {
+    code: "",
+    discountType: "percent",
+    discountValue: "10",
+    validFrom: "",
+    validUntil: "",
+    maxUses: "",
+    isActive: true,
+    requiresClaim: true,
+    appliesToCourses: true,
+    appliesToPackages: false,
+    clearValidUntilEnd: false,
+  };
+}
+
+function voucherToForm(v: AdminVoucher): FormState {
+  return {
+    code: v.code,
+    discountType: v.discountType === "fixed" ? "fixed" : "percent",
+    discountValue: String(v.discountValue),
+    validFrom: isoToDatetimeLocal(v.validFrom),
+    validUntil: isoToDatetimeLocal(v.validUntil),
+    maxUses: v.maxUses != null ? String(v.maxUses) : "",
+    isActive: v.isActive,
+    requiresClaim: v.requiresClaim,
+    appliesToCourses: v.appliesToCourses,
+    appliesToPackages: v.appliesToPackages,
+    clearValidUntilEnd: false,
+  };
+}
 
 export default function AdminVouchersPage() {
   const { notice, showSuccess, clearNotice } = useFlashNotice();
-  const { classes } = useAdminLocalClasses();
-  const [list, setList] = useState<Voucher[]>([]);
+  const [list, setList] = useState<AdminVoucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<FormState>(emptyForm);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -62,7 +84,7 @@ export default function AdminVouchersPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchVouchers();
+      const data = await adminListVouchers();
       setList(data.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
     } catch (e) {
       setError(getFriendlyApiErrorMessage(e));
@@ -88,94 +110,145 @@ export default function AdminVouchersPage() {
   }, [list.length, page]);
 
   const openAdd = () => {
-    setForm({
-      ...emptyForm,
-      code: `VC${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-      expiresAt: toDateInputValue(new Date(Date.now() + 30 * 86400000).toISOString()),
-    });
+    const f = emptyForm();
+    f.code = `VC${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    setForm(f);
     setEditingId(null);
     setModalMode("add");
     setSubmitError(null);
   };
 
-  const openEdit = (v: Voucher) => {
-    setForm({
-      code: v.code,
-      name: v.name,
-      nominal: String(v.nominal),
-      expiresAt: toDateInputValue(v.expiresAt),
-      active: v.active,
-      applicableClassIds: [...v.applicableClassIds],
-    });
-    setEditingId(v.id);
-    setModalMode("edit");
+  const openEdit = async (v: AdminVoucher) => {
     setSubmitError(null);
+    setModalMode("edit");
+    setEditingId(v.id);
+    try {
+      const full = await adminGetVoucher(v.id);
+      setForm(voucherToForm(full ?? v));
+    } catch {
+      setForm(voucherToForm(v));
+    }
   };
 
-  const toggleClass = (classId: string) => {
-    setForm((f) => {
-      const set = new Set(f.applicableClassIds);
-      if (set.has(classId)) set.delete(classId);
-      else set.add(classId);
-      return { ...f, applicableClassIds: [...set] };
-    });
+  const buildCreatePayload = (): AdminCreateVoucherRequest | null => {
+    const dv = Number(form.discountValue);
+    if (!Number.isFinite(dv) || dv < 0) return null;
+    if (form.discountType === "percent" && (dv < 0 || dv > 100)) return null;
+    if (!form.code.trim()) return null;
+    if (!form.appliesToCourses && !form.appliesToPackages) return null;
+
+    const validFrom = datetimeLocalToIsoOrNull(form.validFrom);
+    const validUntil = datetimeLocalToIsoOrNull(form.validUntil);
+    let maxUses: number | null | undefined = undefined;
+    if (form.maxUses.trim() !== "") {
+      const n = parseInt(form.maxUses, 10);
+      if (!Number.isFinite(n) || n < 1) return null;
+      maxUses = n;
+    }
+
+    const body: AdminCreateVoucherRequest = {
+      code: form.code.trim().toUpperCase(),
+      discountType: form.discountType,
+      discountValue: form.discountType === "percent" ? dv : Math.floor(dv),
+      isActive: form.isActive,
+      requiresClaim: form.requiresClaim,
+      appliesToCourses: form.appliesToCourses,
+      appliesToPackages: form.appliesToPackages,
+    };
+    if (validFrom != null) body.validFrom = validFrom;
+    if (validUntil != null) body.validUntil = validUntil;
+    if (maxUses !== undefined) body.maxUses = maxUses;
+    return body;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
-    const nominal = Math.floor(Number(form.nominal));
-    if (!form.code.trim() || !form.name.trim()) {
-      setSubmitError("Kode dan nama wajib diisi.");
+
+    if (!form.appliesToCourses && !form.appliesToPackages) {
+      setSubmitError("Minimal pilih salah satu: berlaku untuk kelas atau untuk paket landing.");
       return;
     }
-    if (!Number.isFinite(nominal) || nominal < 0) {
-      setSubmitError("Nominal tidak valid.");
-      return;
-    }
-    if (!form.expiresAt.trim()) {
-      setSubmitError("Tanggal kedaluwarsa wajib diisi.");
-      return;
-    }
-    const expiresAt = form.expiresAt.trim();
-    setSubmitLoading(true);
-    try {
-      if (modalMode === "add") {
-        await createVoucher({
-          code: form.code.trim().toUpperCase(),
-          name: form.name.trim(),
-          nominal,
-          expiresAt,
-          active: form.active,
-          applicableClassIds: form.applicableClassIds,
-          id: newVoucherId(),
-        });
-        showSuccess("Voucher berhasil ditambahkan.");
-      } else if (modalMode === "edit" && editingId) {
-        await updateVoucher(editingId, {
-          code: form.code.trim().toUpperCase(),
-          name: form.name.trim(),
-          nominal,
-          expiresAt,
-          active: form.active,
-          applicableClassIds: form.applicableClassIds,
-        });
-        showSuccess("Voucher berhasil diperbarui.");
+
+    if (modalMode === "add") {
+      const payload = buildCreatePayload();
+      if (!payload) {
+        setSubmitError("Periksa kode, nominal diskon, dan batas pemakaian (jika diisi).");
+        return;
       }
-      setModalMode(null);
-      setEditingId(null);
-      await load();
-    } catch (err) {
-      setSubmitError((err as Error).message ?? "Gagal menyimpan");
-    } finally {
-      setSubmitLoading(false);
+      setSubmitLoading(true);
+      try {
+        await adminCreateVoucher(payload);
+        showSuccess("Voucher berhasil dibuat.");
+        setModalMode(null);
+        setEditingId(null);
+        await load();
+      } catch (err) {
+        setSubmitError(getFriendlyApiErrorMessage(err));
+      } finally {
+        setSubmitLoading(false);
+      }
+      return;
+    }
+
+    if (modalMode === "edit" && editingId) {
+      const dv = Number(form.discountValue);
+      if (!Number.isFinite(dv) || dv < 0) {
+        setSubmitError("Nilai diskon tidak valid.");
+        return;
+      }
+      if (form.discountType === "percent" && (dv < 0 || dv > 100)) {
+        setSubmitError("Diskon persen harus 0–100.");
+        return;
+      }
+      setSubmitLoading(true);
+      try {
+        const patch: AdminUpdateVoucherRequest = {
+          code: form.code.trim().toUpperCase(),
+          discountType: form.discountType,
+          discountValue: form.discountType === "percent" ? dv : Math.floor(dv),
+          isActive: form.isActive,
+          requiresClaim: form.requiresClaim,
+          appliesToCourses: form.appliesToCourses,
+          appliesToPackages: form.appliesToPackages,
+        };
+        const vf = datetimeLocalToIsoOrNull(form.validFrom);
+        patch.validFrom = vf;
+        if (form.clearValidUntilEnd) {
+          patch.validUntil = "";
+        } else {
+          const vu = datetimeLocalToIsoOrNull(form.validUntil);
+          patch.validUntil = vu;
+        }
+        if (form.maxUses.trim() === "") {
+          patch.maxUses = null;
+        } else {
+          const n = parseInt(form.maxUses, 10);
+          if (!Number.isFinite(n) || n < 1) {
+            setSubmitError("maxUses harus kosong (tak terbatas) atau angka ≥ 1.");
+            setSubmitLoading(false);
+            return;
+          }
+          patch.maxUses = n;
+        }
+
+        await adminUpdateVoucher(editingId, patch);
+        showSuccess("Voucher berhasil diperbarui.");
+        setModalMode(null);
+        setEditingId(null);
+        await load();
+      } catch (err) {
+        setSubmitError(getFriendlyApiErrorMessage(err));
+      } finally {
+        setSubmitLoading(false);
+      }
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus voucher ini?")) return;
     try {
-      await deleteVoucher(id);
+      await adminDeleteVoucher(id);
       showSuccess("Voucher berhasil dihapus.");
       await load();
     } catch (err) {
@@ -190,14 +263,9 @@ export default function AdminVouchersPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Manage</p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">Voucher</h1>
           <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-            Buat kode diskon dengan nominal dan tanggal kedaluwarsa. Pasangkan ke{" "}
-            <Link href="/admin/kelas" className="font-medium text-emerald-700 underline hover:text-emerald-900">
-              Management Kelas
-            </Link>{" "}
-            (data kelas lokal di browser) agar terlihat di daftar kelas.
-          </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Data disimpan di <code className="rounded bg-zinc-100 px-1">data/vouchers.json</code> (server).
+            Buat dan kelola kode promo: diskon persen atau nominal tetap, masa berlaku, batas pemakaian, serta apakah berlaku
+            untuk pembelian kelas atau paket landing. Jika &quot;Wajib klaim&quot; aktif, siswa harus mengklaim kode sebelum
+            checkout.
           </p>
         </div>
         <button
@@ -224,7 +292,7 @@ export default function AdminVouchersPage() {
       ) : list.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50/80 px-6 py-12 text-center">
           <p className="text-sm font-medium text-zinc-800">Belum ada voucher</p>
-          <p className="mt-1 text-sm text-zinc-600">Klik &quot;Tambah voucher&quot; untuk membuat kode diskon.</p>
+          <p className="mt-1 text-sm text-zinc-600">Buat dari backend atau klik &quot;Tambah voucher&quot;.</p>
         </div>
       ) : (
         <>
@@ -233,45 +301,51 @@ export default function AdminVouchersPage() {
               <thead className="bg-zinc-50">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium text-zinc-600">Kode</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Nama</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Nominal</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Kedaluwarsa</th>
-                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Kelas</th>
+                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Diskon</th>
+                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Berlaku</th>
+                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Pakai</th>
+                  <th className="px-4 py-3 text-left font-medium text-zinc-600">Scope</th>
                   <th className="px-4 py-3 text-left font-medium text-zinc-600">Status</th>
                   <th className="px-4 py-3 text-right font-medium text-zinc-600">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
                 {paginated.map((v) => {
-                  const valid = isVoucherCurrentlyValid(v);
+                  const valid = isAdminVoucherCurrentlyValid(v);
                   return (
                     <tr key={v.id} className="text-zinc-900">
                       <td className="px-4 py-3 font-mono text-xs font-semibold">{v.code}</td>
-                      <td className="px-4 py-3">{v.name}</td>
-                      <td className="px-4 py-3">{formatRp(v.nominal)}</td>
-                      <td className="px-4 py-3 text-zinc-700">{toDateInputValue(v.expiresAt)}</td>
+                      <td className="px-4 py-3">{formatDiscountDisplay(v)}</td>
+                      <td className="max-w-[180px] px-4 py-3 text-xs text-zinc-600">
+                        {v.validFrom ? <div>dari {isoToDatetimeLocal(v.validFrom).replace("T", " ")}</div> : null}
+                        {v.validUntil ? <div>s/d {isoToDatetimeLocal(v.validUntil).replace("T", " ")}</div> : <div>tanpa akhir</div>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-zinc-700">
+                        {v.usedCount ?? 0}
+                        {v.maxUses != null ? ` / ${v.maxUses}` : " / ∞"}
+                      </td>
                       <td className="px-4 py-3 text-xs text-zinc-600">
-                        {v.applicableClassIds.length === 0 ? (
-                          <span className="text-zinc-400">—</span>
-                        ) : (
-                          <span>{v.applicableClassIds.length} kelas</span>
-                        )}
+                        {v.appliesToCourses ? "Kelas " : ""}
+                        {v.appliesToCourses && v.appliesToPackages ? "· " : ""}
+                        {v.appliesToPackages ? "Paket" : ""}
+                        {!v.appliesToCourses && !v.appliesToPackages ? "—" : ""}
+                        {v.requiresClaim ? (
+                          <span className="ml-1 rounded bg-amber-100 px-1 text-amber-900">klaim</span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <span
                           className={`rounded px-2 py-0.5 text-xs font-medium ${
-                            valid
-                              ? "bg-emerald-100 text-emerald-900"
-                              : "bg-zinc-100 text-zinc-600"
+                            valid ? "bg-emerald-100 text-emerald-900" : "bg-zinc-100 text-zinc-600"
                           }`}
                         >
-                          {v.active ? (valid ? "Berlaku" : "Kedaluwarsa/nonaktif") : "Nonaktif"}
+                          {v.isActive ? (valid ? "Berlaku" : "Tidak berlaku") : "Nonaktif"}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() => openEdit(v)}
+                          onClick={() => void openEdit(v)}
                           className="mr-2 text-xs font-medium text-zinc-700 underline"
                         >
                           Edit
@@ -316,80 +390,126 @@ export default function AdminVouchersPage() {
                   value={form.code}
                   onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
                   className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900"
-                  placeholder="VCABC123"
                   required
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-800">Nama / keterangan *</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-800">Tipe diskon *</label>
+                  <select
+                    value={form.discountType}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, discountType: e.target.value as "percent" | "fixed" }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+                  >
+                    <option value="percent">Persen (%)</option>
+                    <option value="fixed">Nominal tetap (Rp)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-800">
+                    Nilai * {form.discountType === "percent" ? "(0–100)" : "(Rp)"}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={form.discountType === "percent" ? 100 : undefined}
+                    step={form.discountType === "percent" ? 1 : 1}
+                    value={form.discountValue}
+                    onChange={(e) => setForm((f) => ({ ...f, discountValue: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-800">Valid dari (opsional)</label>
+                  <input
+                    type="datetime-local"
+                    value={form.validFrom}
+                    onChange={(e) => setForm((f) => ({ ...f, validFrom: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-800">Valid sampai (opsional)</label>
+                  <input
+                    type="datetime-local"
+                    value={form.validUntil}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, validUntil: e.target.value, clearValidUntilEnd: false }))
+                    }
+                    disabled={form.clearValidUntilEnd}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-50"
+                  />
+                  {modalMode === "edit" && (
+                    <label className="mt-2 flex items-center gap-2 text-xs text-zinc-700">
+                      <input
+                        type="checkbox"
+                        checked={form.clearValidUntilEnd}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, clearValidUntilEnd: e.target.checked }))
+                        }
+                        className="h-4 w-4 accent-zinc-900"
+                      />
+                      Hapus batas akhir
+                    </label>
+                  )}
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-zinc-800">Nominal (Rp) *</label>
+                <label className="block text-xs font-medium text-zinc-800">
+                  Maks. pemakaian global (opsional)
+                </label>
                 <input
                   type="number"
-                  min={0}
-                  step={1}
-                  value={form.nominal}
-                  onChange={(e) => setForm((f) => ({ ...f, nominal: e.target.value }))}
+                  min={1}
+                  placeholder="Kosong = tidak dibatasi"
+                  value={form.maxUses}
+                  onChange={(e) => setForm((f) => ({ ...f, maxUses: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-800">Kedaluwarsa *</label>
-                <input
-                  type="date"
-                  value={form.expiresAt}
-                  onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
-                  required
                 />
               </div>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
                 <input
                   type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-                  className="h-4 w-4 rounded border-zinc-400 accent-zinc-900"
+                  checked={form.isActive}
+                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                  className="h-4 w-4 accent-zinc-900"
                 />
                 Aktif
               </label>
-              <div>
-                <p className="text-xs font-medium text-zinc-800">Pasang di kelas (Management Kelas)</p>
-                <p className="mt-0.5 text-[11px] text-zinc-500">
-                  Centang kelas yang boleh memakai voucher ini. Kosong = belum dipasang ke kelas manapun.
-                </p>
-                {classes.length === 0 ? (
-                  <p className="mt-2 text-xs text-amber-800">
-                    Belum ada kelas lokal. Buat di{" "}
-                    <Link href="/admin/kelas" className="underline">
-                      Management Kelas
-                    </Link>
-                    .
-                  </p>
-                ) : (
-                  <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-50 p-2">
-                    {classes.map((c) => (
-                      <li key={c.id}>
-                        <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm text-zinc-900 hover:bg-white">
-                          <input
-                            type="checkbox"
-                            checked={form.applicableClassIds.includes(c.id)}
-                            onChange={() => toggleClass(c.id)}
-                            className="h-4 w-4 border-zinc-400 accent-zinc-900"
-                          />
-                          <span className="min-w-0 truncate">{c.title}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
+                <input
+                  type="checkbox"
+                  checked={form.requiresClaim}
+                  onChange={(e) => setForm((f) => ({ ...f, requiresClaim: e.target.checked }))}
+                  className="h-4 w-4 accent-zinc-900"
+                />
+                Wajib klaim siswa sebelum checkout
+              </label>
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+                <p className="text-xs font-medium text-zinc-800">Berlaku untuk *</p>
+                <label className="mt-2 flex items-center gap-2 text-sm text-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={form.appliesToCourses}
+                    onChange={(e) => setForm((f) => ({ ...f, appliesToCourses: e.target.checked }))}
+                    className="h-4 w-4 accent-zinc-900"
+                  />
+                  Pembelian kelas
+                </label>
+                <label className="mt-1 flex items-center gap-2 text-sm text-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={form.appliesToPackages}
+                    onChange={(e) => setForm((f) => ({ ...f, appliesToPackages: e.target.checked }))}
+                    className="h-4 w-4 accent-zinc-900"
+                  />
+                  Paket landing
+                </label>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
@@ -414,6 +534,14 @@ export default function AdminVouchersPage() {
           </div>
         </div>
       )}
+
+      <p className="mt-8 text-center text-xs text-zinc-500">
+        <Link href="/admin/kelas" className="text-emerald-700 underline">
+          Management Kelas
+        </Link>{" "}
+        menyimpan daftar kelas lokal di browser; voucher di halaman ini mengatur promo saat pembelian kelas lewat sistem,
+        terpisah dari modul lokal tersebut.
+      </p>
     </div>
   );
 }

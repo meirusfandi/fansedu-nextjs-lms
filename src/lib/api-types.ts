@@ -689,3 +689,61 @@ export interface TrainerCourseCreateRequest {
   title: string;
   description?: string | null;
 }
+
+// --- Vouchers (admin: /admin/vouchers, siswa: /vouchers/*) ---
+export type VoucherDiscountType = "percent" | "fixed";
+
+/** Satu voucher promosi (admin CRUD). */
+export interface AdminVoucher {
+  id: string;
+  code: string;
+  discountType: VoucherDiscountType;
+  discountValue: number;
+  validFrom: string | null;
+  validUntil: string | null;
+  maxUses: number | null;
+  usedCount: number;
+  isActive: boolean;
+  requiresClaim: boolean;
+  appliesToCourses: boolean;
+  appliesToPackages: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminCreateVoucherRequest {
+  code: string;
+  discountType: VoucherDiscountType;
+  discountValue: number;
+  validFrom?: string | null;
+  validUntil?: string | null;
+  maxUses?: number | null;
+  isActive?: boolean;
+  requiresClaim?: boolean;
+  appliesToCourses: boolean;
+  appliesToPackages: boolean;
+}
+
+export type AdminUpdateVoucherRequest = Partial<{
+  code: string;
+  discountType: VoucherDiscountType;
+  discountValue: number;
+  validFrom: string | null;
+  /** String kosong "" = hapus batas akhir (sesuai kontrak backend). */
+  validUntil: string | null | "";
+  maxUses: number | null;
+  isActive: boolean;
+  requiresClaim: boolean;
+  appliesToCourses: boolean;
+  appliesToPackages: boolean;
+}>;
+
+/** GET /vouchers/mine — klaim belum dipakai checkout. */
+export interface StudentVoucherClaim {
+  claimId: string;
+  promoId: string;
+  code: string;
+  discountType: VoucherDiscountType;
+  discountValue: number;
+  validUntil: string | null;
+}

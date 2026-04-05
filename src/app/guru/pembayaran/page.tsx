@@ -46,9 +46,7 @@ export default function GuruPembayaranPage() {
           <div className="p-10 text-center text-sm text-zinc-500">Memuat…</div>
         ) : payments.length === 0 ? (
           <div className="p-10 text-center text-sm text-zinc-600">
-            Belum ada riwayat pembayaran tercatat. Data diambil dari{" "}
-            <code className="rounded bg-zinc-100 px-1 text-xs">GET /trainer/payments</code> atau{" "}
-            <code className="rounded bg-zinc-100 px-1 text-xs">GET /payments</code>.
+            Belum ada riwayat pembayaran tercatat. Data diambil dari server.
           </div>
         ) : (
           <div className="overflow-x-auto">

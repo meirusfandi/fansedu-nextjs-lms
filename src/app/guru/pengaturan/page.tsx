@@ -126,7 +126,7 @@ export default function GuruPengaturanPage() {
       await updateTrainerProfile({ name });
       setProfileSuccess("Profil berhasil diperbarui.");
     } catch (err) {
-      setProfileError((err as Error).message || "Gagal memperbarui profil. Pastikan backend menyediakan PUT /trainer/profile.");
+      setProfileError((err as Error).message || "Gagal memperbarui profil. Periksa koneksi atau coba lagi nanti.");
     } finally {
       setProfileLoading(false);
     }
@@ -272,7 +272,7 @@ export default function GuruPengaturanPage() {
         {/* Profil */}
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-zinc-800">Profil</h2>
-          <p className="mt-1 text-xs text-zinc-500">Perubahan nama/profile dapat ditambahkan saat backend mendukung (mis. PUT /trainer/profile).</p>
+          <p className="mt-1 text-xs text-zinc-500">Perubahan nama disimpan ke akun Anda di server.</p>
           {profileSuccess && (
             <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{profileSuccess}</div>
           )}
@@ -305,7 +305,7 @@ export default function GuruPengaturanPage() {
         {/* Detail info sekolah */}
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-zinc-800">Detail info sekolah</h2>
-          <p className="mt-1 text-xs text-zinc-500">Data sekolah yang terhubung dengan akun guru (dari GET /trainer/profile).</p>
+          <p className="mt-1 text-xs text-zinc-500">Data sekolah yang terhubung dengan akun guru Anda.</p>
           {schoolInfo ? (
             <>
               <dl className="mt-4 space-y-2 text-sm">
@@ -349,7 +349,7 @@ export default function GuruPengaturanPage() {
             </>
           ) : (
             <p className="mt-3 rounded-lg border border-dashed border-zinc-200 bg-zinc-50/50 px-3 py-4 text-center text-xs text-zinc-500">
-              Info sekolah akan tampil setelah backend mengembalikan data dari GET /trainer/profile (termasuk objek school).
+              Info sekolah akan tampil setelah profil Anda menyertakan data sekolah dari server.
             </p>
           )}
           <div className="mt-4 border-t border-zinc-100 pt-4">
@@ -474,7 +474,7 @@ export default function GuruPengaturanPage() {
         {/* Ubah kata sandi */}
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-zinc-800">Ubah kata sandi</h2>
-          <p className="mt-1 text-xs text-zinc-500">Ganti kata sandi akun Anda. Pastikan backend menyediakan POST /auth/change-password.</p>
+          <p className="mt-1 text-xs text-zinc-500">Ganti kata sandi akun Anda secara aman.</p>
           {passwordSuccess && (
             <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
               {passwordSuccess}

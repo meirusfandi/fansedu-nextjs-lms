@@ -135,8 +135,8 @@ export default function AdminPaymentPage() {
           <div className="p-12 text-center">
             <p className="text-sm font-medium text-zinc-700">Belum ada data pembayaran</p>
             <p className="mt-2 text-xs text-zinc-500">
-              Pastikan backend menyediakan <code className="rounded bg-zinc-100 px-1">GET /api/v1/admin/payments</code>.
-              Lihat docs: <code className="rounded bg-zinc-100 px-1">docs/PAYMENT_AND_CONFIRMATION_FLOW.md</code>
+              Jika seharusnya ada transaksi, periksa koneksi ke server dan hak akses admin. Dokumentasi alur ada di{" "}
+              <code className="rounded bg-zinc-100 px-1">docs/PAYMENT_AND_CONFIRMATION_FLOW.md</code>.
             </p>
           </div>
         ) : (
@@ -253,10 +253,7 @@ export default function AdminPaymentPage() {
       </div>
 
       <p className="mt-6 text-xs text-zinc-500">
-        Endpoint backend yang diharapkan:{" "}
-        <code className="rounded bg-zinc-100 px-1">POST /api/v1/admin/payments/:id/confirm</code>,{" "}
-        <code className="rounded bg-zinc-100 px-1">POST /api/v1/admin/payments/:id/reject</code> (body opsional{" "}
-        <code className="rounded bg-zinc-100 px-1">{"{ reason }"}</code>).
+        Setujui atau tolak pembayaran menunggu diproses memerlukan dukungan server; penolakan dapat menyertakan alasan.
       </p>
     </div>
   );

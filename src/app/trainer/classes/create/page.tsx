@@ -25,7 +25,7 @@ export default function TrainerCreateClassPage() {
   return (
     <div>
       <h1 className="text-xl font-semibold text-zinc-900">Buat Kelas</h1>
-      <p className="mt-1 text-sm text-zinc-500">Integrasi POST /trainer/courses.</p>
+      <p className="mt-1 text-sm text-zinc-500">Kelas baru akan dibuat di server.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 max-w-md space-y-4">
         {createCourse.error && (

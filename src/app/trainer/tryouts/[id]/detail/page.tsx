@@ -124,7 +124,7 @@ export default function TrainerTryoutDetailPage() {
             Siswa (submit)
           </h2>
           {students.length === 0 ? (
-            <p className="mt-3 text-sm text-zinc-500">Belum ada data siswa atau endpoint students kosong.</p>
+            <p className="mt-3 text-sm text-zinc-500">Belum ada data siswa atau daftar submit belum tersedia.</p>
           ) : (
             <div className="mt-3 overflow-x-auto">
               <table className="min-w-full text-sm">

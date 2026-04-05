@@ -38,8 +38,7 @@ export default function TrainerTryoutsPage() {
     <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
       <h1 className="text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">Tryout</h1>
       <p className="mt-1 text-sm text-zinc-500">
-        Review jawaban siswa untuk tryout yang terkait mapel Anda. Pastikan endpoint GET{" "}
-        <code className="rounded bg-zinc-100 px-1 text-xs">/trainer/tryouts</code> aktif di backend.
+        Review jawaban siswa untuk tryout yang terkait mapel Anda.
       </p>
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

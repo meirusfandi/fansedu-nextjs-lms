@@ -71,6 +71,10 @@ import type {
   LandingPackage,
   AdminLandingPackageCreateRequest,
   AdminLandingPackageUpdateRequest,
+  AdminCreateVoucherRequest,
+  AdminUpdateVoucherRequest,
+  AdminVoucher,
+  StudentVoucherClaim,
 } from "./api-types";
 import { deepToCamelCase } from "./json-case";
 
@@ -2340,4 +2344,100 @@ export async function adminPutCourseLinkedTryouts(
 ): Promise<Record<string, unknown>> {
   const cid = encodeURIComponent(courseId);
   return request(`/admin/courses/${cid}/linked-tryouts`, { method: "PUT", body });
+}
+
+// --- Admin vouchers: GET/POST /admin/vouchers, GET/PUT/DELETE /admin/vouchers/:id (permission vouchers.manage) ---
+
+function extractVoucherArray(raw: unknown): AdminVoucher[] {
+  if (Array.isArray(raw)) return raw as AdminVoucher[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)) {
+    return (raw as { data: AdminVoucher[] }).data;
+  }
+  return [];
+}
+
+function unwrapVoucherResponse(raw: unknown): AdminVoucher {
+  const nested = unwrapApiData(raw as Record<string, unknown>);
+  if (nested && typeof nested.id === "string") {
+    return nested as unknown as AdminVoucher;
+  }
+  if (raw && typeof raw === "object" && typeof (raw as AdminVoucher).id === "string") {
+    return raw as AdminVoucher;
+  }
+  throw new Error("Respons voucher tidak valid");
+}
+
+/** Daftar voucher. GET /admin/vouchers → { data: [...] } */
+export async function adminListVouchers(): Promise<AdminVoucher[]> {
+  try {
+    const raw = await request<unknown>("/admin/vouchers", { method: "GET" });
+    return extractVoucherArray(raw);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Detail voucher. GET /admin/vouchers/:id */
+export async function adminGetVoucher(voucherId: string): Promise<AdminVoucher | null> {
+  const id = encodeURIComponent(voucherId.trim());
+  try {
+    const raw = await request<unknown>(`/admin/vouchers/${id}`, { method: "GET" });
+    if (raw && typeof raw === "object" && typeof (raw as AdminVoucher).id === "string") {
+      return raw as AdminVoucher;
+    }
+    const u = unwrapApiData(raw as Record<string, unknown>);
+    if (u && typeof (u as { id?: string }).id === "string") {
+      return u as unknown as AdminVoucher;
+    }
+    return null;
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
+}
+
+/** Buat voucher. POST /admin/vouchers */
+export async function adminCreateVoucher(body: AdminCreateVoucherRequest): Promise<AdminVoucher> {
+  const raw = await request<unknown>("/admin/vouchers", { method: "POST", body });
+  return unwrapVoucherResponse(raw);
+}
+
+/** Update parsial. PUT /admin/vouchers/:id */
+export async function adminUpdateVoucher(
+  voucherId: string,
+  body: AdminUpdateVoucherRequest
+): Promise<AdminVoucher> {
+  const id = encodeURIComponent(voucherId.trim());
+  const raw = await request<unknown>(`/admin/vouchers/${id}`, { method: "PUT", body });
+  return unwrapVoucherResponse(raw);
+}
+
+/** Hapus voucher. DELETE /admin/vouchers/:id → 204 */
+export async function adminDeleteVoucher(voucherId: string): Promise<void> {
+  const id = encodeURIComponent(voucherId.trim());
+  await request(`/admin/vouchers/${id}`, { method: "DELETE" });
+}
+
+/** Klaim voucher (siswa). POST /vouchers/claim → 204 */
+export async function studentClaimVoucher(code: string): Promise<void> {
+  await request("/vouchers/claim", {
+    method: "POST",
+    body: { code: code.trim() },
+  });
+}
+
+/** Voucher yang sudah diklaim. GET /vouchers/mine */
+export async function studentListMyVouchers(): Promise<StudentVoucherClaim[]> {
+  try {
+    const raw = await request<unknown>("/vouchers/mine", { method: "GET" });
+    if (Array.isArray(raw)) return raw as StudentVoucherClaim[];
+    if (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)) {
+      return (raw as { data: StudentVoucherClaim[] }).data;
+    }
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
 }

@@ -135,14 +135,13 @@ export default function MasterDataSekolahPage() {
                   </p>
                   {rawSekolah === null && rawKelas === null && (
                     <p className="mb-3 text-xs text-zinc-600">
-                      GET /api/v1/admin/master-data/sekolah mengembalikan 404/405 atau error. Pastikan endpoint ini ada di backend dan mengembalikan array atau objek berisi data sekolah.
+                      Permintaan data sekolah gagal (misalnya tidak ditemukan atau ditolak). Pastikan layanan master data
+                      sekolah aktif dan mengembalikan array atau objek berisi data sekolah.
                     </p>
                   )}
                   {rawSekolah !== null && (
                     <div className="mb-3">
-                      <p className="text-xs font-medium text-zinc-600">
-                        GET /api/v1/admin/master-data/sekolah
-                      </p>
+                      <p className="text-xs font-medium text-zinc-600">Respons: master data sekolah</p>
                       <pre className="mt-1 max-h-48 overflow-auto rounded-lg border border-zinc-200 bg-white p-3 text-left text-xs text-zinc-800">
                         {JSON.stringify(rawSekolah, null, 2)}
                       </pre>
@@ -150,9 +149,7 @@ export default function MasterDataSekolahPage() {
                   )}
                   {rawKelas !== null && (
                     <div>
-                      <p className="text-xs font-medium text-zinc-600">
-                        GET /api/v1/admin/kelas (hasil kelas)
-                      </p>
+                      <p className="text-xs font-medium text-zinc-600">Respons: daftar kelas (fallback)</p>
                       <pre className="mt-1 max-h-48 overflow-auto rounded-lg border border-zinc-200 bg-white p-3 text-left text-xs text-zinc-800">
                         {JSON.stringify(rawKelas, null, 2)}
                       </pre>

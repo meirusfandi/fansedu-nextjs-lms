@@ -12,9 +12,9 @@ import {
   uid,
 } from "@/features/admin/local-kelas-storage";
 import { useAdminLocalClasses } from "@/features/admin/useAdminLocalClasses";
-import { adminListUsers, getFriendlyApiErrorMessage } from "@/lib/api";
-import type { Voucher } from "@/lib/vouchers/types";
-import { fetchVouchers } from "@/lib/vouchers-client";
+import { adminListUsers, adminListVouchers, getFriendlyApiErrorMessage } from "@/lib/api";
+import type { AdminVoucher } from "@/lib/api-types";
+import { formatDiscountDisplay, isAdminVoucherCurrentlyValid } from "@/lib/voucher-utils";
 import { isTrainerAccountRole } from "@/lib/user-role";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -29,12 +29,16 @@ export default function AdminKelasListPage() {
   const [classModalMode, setClassModalMode] = useState<"add" | "edit" | null>(null);
   const [classForm, setClassForm] = useState(emptyClassForm);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
-  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [courseVouchers, setCourseVouchers] = useState<AdminVoucher[]>([]);
 
   useEffect(() => {
-    fetchVouchers()
-      .then(setVouchers)
-      .catch(() => setVouchers([]));
+    adminListVouchers()
+      .then((all) =>
+        setCourseVouchers(
+          all.filter((v) => v.appliesToCourses && isAdminVoucherCurrentlyValid(v))
+        )
+      )
+      .catch(() => setCourseVouchers([]));
   }, []);
 
   useEffect(() => {
@@ -57,18 +61,6 @@ export default function AdminKelasListPage() {
     () => classes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [classes, page]
   );
-
-  const vouchersByClassId = useMemo(() => {
-    const m = new Map<string, Voucher[]>();
-    for (const v of vouchers) {
-      for (const cid of v.applicableClassIds) {
-        const list = m.get(cid) ?? [];
-        list.push(v);
-        m.set(cid, list);
-      }
-    }
-    return m;
-  }, [vouchers]);
 
   useEffect(() => {
     if (classes.length > 0 && (page - 1) * PAGE_SIZE >= classes.length) {
@@ -206,11 +198,11 @@ export default function AdminKelasListPage() {
             <Link href="/admin/master-data/kelas" className="font-medium text-emerald-700 underline">
               Master Data → Kelas
             </Link>
-            . Voucher diskon (nominal &amp; kedaluwarsa) di{" "}
+            . Promo diskon untuk pembelian kelas dikelola di{" "}
             <Link href="/admin/vouchers" className="font-medium text-emerald-700 underline">
               Voucher
-            </Link>
-            .
+            </Link>{" "}
+            dan tidak terikat ke baris kelas lokal di tabel ini.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -245,6 +237,18 @@ export default function AdminKelasListPage() {
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
 
+      {courseVouchers.length > 0 && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
+          <span className="font-medium">Promo aktif untuk checkout kelas (backend): </span>
+          <span className="font-mono text-xs">
+            {courseVouchers.map((v) => `${v.code} (${formatDiscountDisplay(v)})`).join(" · ")}
+          </span>
+          <Link href="/admin/vouchers" className="ml-2 font-medium text-emerald-800 underline">
+            Kelola
+          </Link>
+        </div>
+      )}
+
       <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">Daftar kelas</div>
         {classes.length === 0 ? (
@@ -258,7 +262,6 @@ export default function AdminKelasListPage() {
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Kelas</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Status</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Modul</th>
-                    <th className="px-4 py-3 text-left font-medium text-zinc-600">Voucher</th>
                     <th className="px-4 py-3 text-right font-medium text-zinc-600">Aksi</th>
                   </tr>
                 </thead>
@@ -278,39 +281,6 @@ export default function AdminKelasListPage() {
                           Kelola modul
                         </Link>
                         <span className="ml-2 text-xs text-zinc-500">({c.modules.length})</span>
-                      </td>
-                      <td className="max-w-[200px] px-4 py-3 align-top text-xs text-zinc-700">
-                        {(() => {
-                          const vs = vouchersByClassId.get(c.id) ?? [];
-                          if (vs.length === 0) {
-                            return (
-                              <span className="text-zinc-400">
-                                —{" "}
-                                <Link href="/admin/vouchers" className="text-emerald-700 underline">
-                                  Pasang
-                                </Link>
-                              </span>
-                            );
-                          }
-                          return (
-                            <ul className="space-y-0.5">
-                              {vs.map((v) => (
-                                <li key={v.id} className="font-mono text-[11px]">
-                                  {v.code}{" "}
-                                  <span className="text-zinc-500">
-                                    (
-                                    {new Intl.NumberFormat("id-ID", {
-                                      style: "currency",
-                                      currency: "IDR",
-                                      maximumFractionDigits: 0,
-                                    }).format(v.nominal)}
-                                    )
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          );
-                        })()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -380,9 +350,8 @@ export default function AdminKelasListPage() {
                   </select>
                   {trainers.length === 0 ? (
                     <p className="mt-1 text-xs text-zinc-500">
-                      Tidak ada akun pengajar dari <code className="rounded bg-zinc-100 px-1">GET /admin/users</code>{" "}
-                      (role trainer / guru / teacher dinormalisasi). Periksa backend atau Management User. Kelas tetap
-                      bisa disimpan tanpa pengajar.
+                      Belum ada akun pengajar yang tercatat (peran trainer / guru / teacher). Periksa Management User atau
+                      sinkronisasi data. Kelas tetap bisa disimpan tanpa pengajar.
                     </p>
                   ) : null}
                 </div>

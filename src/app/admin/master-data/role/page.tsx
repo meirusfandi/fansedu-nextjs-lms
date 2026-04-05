@@ -66,7 +66,7 @@ export default function MasterDataRolePage() {
             <div className="p-8 text-center text-sm text-zinc-500">
               <p>Belum ada data role.</p>
               <p className="mt-2 text-xs">
-                Pastikan backend <code className="rounded bg-zinc-200 px-1">GET /api/v1/admin/roles</code> mengembalikan array role.
+                Jika seharusnya ada data, periksa koneksi ke server dan konfigurasi master data role.
               </p>
             </div>
           ) : (

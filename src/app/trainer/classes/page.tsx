@@ -23,7 +23,7 @@ export default function TrainerClassesPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">Kelas Saya</h1>
-          <p className="mt-1 text-sm text-zinc-500">Daftar kelas (integrasi GET /trainer/courses).</p>
+          <p className="mt-1 text-sm text-zinc-500">Daftar kelas yang terhubung dengan akun Anda.</p>
         </div>
         <Link
           href="/trainer/classes/create"

@@ -220,9 +220,7 @@ export default function AdminLandingPackagesPage() {
             Paket promo landing
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Kelola paket program yang tampil di landing publik (data dari backend:{" "}
-            <code className="rounded bg-zinc-100 px-1">GET /api/v1/packages</code>, admin CRUD:{" "}
-            <code className="rounded bg-zinc-100 px-1">/api/v1/admin/landing/packages</code>).
+            Kelola paket program yang tampil di halaman landing publik. Perubahan disimpan ke server.
           </p>
         </div>
         <button
