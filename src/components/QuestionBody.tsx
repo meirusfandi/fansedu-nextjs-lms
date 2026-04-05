@@ -22,7 +22,9 @@ export function QuestionBody({
     : (html || "");
 
   if (!combinedHtml.trim()) {
-    return <span className={className}>–</span>;
+    return (
+      <span className={`text-sm text-zinc-800 [color-scheme:light] ${className}`}>–</span>
+    );
   }
 
   if (asPreview) {
@@ -31,8 +33,11 @@ export function QuestionBody({
       .replace(/\s+/g, " ")
       .trim();
     const preview = stripped.length > 120 ? `${stripped.slice(0, 120)}…` : stripped;
+    /* Jangan pakai dark:text-* di sini: kartu admin putih; prefers-color-scheme dark membuat teks nyaris tak terbaca. */
     return (
-      <p className={`text-sm text-zinc-900 dark:text-zinc-50 ${className}`}>
+      <p
+        className={`text-sm font-normal text-zinc-900 [color-scheme:light] ${className}`.trim()}
+      >
         {preview}
       </p>
     );
@@ -45,7 +50,7 @@ export function QuestionBody({
 
   return (
     <div
-      className={`question-body text-sm text-zinc-900 ${className}`}
+      className={`question-body text-sm text-zinc-900 [color-scheme:light] ${className}`}
       dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   );

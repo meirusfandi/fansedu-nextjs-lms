@@ -7,6 +7,63 @@ function isQuestionType(s: string): s is QuestionType {
   return TYPES.includes(s as QuestionType);
 }
 
+/** Gabungkan entri bank yang ada dengan patch (hanya field yang dikirim). */
+export function mergeQuestionBankEntry(
+  existing: QuestionBankEntry,
+  patch: Record<string, unknown>
+): QuestionBankEntry | null {
+  const nextType = patch.type !== undefined ? String(patch.type) : existing.type;
+  if (!isQuestionType(nextType)) return null;
+
+  let maxScore = existing.maxScore;
+  if (patch.maxScore !== undefined) {
+    const n =
+      typeof patch.maxScore === "number" && Number.isFinite(patch.maxScore)
+        ? patch.maxScore
+        : Number(patch.maxScore);
+    if (Number.isFinite(n) && n >= 0) maxScore = n;
+  }
+
+  const body = patch.body !== undefined ? String(patch.body) : existing.body;
+
+  let options = existing.options;
+  if (patch.options !== undefined) {
+    options = Array.isArray(patch.options) ? (patch.options as QuestionBankEntry["options"]) : null;
+  }
+
+  const correctOption =
+    patch.correctOption !== undefined
+      ? patch.correctOption === null
+        ? null
+        : String(patch.correctOption)
+      : existing.correctOption;
+
+  const correctText =
+    patch.correctText !== undefined
+      ? patch.correctText === null
+        ? null
+        : String(patch.correctText)
+      : existing.correctText;
+
+  const imageUrl =
+    patch.imageUrl !== undefined
+      ? patch.imageUrl === null || patch.imageUrl === ""
+        ? null
+        : String(patch.imageUrl)
+      : existing.imageUrl;
+
+  return {
+    ...existing,
+    type: nextType,
+    body,
+    options,
+    maxScore,
+    correctOption: correctOption ?? null,
+    correctText: correctText ?? null,
+    imageUrl: imageUrl ?? null,
+  };
+}
+
 export function normalizeQuestionBankEntries(raw: unknown): QuestionBankEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: QuestionBankEntry[] = [];

@@ -4,7 +4,7 @@ import {
   readQuestionBankFromDisk,
   writeQuestionBankToDisk,
 } from "@/lib/question-bank/store";
-import { normalizeQuestionBankEntries } from "@/lib/question-bank/normalize";
+import { mergeQuestionBankEntry, normalizeQuestionBankEntries } from "@/lib/question-bank/normalize";
 
 export const runtime = "nodejs";
 
@@ -74,6 +74,67 @@ export async function POST(request: NextRequest) {
       skipped: incoming.length - added,
       total: merged.length,
     });
+  } catch {
+    return NextResponse.json({ error: "Body tidak valid" }, { status: 400 });
+  }
+}
+
+const PATCH_KEYS = [
+  "type",
+  "body",
+  "options",
+  "maxScore",
+  "correctOption",
+  "correctText",
+  "imageUrl",
+] as const;
+
+function pickQuestionBankPatch(body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of PATCH_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(body, k)) {
+      out[k] = body[k];
+    }
+  }
+  return out;
+}
+
+/** PUT — perbarui satu entri by body.id (admin). */
+export async function PUT(request: NextRequest) {
+  if (!isAdmin(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = String(body?.id ?? "").trim();
+    if (!id) {
+      return NextResponse.json({ error: "Field id wajib" }, { status: 400 });
+    }
+    const patch = pickQuestionBankPatch(body);
+    const existing = readQuestionBankFromDisk();
+    const idx = existing.findIndex((e) => e.id === id);
+    if (idx < 0) {
+      return NextResponse.json({ error: "Tidak ditemukan" }, { status: 404 });
+    }
+    const merged = mergeQuestionBankEntry(existing[idx], patch);
+    if (!merged) {
+      return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
+    }
+    const next = [...existing];
+    next[idx] = merged;
+    try {
+      writeQuestionBankToDisk(next);
+    } catch (err) {
+      console.error("question-bank write failed", err);
+      return NextResponse.json(
+        {
+          error:
+            "Gagal menulis file (environment read-only). Untuk production gunakan volume yang dapat ditulis atau API backend.",
+        },
+        { status: 507 }
+      );
+    }
+    return NextResponse.json({ ok: true, data: merged });
   } catch {
     return NextResponse.json({ error: "Body tidak valid" }, { status: 400 });
   }

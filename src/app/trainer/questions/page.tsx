@@ -37,7 +37,7 @@ export default function TrainerQuestionBankReadPage() {
   }, [load]);
 
   return (
-    <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
+    <div className="px-4 py-5 text-zinc-900 [color-scheme:light] sm:px-6 md:px-8 md:py-8">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Trainer</p>
       <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Bank soal</h1>
       <p className="mt-1 text-sm text-zinc-600">

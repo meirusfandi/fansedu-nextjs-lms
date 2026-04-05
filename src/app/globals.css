@@ -59,6 +59,16 @@ textarea:focus {
   }
 }
 
+/* Editor pertanyaan: tetap putih meski OS dark mode (hindari textarea/focus gelap) */
+.rich-text-editor-root textarea:focus {
+  color: #18181b;
+  background-color: #ffffff;
+}
+.rich-text-editor-root [contenteditable="true"]:focus {
+  color: #18181b;
+  background-color: #ffffff;
+}
+
 /* Soal: HTML body dengan kode dan gambar — teks jelas (hitam/zinc-900) */
 .question-body {
   line-height: 1.6;

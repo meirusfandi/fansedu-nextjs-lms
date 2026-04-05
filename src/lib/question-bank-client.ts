@@ -71,3 +71,25 @@ export async function deleteQuestionBankEntry(id: string): Promise<void> {
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
+
+/** Perbarui soal di bank (field yang dikirim digabung ke entri yang ada). */
+export async function updateQuestionBankEntry(
+  id: string,
+  patch: Partial<
+    Pick<
+      QuestionBankEntry,
+      "type" | "body" | "options" | "maxScore" | "correctOption" | "correctText" | "imageUrl"
+    >
+  >
+): Promise<QuestionBankEntry> {
+  const res = await fetch("/api/admin/question-bank", {
+    method: "PUT",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, ...patch }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  const j = (await res.json()) as { data?: QuestionBankEntry };
+  if (!j.data) throw new Error("Respons tidak valid");
+  return j.data;
+}

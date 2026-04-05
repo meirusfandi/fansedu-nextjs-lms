@@ -88,83 +88,83 @@ export function RichTextEditor({
   };
 
   return (
-    <div className="w-full rounded-lg border border-zinc-200 bg-white text-xs text-zinc-800 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-zinc-200 bg-zinc-50 px-2 py-1.5 dark:border-zinc-700 dark:bg-zinc-900/70">
+    <div className="rich-text-editor-root w-full rounded-lg border border-zinc-200 bg-white text-xs text-zinc-900 shadow-sm [color-scheme:light]">
+      {/* Toolbar — selalu tema terang (bukan dark:bg-zinc-900) agar form pertanyaan putih */}
+      <div className="flex flex-wrap items-center gap-1 border-b border-zinc-200 bg-zinc-50 px-2 py-1.5 text-zinc-800">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => exec("bold")}
-            className="rounded-md px-2 py-1 text-[11px] font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] font-semibold text-zinc-800 hover:bg-zinc-200"
           >
             B
           </button>
           <button
             type="button"
             onClick={() => exec("underline")}
-            className="rounded-md px-2 py-1 text-[11px] font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] font-semibold text-zinc-800 hover:bg-zinc-200"
           >
             U
           </button>
           <button
             type="button"
             onClick={() => exec("italic")}
-            className="rounded-md px-2 py-1 text-[11px] font-semibold italic hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] font-semibold italic text-zinc-800 hover:bg-zinc-200"
           >
             I
           </button>
         </div>
-        <div className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+        <div className="mx-1 h-5 w-px bg-zinc-200" />
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => exec("insertUnorderedList")}
-            className="rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200"
           >
             • List
           </button>
           <button
             type="button"
             onClick={() => exec("insertOrderedList")}
-            className="rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200"
           >
             1. List
           </button>
         </div>
-        <div className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+        <div className="mx-1 h-5 w-px bg-zinc-200" />
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => exec("justifyLeft")}
-            className="rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200"
           >
             ⬅︎
           </button>
           <button
             type="button"
             onClick={() => exec("justifyCenter")}
-            className="rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200"
           >
             ⬌
           </button>
           <button
             type="button"
             onClick={() => exec("justifyRight")}
-            className="rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200"
           >
             ➡︎
           </button>
         </div>
-        <div className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+        <div className="mx-1 h-5 w-px bg-zinc-200" />
         <div className="flex items-center gap-1">
-          <label className="inline-flex cursor-pointer items-center rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800">
+          <label className="inline-flex cursor-pointer items-center rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200">
             <span>🖼 Gambar</span>
             <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
           </label>
           <button
             type="button"
             onClick={handleInsertVideo}
-            className="rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200"
           >
             ▶︎ Video
           </button>
@@ -175,16 +175,16 @@ export function RichTextEditor({
               if (!url) return;
               exec("createLink", url);
             }}
-            className="rounded-md px-2 py-1 text-[11px] hover:bg-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-md px-2 py-1 text-[11px] text-zinc-800 hover:bg-zinc-200"
           >
             🔗 Link
           </button>
         </div>
-        <div className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+        <div className="mx-1 h-5 w-px bg-zinc-200" />
         <button
           type="button"
           onClick={handleToggleCode}
-          className="ml-auto rounded-md px-2 py-1 text-[11px] font-medium hover:bg-zinc-200 dark:hover:bg-zinc-800"
+          className="ml-auto rounded-md px-2 py-1 text-[11px] font-medium text-zinc-800 hover:bg-zinc-200"
         >
           {codeView ? "<> WYSIWYG" : "<> Code"}
         </button>
@@ -192,19 +192,19 @@ export function RichTextEditor({
 
       {/* Editor area */}
       <div
-        className="max-h-[420px] overflow-y-auto px-3 py-2 text-xs sm:text-sm"
+        className="max-h-[420px] overflow-y-auto bg-white px-3 py-2 text-xs text-zinc-900 sm:text-sm"
         style={{ minHeight }}
       >
         {codeView ? (
           <textarea
-            className="h-[220px] w-full resize-none rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1.5 font-mono text-[11px] leading-snug dark:border-zinc-700 dark:bg-zinc-900"
+            className="h-[220px] w-full resize-none rounded-md border border-zinc-200 bg-white px-2 py-1.5 font-mono text-[11px] leading-snug text-zinc-900"
             value={value}
             onChange={(e) => onChange(e.target.value)}
           />
         ) : (
           <div
             ref={editableRef}
-            className="min-h-[160px] whitespace-pre-wrap break-words text-xs leading-relaxed text-zinc-800 outline-none dark:text-zinc-100"
+            className="min-h-[160px] whitespace-pre-wrap break-words rounded-md border border-zinc-100 bg-white px-1 py-1 text-xs leading-relaxed text-zinc-900 outline-none focus-visible:ring-2 focus-visible:ring-zinc-300"
             contentEditable
             data-placeholder={placeholder}
             onInput={handleInput}
