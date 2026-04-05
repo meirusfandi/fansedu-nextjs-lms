@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import type { AdminLandingPackageCreateRequest, Course, LandingPackage } from "@/lib/api-types";
 import {
   adminLandingCreatePackage,
@@ -63,6 +64,7 @@ function parseNumberOrUndefined(text: string): number | undefined {
 }
 
 export default function AdminLandingPackagesPage() {
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [items, setItems] = useState<LandingPackage[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +126,7 @@ export default function AdminLandingPackagesPage() {
     e.preventDefault();
     setSaving(true);
     setSaveError(null);
+    const op = modalOpen;
     try {
       const name = form.name.trim();
       const slug = form.slug.trim();
@@ -153,6 +156,9 @@ export default function AdminLandingPackagesPage() {
       setModalOpen(null);
       setEditingId(null);
       await load();
+      showSuccess(
+        op === "add" ? "Paket berhasil ditambahkan." : "Paket berhasil diperbarui."
+      );
     } catch (err) {
       setSaveError(getFriendlyApiErrorMessage(err));
     } finally {
@@ -169,6 +175,7 @@ export default function AdminLandingPackagesPage() {
       try {
         await adminLandingDeletePackage(id);
         await load();
+        showSuccess("Paket berhasil dihapus.");
       } catch (err) {
         setSaveError(getFriendlyApiErrorMessage(err));
       } finally {
@@ -227,6 +234,12 @@ export default function AdminLandingPackagesPage() {
           + Tambah paket
         </button>
       </div>
+
+      {notice && (
+        <div className="mb-4">
+          <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>

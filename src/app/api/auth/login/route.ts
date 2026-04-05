@@ -1,3 +1,4 @@
+import { deepToCamelCase } from "@/lib/json-case";
 import { NextRequest, NextResponse } from "next/server";
 
 // Proxy login ke backend Go. Pakai NEXT_PUBLIC_API_URL (khusus backend Go).
@@ -19,10 +20,10 @@ export async function POST(request: NextRequest) {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(deepToCamelCase(body)),
     });
     const data = await res.json().catch(() => ({}));
-    return NextResponse.json(data, { status: res.status });
+    return NextResponse.json(deepToCamelCase(data), { status: res.status });
   } catch (e) {
     return NextResponse.json(
       { error: "Gagal menghubungi server." },

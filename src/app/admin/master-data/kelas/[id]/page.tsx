@@ -1,6 +1,7 @@
 "use client";
 
 import { CourseProgramModal } from "@/components/admin/CourseProgramModal";
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminCreateCourseUnderSubject,
@@ -24,6 +25,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 function KelasDetailInner() {
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const subjectId = String(params?.id ?? "").trim();
@@ -144,6 +146,7 @@ function KelasDetailInner() {
     if (!subjectId) return;
     setSubmitError(null);
     setSubmitLoading(true);
+    const editing = editingModuleId;
     try {
       if (editingModuleId) {
         await adminUpdateCourse(editingModuleId, {
@@ -161,6 +164,7 @@ function KelasDetailInner() {
       setModuleModalOpen(false);
       setEditingModuleId(null);
       await loadModules();
+      showSuccess(editing ? "Modul berhasil diperbarui." : "Modul berhasil ditambahkan.");
     } catch (err) {
       setSubmitError(getFriendlyApiErrorMessage(err));
     } finally {
@@ -173,6 +177,7 @@ function KelasDetailInner() {
     try {
       await adminDeleteCourse(moduleId);
       await loadModules();
+      showSuccess("Modul berhasil dihapus.");
     } catch (err) {
       setPageError(getFriendlyApiErrorMessage(err));
     }
@@ -191,6 +196,11 @@ function KelasDetailInner() {
 
   return (
     <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
+      {notice && (
+        <div className="mb-4">
+          <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+        </div>
+      )}
       <div className="mb-6">
         <Link
           href="/admin/master-data/kelas"
@@ -511,7 +521,10 @@ function KelasDetailInner() {
         courseId={programCourse?.id ?? ""}
         courseTitle={programCourse?.title ?? ""}
         onClose={() => setProgramCourse(null)}
-        onSaved={() => void loadModules()}
+        onSaved={() => {
+          void loadModules();
+          showSuccess("Program kelas berhasil disimpan.");
+        }}
       />
     </div>
   );

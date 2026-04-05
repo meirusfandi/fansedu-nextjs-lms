@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import {
   adminCreateTryout,
   adminDeleteTryout,
@@ -70,6 +71,7 @@ const emptyForm: AdminCreateTryoutRequest = {
 };
 
 export default function AdminTryoutsPage() {
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [list, setList] = useState<TryoutSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -150,6 +152,7 @@ export default function AdminTryoutsPage() {
     e.preventDefault();
     setSubmitError(null);
     setSubmitLoading(true);
+    const modalKind = modalOpen;
     try {
       const opensDate = form.opensAt ? new Date(form.opensAt) : null;
       const closesDate = form.closesAt ? new Date(form.closesAt) : null;
@@ -205,6 +208,10 @@ export default function AdminTryoutsPage() {
       }
       closeModal();
       loadList();
+      setError(null);
+      showSuccess(
+        modalKind === "add" ? "Event berhasil ditambahkan." : "Event berhasil diperbarui."
+      );
     } catch (err) {
       const msg = (err as Error).message ?? "Gagal menyimpan";
       setSubmitError(msg);
@@ -219,6 +226,8 @@ export default function AdminTryoutsPage() {
       await adminDeleteTryout(id);
       setDeleteConfirm(null);
       loadList();
+      setError(null);
+      showSuccess("Event berhasil dihapus.");
     } catch (err) {
       setError((err as Error).message ?? "Gagal menghapus");
     }
@@ -246,6 +255,12 @@ export default function AdminTryoutsPage() {
             + Tambah Event
           </button>
         </div>
+
+        {notice && (
+          <div className="mb-4">
+            <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

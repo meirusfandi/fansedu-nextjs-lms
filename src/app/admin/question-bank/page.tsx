@@ -1,6 +1,7 @@
 "use client";
 
 import { QuestionBankEntryModal } from "@/components/admin/QuestionBankEntryModal";
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { QuestionBody } from "@/components/QuestionBody";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
@@ -26,6 +27,7 @@ function typeLabel(t: string): string {
 }
 
 export default function AdminQuestionBankPage() {
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [entries, setEntries] = useState<QuestionBankEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,11 +145,11 @@ export default function AdminQuestionBankPage() {
     setImportNotice(null);
     try {
       const r = await appendQuestionBankEntries(toAdd);
-      setImportNotice(
-        `Berhasil: ${r.added} ditambahkan${r.skipped > 0 ? `, ${r.skipped} sudah ada di bank (dilewati)` : ""}.`
-      );
+      const msg = `Berhasil: ${r.added} ditambahkan${r.skipped > 0 ? `, ${r.skipped} sudah ada di bank (dilewati)` : ""}.`;
+      setImportNotice(msg);
       await loadBank();
       setSelectedQIds(new Set());
+      showSuccess(msg);
     } catch (e) {
       setImportNotice(getFriendlyApiErrorMessage(e));
     } finally {
@@ -160,6 +162,7 @@ export default function AdminQuestionBankPage() {
     try {
       await deleteQuestionBankEntry(id);
       await loadBank();
+      showSuccess("Soal berhasil dihapus dari bank.");
     } catch (e) {
       setError(getFriendlyApiErrorMessage(e));
     }
@@ -187,6 +190,12 @@ export default function AdminQuestionBankPage() {
           Impor dari tryout
         </button>
       </div>
+
+      {notice && (
+        <div className="mb-4">
+          <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -275,7 +284,10 @@ export default function AdminQuestionBankPage() {
           setBankModalOpen(false);
           setBankModalEntry(null);
         }}
-        onSaved={() => void loadBank()}
+        onSaved={() => {
+          void loadBank();
+          showSuccess("Perubahan soal berhasil disimpan.");
+        }}
       />
 
       {importOpen && (

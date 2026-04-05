@@ -72,6 +72,7 @@ import type {
   AdminLandingPackageCreateRequest,
   AdminLandingPackageUpdateRequest,
 } from "./api-types";
+import { deepToCamelCase } from "./json-case";
 
 /**
  * Mengubah error dari API/jaringan menjadi pesan yang ramah pengguna.
@@ -191,26 +192,6 @@ interface RequestOptions {
   method?: string;
   body?: unknown;
   auth?: boolean;
-}
-
-function toCamelCaseKey(key: string): string {
-  return key
-    .replace(/[_-\s]+([a-zA-Z0-9])/g, (_, c: string) => c.toUpperCase())
-    .replace(/^([A-Z])/, (m) => m.toLowerCase());
-}
-
-function deepToCamelCase<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map((v) => deepToCamelCase(v)) as T;
-  }
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    Object.entries(value as Record<string, unknown>).forEach(([k, v]) => {
-      out[toCamelCaseKey(k)] = deepToCamelCase(v);
-    });
-    return out as T;
-  }
-  return value;
 }
 
 async function request<T>(
@@ -358,8 +339,8 @@ function normalizeQuestion(item: unknown): Question {
     typeRaw === "short" || typeRaw === "multiple_choice" || typeRaw === "true_false"
       ? typeRaw
       : "short";
-  const co = obj.correctOption ?? obj.correct_option;
-  const ct = obj.correctText ?? obj.correct_text;
+  const co = obj.correctOption;
+  const ct = obj.correctText;
   const correctOption =
     co != null && String(co).trim() !== "" ? String(co).trim() : null;
   const correctText = ct != null && String(ct).trim() !== "" ? String(ct) : null;
@@ -924,8 +905,8 @@ export async function getStudentDashboard(): Promise<StudentDashboardResponse> {
   const improvement =
     raw.improvementAreas ??
     data.improvementAreas ??
-    raw.perlu_ditingkatkan ??
-    data.perlu_ditingkatkan ??
+    raw.perluDitingkatkan ??
+    data.perluDitingkatkan ??
     raw.improvements ??
     data.improvements ??
     raw.improvement;
@@ -1408,17 +1389,11 @@ function coerceAnswerDisplay(v: unknown): string | null {
 function pickUserAnswerFromReviewRow(r: Record<string, unknown>): string | null {
   const keys = [
     "userAnswer",
-    "user_answer",
     "answerText",
-    "answer_text",
     "studentAnswer",
-    "student_answer",
     "submittedAnswer",
-    "submitted_answer",
     "selectedOption",
-    "selected_option",
     "chosenOption",
-    "chosen_option",
     "response",
     "value",
     "content",
@@ -1436,19 +1411,13 @@ function pickUserAnswerFromReviewRow(r: Record<string, unknown>): string | null 
 function pickCorrectAnswerFromReviewRow(r: Record<string, unknown>): string | null {
   const keys = [
     "correctAnswer",
-    "correct_answer",
     "correctText",
-    "correct_text",
     "correctOption",
-    "correct_option",
     "answerKey",
-    "answer_key",
     "expectedAnswer",
-    "expected_answer",
     "solution",
     "key",
     "rightAnswer",
-    "right_answer",
   ];
   for (const k of keys) {
     if (r[k] !== undefined && r[k] !== null) {
@@ -1460,15 +1429,15 @@ function pickCorrectAnswerFromReviewRow(r: Record<string, unknown>): string | nu
 }
 
 function pickManualScoreField(raw: Record<string, unknown>): number | null | undefined {
-  const v = raw.manualScore ?? raw.manual_score;
+  const v = raw.manualScore;
   if (v === null) return null;
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
   return undefined;
 }
 
-function pickOptionalNumber(raw: Record<string, unknown>, camel: string, snake: string): number | null | undefined {
-  const v = raw[camel] ?? raw[snake];
+function pickOptionalNumber(raw: Record<string, unknown>, camel: string): number | null | undefined {
+  const v = raw[camel];
   if (v === null) return null;
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
@@ -1478,15 +1447,15 @@ function pickOptionalNumber(raw: Record<string, unknown>, camel: string, snake: 
 function normalizeAttemptReviewItem(item: unknown): AttemptReviewItem | null {
   if (!item || typeof item !== "object") return null;
   const r = item as Record<string, unknown>;
-  const qid = r.questionId ?? r.question_id;
+  const qid = r.questionId;
   if (qid == null || String(qid) === "") return null;
   const manualScore = pickManualScoreField(r);
-  const reviewerRaw = r.reviewerComment ?? r.reviewer_comment;
+  const reviewerRaw = r.reviewerComment;
   const userAns = pickUserAnswerFromReviewRow(r);
   const correctAns = pickCorrectAnswerFromReviewRow(r);
-  const isCorrectRaw = r.isCorrect ?? r.is_correct;
-  const sortRaw = r.sortOrder ?? r.sort_order;
-  const img = r.imageUrl ?? r.image_url;
+  const isCorrectRaw = r.isCorrect;
+  const sortRaw = r.sortOrder;
+  const img = r.imageUrl;
   return {
     questionId: String(qid),
     body: String(r.body ?? r.questionBody ?? ""),
@@ -1505,7 +1474,7 @@ function normalizeAttemptReviewItem(item: unknown): AttemptReviewItem | null {
     imageUrl: img != null ? String(img) : null,
     reviewerComment: reviewerRaw != null ? String(reviewerRaw) : null,
     manualScore,
-    autoScore: pickOptionalNumber(r, "autoScore", "auto_score"),
+    autoScore: pickOptionalNumber(r, "autoScore"),
   };
 }
 
@@ -1632,7 +1601,7 @@ export type TryoutAttemptAutoGradeBody = {
   clearReviewerComments?: boolean;
 };
 
-/** Jalankan ulang penilaian otomatis (hapus manual_score pada attempt). POST .../auto-grade */
+/** Jalankan ulang penilaian otomatis (hapus manualScore pada attempt). POST .../auto-grade */
 export async function adminPostTryoutAttemptAutoGrade(
   tryoutId: string,
   attemptId: string,
@@ -1978,26 +1947,19 @@ export async function adminCreateCourse(
 
 function normalizeAdminCourseItem(item: unknown): Course {
   const o = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
-  const tt = o.trackType ?? o.track_type;
+  const tt = o.trackType;
   const trackType: CourseTrackType | undefined =
     tt === "tryout" ? "tryout" : tt === "meetings" ? "meetings" : undefined;
-  const st = o.status ?? o.courseStatus ?? o.course_status ?? o.publicationStatus ?? o.publication_status;
+  const st = o.status ?? o.courseStatus ?? o.publicationStatus;
   const status: CoursePublicationStatus | null =
     st != null && String(st).trim() !== "" ? String(st) : null;
   return {
     id: String(o.id ?? ""),
     title: String(o.title ?? ""),
     description: o.description != null ? String(o.description) : null,
-    createdBy:
-      o.createdBy != null ? String(o.createdBy) : o.created_by != null ? String(o.created_by) : null,
-    subjectId:
-      o.subjectId != null ? String(o.subjectId) : o.subject_id != null ? String(o.subject_id) : null,
-    sortOrder:
-      typeof o.sortOrder === "number"
-        ? o.sortOrder
-        : typeof o.sort_order === "number"
-          ? o.sort_order
-          : null,
+    createdBy: o.createdBy != null ? String(o.createdBy) : null,
+    subjectId: o.subjectId != null ? String(o.subjectId) : null,
+    sortOrder: typeof o.sortOrder === "number" ? o.sortOrder : null,
     trackType,
     status,
   };
@@ -2121,17 +2083,61 @@ export async function adminGetLevelSubjects(
 }
 
 // --- Admin Users (GET/POST/PUT api/v1/admin/users) ---
+
+/** Backend kadang membungkus array user (users, data, items, nested data.users). */
+function extractUsersFromAdminUsersResponse(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    for (const k of ["users", "data", "items", "results", "records"]) {
+      const v = o[k];
+      if (Array.isArray(v)) return v;
+    }
+    const nested = o.data;
+    if (nested && typeof nested === "object") {
+      const d = nested as Record<string, unknown>;
+      for (const k of ["users", "items", "data", "results", "records"]) {
+        const v = d[k];
+        if (Array.isArray(v)) return v;
+      }
+    }
+  }
+  return [];
+}
+
+/** Satu baris user dari GET /admin/users → bentuk User (toleran field nama/role). */
+function coerceAdminUserRow(row: unknown): User | null {
+  if (!row || typeof row !== "object") return null;
+  const obj = row as Record<string, unknown>;
+  const inner =
+    obj.user && typeof obj.user === "object" ? (obj.user as Record<string, unknown>) : obj;
+  const id = inner.id != null ? String(inner.id) : "";
+  if (!id) return null;
+  const nameRaw = inner.name ?? inner.fullName ?? inner.displayName;
+  const name =
+    String(nameRaw ?? "").trim() || String(inner.email ?? "").trim() || "(Tanpa nama)";
+  const email = String(inner.email ?? "").trim();
+  const roleRaw = inner.role ?? inner.roleSlug;
+  const role = String(roleRaw ?? "student").trim();
+  return {
+    id,
+    name,
+    email,
+    role: role as User["role"],
+    avatarUrl: inner.avatarUrl != null ? String(inner.avatarUrl) : null,
+    subjectId: inner.subjectId != null ? String(inner.subjectId) : null,
+    schoolId: inner.schoolId != null ? String(inner.schoolId) : null,
+    subjectName: inner.subjectName != null ? String(inner.subjectName) : null,
+    schoolName: inner.schoolName != null ? String(inner.schoolName) : null,
+  };
+}
+
 /** Daftar semua user. GET api/v1/admin/users. 404 = daftar kosong. */
 export async function adminListUsers(): Promise<User[]> {
   try {
-    const raw = await request<User[] | { users?: User[]; data?: User[] }>(
-      "/admin/users",
-      { method: "GET" }
-    );
-    if (Array.isArray(raw)) return raw;
-    if (raw?.users && Array.isArray(raw.users)) return raw.users;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    const raw = await request<unknown>("/admin/users", { method: "GET" });
+    const rows = extractUsersFromAdminUsersResponse(raw);
+    return rows.map(coerceAdminUserRow).filter((u): u is User => u != null);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;

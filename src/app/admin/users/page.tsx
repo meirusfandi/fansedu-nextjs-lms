@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminCreateUser,
@@ -10,6 +11,7 @@ import {
   adminUpdateUser,
 } from "@/lib/api";
 import type { Sekolah, Subject, User, UserRole } from "@/lib/api-types";
+import { normalizeUserRoleFromApi } from "@/lib/user-role";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const ROLE_LABEL: Record<string, string> = {
@@ -18,14 +20,8 @@ const ROLE_LABEL: Record<string, string> = {
   trainer: "Pengajar",
 };
 
-function normalizeUserRole(role: string | undefined): UserRole {
-  const r = (role ?? "").toLowerCase();
-  if (r === "admin") return "admin";
-  if (r === "trainer" || r === "guru" || r === "teacher") return "trainer";
-  return "student";
-}
-
 export default function AdminUsersPage() {
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +116,7 @@ export default function AdminUsersPage() {
         name: full.name,
         email: full.email,
         password: "",
-        role: normalizeUserRole(full.role),
+        role: normalizeUserRoleFromApi(full.role),
         subjectId: full.subjectId ?? "",
         schoolId: full.schoolId ?? "",
       });
@@ -131,7 +127,7 @@ export default function AdminUsersPage() {
         name: u.name,
         email: u.email,
         password: "",
-        role: normalizeUserRole(u.role),
+        role: normalizeUserRoleFromApi(u.role),
         subjectId: u.subjectId ?? "",
         schoolId: u.schoolId ?? "",
       });
@@ -150,6 +146,7 @@ export default function AdminUsersPage() {
     e.preventDefault();
     setSubmitError(null);
     setSubmitLoading(true);
+    const mode = modalMode;
     try {
       if (modalMode === "add") {
         await adminCreateUser({
@@ -182,6 +179,9 @@ export default function AdminUsersPage() {
       }
       closeModal();
       loadUsers();
+      showSuccess(
+        mode === "add" ? "Pengguna berhasil ditambahkan." : "Data pengguna berhasil diperbarui."
+      );
     } catch (err) {
       setSubmitError((err as Error).message ?? "Gagal menyimpan");
     } finally {
@@ -211,6 +211,12 @@ export default function AdminUsersPage() {
             + Tambah User
           </button>
         </div>
+
+        {notice && (
+          <div className="mb-4">
+            <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

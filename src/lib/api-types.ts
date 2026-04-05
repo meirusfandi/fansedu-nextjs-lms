@@ -344,8 +344,7 @@ export interface StudentDashboardSummary {
   avgPercentile: number;
 }
 
-/** Nama siswa dari DB bisa dikembalikan di dashboard sebagai user/student.name atau user/student.nama.
- * Backend bisa mengirim strengthAreas/kekuatan, improvementAreas/perlu_ditingkatkan, recommendation/rekomendasi. */
+/** Response dinormalisasi ke camelCase (`request()` / proxy). Alias lokal: kekuatan → strengthAreas, perluDitingkatkan → improvementAreas, rekomendasi → recommendation. */
 export interface StudentDashboardResponse {
   summary: StudentDashboardSummary;
   openTryouts: TryoutSession[];
@@ -353,8 +352,8 @@ export interface StudentDashboardResponse {
   strengthAreas: string[];
   improvementAreas: string[];
   recommendation: string;
-  user?: { name?: string; nama?: string };
-  student?: { name?: string; nama?: string };
+  user?: { name?: string };
+  student?: { name?: string };
   /** Tanggal expired akses/langganan siswa (ISO string). Jika ada dan sudah lewat, frontend akan logout & redirect ke login. */
   expiresAt?: string;
 }

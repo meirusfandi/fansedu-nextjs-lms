@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import {
   assetTypeLabel,
   contentTypeLabel,
@@ -23,6 +24,7 @@ export default function AdminKelasModulesPage() {
   const classId = String(params?.id ?? "").trim();
 
   const { classes, setClasses, hydrated } = useAdminLocalClasses();
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [error, setError] = useState<string | null>(null);
 
   const selectedClass = useMemo(() => classes.find((c) => c.id === classId) ?? null, [classes, classId]);
@@ -72,6 +74,7 @@ export default function AdminKelasModulesPage() {
     );
     setModuleModalOpen(false);
     setError(null);
+    showSuccess("Modul berhasil ditambahkan.");
   };
 
   const removeModule = (moduleId: string) => {
@@ -83,6 +86,7 @@ export default function AdminKelasModulesPage() {
           : c
       )
     );
+    showSuccess("Modul berhasil dihapus.");
   };
 
   const openAddContent = (moduleId: string) => {
@@ -126,6 +130,7 @@ export default function AdminKelasModulesPage() {
     );
     setContentModalOpen(false);
     setError(null);
+    showSuccess("Konten berhasil ditambahkan.");
   };
 
   const removeContent = (moduleId: string, contentId: string) => {
@@ -142,6 +147,7 @@ export default function AdminKelasModulesPage() {
         };
       })
     );
+    showSuccess("Konten berhasil dihapus.");
   };
 
   const openAddAsset = (contentId: string) => {
@@ -187,6 +193,7 @@ export default function AdminKelasModulesPage() {
     );
     setAssetModalOpen(false);
     setError(null);
+    showSuccess("Materi berhasil ditambahkan.");
   };
 
   const removeAsset = (contentId: string, assetId: string) => {
@@ -205,6 +212,7 @@ export default function AdminKelasModulesPage() {
         };
       })
     );
+    showSuccess("Materi berhasil dihapus.");
   };
 
   if (!classId) {
@@ -228,6 +236,11 @@ export default function AdminKelasModulesPage() {
 
   return (
     <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+      {notice && (
+        <div className="mb-4">
+          <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+        </div>
+      )}
       <Link
         href="/admin/kelas"
         className="text-sm font-medium text-zinc-600 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900"

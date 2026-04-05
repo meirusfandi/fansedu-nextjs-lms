@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import Link from "next/link";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
@@ -95,6 +96,7 @@ function KelasLevelList({
 }
 
 export default function MasterDataKelasListPage() {
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [levels, setLevels] = useState<Level[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -169,6 +171,7 @@ export default function MasterDataKelasListPage() {
     if (!levelId) return;
     setSubmitError(null);
     setSubmitLoading(true);
+    const modalMode = kelasModalMode;
     try {
       if (kelasModalMode === "add") {
         await adminCreateSubject({
@@ -188,6 +191,9 @@ export default function MasterDataKelasListPage() {
       setKelasModalMode(null);
       setEditingSubjectId(null);
       loadSubjects(levelId);
+      showSuccess(
+        modalMode === "add" ? "Kelas berhasil ditambahkan." : "Kelas berhasil diperbarui."
+      );
     } catch (err) {
       setSubmitError((err as Error).message ?? "Gagal menyimpan");
     } finally {
@@ -200,6 +206,7 @@ export default function MasterDataKelasListPage() {
     try {
       await adminDeleteSubject(subjectId);
       loadSubjects(levelId);
+      showSuccess("Kelas berhasil dihapus.");
     } catch (err) {
       setError((err as Error).message ?? "Gagal menghapus");
     }
@@ -215,6 +222,12 @@ export default function MasterDataKelasListPage() {
           <strong className="font-medium text-zinc-800">Kelola modul</strong>.
         </p>
       </div>
+
+      {notice && (
+        <div className="mb-4">
+          <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { OSN_PREP_CURRICULUM_MODULES } from "@/data/osn-class-curriculum";
 import {
@@ -12,11 +13,13 @@ import {
 } from "@/features/admin/local-kelas-storage";
 import { useAdminLocalClasses } from "@/features/admin/useAdminLocalClasses";
 import { adminListUsers, getFriendlyApiErrorMessage } from "@/lib/api";
+import { isTrainerAccountRole } from "@/lib/user-role";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 export default function AdminKelasListPage() {
   const { classes, setClasses } = useAdminLocalClasses();
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [trainers, setTrainers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +31,9 @@ export default function AdminKelasListPage() {
   useEffect(() => {
     adminListUsers()
       .then((users) => {
+        /** Hanya akun pengajar (dashboard trainer): role `trainer` setelah normalisasi API. Role `guru`/`teacher` dari backend ikut dianggap trainer — bukan admin/siswa. */
         const list = (users ?? [])
-          .filter((u) => (u as { role?: string }).role === "trainer" || (u as { role?: string }).role === "guru")
+          .filter((u) => isTrainerAccountRole(u.role))
           .map((u) => ({ id: u.id, name: u.name, email: u.email }))
           .sort((a, b) => a.name.localeCompare(b.name));
         setTrainers(list);
@@ -79,6 +83,7 @@ export default function AdminKelasListPage() {
       setError("Judul kelas wajib diisi.");
       return;
     }
+    let savedKind: "add" | "edit" | null = null;
     if (classModalMode === "add") {
       const trainer = trainers.find((t) => t.id === classForm.trainerId) ?? null;
       const created: AdminClass = {
@@ -95,6 +100,7 @@ export default function AdminKelasListPage() {
         updatedAt: nowIso(),
       };
       setClasses((prev) => [created, ...prev]);
+      savedKind = "add";
     } else if (classModalMode === "edit" && editingClassId) {
       setClasses((prev) =>
         prev.map((c) =>
@@ -114,13 +120,17 @@ export default function AdminKelasListPage() {
             : c
         )
       );
+      savedKind = "edit";
     }
     setClassModalMode(null);
+    if (savedKind === "add") showSuccess("Kelas berhasil ditambahkan.");
+    else if (savedKind === "edit") showSuccess("Kelas berhasil diperbarui.");
   };
 
   const handleDeleteClass = (id: string) => {
     if (!confirm("Hapus kelas ini beserta semua module/quiz/tryout dan materi?")) return;
     setClasses((prev) => prev.filter((c) => c.id !== id));
+    showSuccess("Kelas berhasil dihapus.");
   };
 
   const handleImportOsnPrepClass = () => {
@@ -158,6 +168,7 @@ export default function AdminKelasListPage() {
       updatedAt: nowIso(),
     };
     setClasses((prev) => [created, ...prev]);
+    showSuccess("Kelas contoh OSN-K berhasil ditambahkan.");
   };
 
   return (
@@ -194,6 +205,16 @@ export default function AdminKelasListPage() {
           </button>
         </div>
       </div>
+
+      {notice && (
+        <div className="mb-4">
+          <FlashNoticeBar
+            kind={notice.kind}
+            message={notice.text}
+            onDismiss={clearNotice}
+          />
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
@@ -285,7 +306,7 @@ export default function AdminKelasListPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-zinc-600">Trainer / Pengajar</label>
+                  <label className="block text-xs font-medium text-zinc-600">Pengajar (akun trainer)</label>
                   <select
                     value={classForm.trainerId}
                     onChange={(e) => setClassForm((f) => ({ ...f, trainerId: e.target.value }))}
@@ -300,8 +321,9 @@ export default function AdminKelasListPage() {
                   </select>
                   {trainers.length === 0 ? (
                     <p className="mt-1 text-xs text-zinc-500">
-                      Belum ada user role trainer/pengajar atau gagal memuat daftar. Kelas tetap bisa disimpan tanpa
-                      trainer.
+                      Tidak ada akun pengajar dari <code className="rounded bg-zinc-100 px-1">GET /admin/users</code>{" "}
+                      (role trainer / guru / teacher dinormalisasi). Periksa backend atau Management User. Kelas tetap
+                      bisa disimpan tanpa pengajar.
                     </p>
                   ) : null}
                 </div>

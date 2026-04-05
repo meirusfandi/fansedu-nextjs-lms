@@ -24,8 +24,8 @@ function normalizeRoleFromApi(raw: string | undefined): User["role"] {
 export async function login(credentials: LoginRequest, rememberMe = false) {
   const res = await apiLogin(credentials);
   const maxAge = rememberMe ? 2592000 : 604800;
-  const user = res.user as User & { nama?: string; full_name?: string; role?: string };
-  const name = (user.name ?? user.nama ?? user.full_name ?? "").trim() || user.email;
+  const user = res.user as User & { role?: string; displayName?: string };
+  const name = (user.name ?? user.displayName ?? "").trim() || user.email;
   const role = normalizeRoleFromApi(user.role);
   const normalizedUser: User = { ...user, name, role };
   useAuthStore.getState().setAuth({
@@ -39,8 +39,8 @@ export async function login(credentials: LoginRequest, rememberMe = false) {
 /** Pendaftaran self-service: hanya Trainer (backend memakai alias `guru` jika perlu). */
 export async function register(data: RegisterRequest) {
   const res = await apiRegister(data);
-  const user = res.user as User & { nama?: string; full_name?: string; role?: string };
-  const name = (user.name ?? user.nama ?? user.full_name ?? "").trim() || user.email;
+  const user = res.user as User & { role?: string; displayName?: string };
+  const name = (user.name ?? user.displayName ?? "").trim() || user.email;
   const role = normalizeRoleFromApi(user.role);
   const normalizedUser: User = { ...user, name, role };
   useAuthStore.getState().setAuth({

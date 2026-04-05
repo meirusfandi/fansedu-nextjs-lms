@@ -1,5 +1,6 @@
 "use client";
 
+import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { QuestionBody } from "@/components/QuestionBody";
 import { RichTextEditor } from "@/components/RichTextEditor";
@@ -55,6 +56,7 @@ function defaultCorrectKey(q: Question): string {
 }
 
 export default function AdminTryoutSoalPage() {
+  const { notice, showSuccess, clearNotice } = useFlashNotice();
   const params = useParams();
   const tryoutId = params?.id as string | undefined;
 
@@ -208,6 +210,7 @@ export default function AdminTryoutSoalPage() {
     }
     setSubmitError(null);
     setSubmitLoading(true);
+    const kind = modalOpen;
     try {
       const sortOrder = parseInt(form.sortOrder, 10) || 1;
       const maxScore = parseInt(form.maxScore, 10) || 1;
@@ -269,6 +272,7 @@ export default function AdminTryoutSoalPage() {
       }
       closeModal();
       loadData();
+      showSuccess(kind === "add" ? "Soal berhasil ditambahkan." : "Soal berhasil diperbarui.");
     } catch (err) {
       setSubmitError((err as Error).message ?? "Gagal menyimpan soal");
     } finally {
@@ -282,6 +286,7 @@ export default function AdminTryoutSoalPage() {
     try {
       await adminDeleteQuestion(tryoutId, questionId);
       loadData();
+      showSuccess("Soal berhasil dihapus.");
     } catch (err) {
       setError((err as Error).message ?? "Gagal menghapus");
     }
@@ -320,6 +325,12 @@ export default function AdminTryoutSoalPage() {
             + Tambah Soal
           </button>
         </div>
+
+        {notice && (
+          <div className="mb-4">
+            <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
