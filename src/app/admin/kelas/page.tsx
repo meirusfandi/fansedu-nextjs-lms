@@ -13,6 +13,8 @@ import {
 } from "@/features/admin/local-kelas-storage";
 import { useAdminLocalClasses } from "@/features/admin/useAdminLocalClasses";
 import { adminListUsers, getFriendlyApiErrorMessage } from "@/lib/api";
+import type { Voucher } from "@/lib/vouchers/types";
+import { fetchVouchers } from "@/lib/vouchers-client";
 import { isTrainerAccountRole } from "@/lib/user-role";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -27,6 +29,13 @@ export default function AdminKelasListPage() {
   const [classModalMode, setClassModalMode] = useState<"add" | "edit" | null>(null);
   const [classForm, setClassForm] = useState(emptyClassForm);
   const [editingClassId, setEditingClassId] = useState<string | null>(null);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+
+  useEffect(() => {
+    fetchVouchers()
+      .then(setVouchers)
+      .catch(() => setVouchers([]));
+  }, []);
 
   useEffect(() => {
     adminListUsers()
@@ -48,6 +57,18 @@ export default function AdminKelasListPage() {
     () => classes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [classes, page]
   );
+
+  const vouchersByClassId = useMemo(() => {
+    const m = new Map<string, Voucher[]>();
+    for (const v of vouchers) {
+      for (const cid of v.applicableClassIds) {
+        const list = m.get(cid) ?? [];
+        list.push(v);
+        m.set(cid, list);
+      }
+    }
+    return m;
+  }, [vouchers]);
 
   useEffect(() => {
     if (classes.length > 0 && (page - 1) * PAGE_SIZE >= classes.length) {
@@ -185,6 +206,10 @@ export default function AdminKelasListPage() {
             <Link href="/admin/master-data/kelas" className="font-medium text-emerald-700 underline">
               Master Data → Kelas
             </Link>
+            . Voucher diskon (nominal &amp; kedaluwarsa) di{" "}
+            <Link href="/admin/vouchers" className="font-medium text-emerald-700 underline">
+              Voucher
+            </Link>
             .
           </p>
         </div>
@@ -233,6 +258,7 @@ export default function AdminKelasListPage() {
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Kelas</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Status</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Modul</th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-600">Voucher</th>
                     <th className="px-4 py-3 text-right font-medium text-zinc-600">Aksi</th>
                   </tr>
                 </thead>
@@ -252,6 +278,39 @@ export default function AdminKelasListPage() {
                           Kelola modul
                         </Link>
                         <span className="ml-2 text-xs text-zinc-500">({c.modules.length})</span>
+                      </td>
+                      <td className="max-w-[200px] px-4 py-3 align-top text-xs text-zinc-700">
+                        {(() => {
+                          const vs = vouchersByClassId.get(c.id) ?? [];
+                          if (vs.length === 0) {
+                            return (
+                              <span className="text-zinc-400">
+                                —{" "}
+                                <Link href="/admin/vouchers" className="text-emerald-700 underline">
+                                  Pasang
+                                </Link>
+                              </span>
+                            );
+                          }
+                          return (
+                            <ul className="space-y-0.5">
+                              {vs.map((v) => (
+                                <li key={v.id} className="font-mono text-[11px]">
+                                  {v.code}{" "}
+                                  <span className="text-zinc-500">
+                                    (
+                                    {new Intl.NumberFormat("id-ID", {
+                                      style: "currency",
+                                      currency: "IDR",
+                                      maximumFractionDigits: 0,
+                                    }).format(v.nominal)}
+                                    )
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button

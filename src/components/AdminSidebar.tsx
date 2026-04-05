@@ -52,6 +52,7 @@ export function AdminSidebar({ currentPath = "", onLogout }: AdminSidebarProps) 
   const isKelas = currentPath.startsWith("/admin/kelas");
   const isEvents = currentPath.startsWith("/admin/tryouts");
   const isQuestionBank = currentPath.startsWith("/admin/question-bank");
+  const isVouchers = currentPath.startsWith("/admin/vouchers");
   const isPayment = currentPath.startsWith("/admin/payment");
   const isReport = currentPath.startsWith("/admin/report");
 
@@ -100,6 +101,7 @@ export function AdminSidebar({ currentPath = "", onLogout }: AdminSidebarProps) 
           <NavLink href="/admin/kelas" label="Management Kelas" isActive={isKelas} />
           <NavLink href="/admin/tryouts" label="Event" isActive={isEvents} />
           <NavLink href="/admin/question-bank" label="Bank soal" isActive={isQuestionBank} />
+          <NavLink href="/admin/vouchers" label="Voucher" isActive={isVouchers} />
           <NavLink href="/admin/payment" label="Payment" isActive={isPayment} />
           <NavLink href="/admin/report" label="Report" isActive={isReport} />
         </div>
