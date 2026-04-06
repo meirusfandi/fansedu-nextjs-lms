@@ -12,8 +12,14 @@ import {
   uid,
 } from "@/features/admin/local-kelas-storage";
 import { useAdminLocalClasses } from "@/features/admin/useAdminLocalClasses";
-import { adminListUsers, adminListVouchers, getFriendlyApiErrorMessage } from "@/lib/api";
-import type { AdminVoucher } from "@/lib/api-types";
+import {
+  adminGetLevelSubjects,
+  adminListLevels,
+  adminListUsers,
+  adminListVouchers,
+  getFriendlyApiErrorMessage,
+} from "@/lib/api";
+import type { AdminVoucher, Level, Subject } from "@/lib/api-types";
 import { formatDiscountDisplay, isAdminVoucherCurrentlyValid } from "@/lib/voucher-utils";
 import { isTrainerAccountRole } from "@/lib/user-role";
 import Link from "next/link";
@@ -25,6 +31,10 @@ export default function AdminKelasListPage() {
   const [trainers, setTrainers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [levels, setLevels] = useState<Level[]>([]);
+  const [subjectsByLevel, setSubjectsByLevel] = useState<Record<string, Subject[]>>({});
+  const [filterLevelId, setFilterLevelId] = useState("");
+  const [filterSubjectId, setFilterSubjectId] = useState("");
 
   const [classModalMode, setClassModalMode] = useState<"add" | "edit" | null>(null);
   const [classForm, setClassForm] = useState(emptyClassForm);
@@ -39,6 +49,12 @@ export default function AdminKelasListPage() {
         )
       )
       .catch(() => setCourseVouchers([]));
+  }, []);
+
+  useEffect(() => {
+    adminListLevels()
+      .then((rows) => setLevels(rows ?? []))
+      .catch(() => setLevels([]));
   }, []);
 
   useEffect(() => {
@@ -57,16 +73,32 @@ export default function AdminKelasListPage() {
       });
   }, []);
 
+  useEffect(() => {
+    const lid = classForm.levelId?.trim();
+    if (!lid || subjectsByLevel[lid]) return;
+    adminGetLevelSubjects(lid)
+      .then((rows) => setSubjectsByLevel((prev) => ({ ...prev, [lid]: rows ?? [] })))
+      .catch(() => setSubjectsByLevel((prev) => ({ ...prev, [lid]: [] })));
+  }, [classForm.levelId, subjectsByLevel]);
+
+  const filteredClasses = useMemo(() => {
+    return classes.filter((c) => {
+      if (filterLevelId && c.levelId !== filterLevelId) return false;
+      if (filterSubjectId && c.subjectId !== filterSubjectId) return false;
+      return true;
+    });
+  }, [classes, filterLevelId, filterSubjectId]);
+
   const paginated = useMemo(
-    () => classes.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [classes, page]
+    () => filteredClasses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredClasses, page]
   );
 
   useEffect(() => {
-    if (classes.length > 0 && (page - 1) * PAGE_SIZE >= classes.length) {
+    if (filteredClasses.length > 0 && (page - 1) * PAGE_SIZE >= filteredClasses.length) {
       setPage(1);
     }
-  }, [classes.length, page]);
+  }, [filteredClasses.length, page]);
 
   const openAddClass = () => {
     setClassForm(emptyClassForm);
@@ -79,6 +111,8 @@ export default function AdminKelasListPage() {
     setClassForm({
       title: c.title,
       description: c.description ?? "",
+      levelId: c.levelId ?? "",
+      subjectId: c.subjectId ?? "",
       trainerId: c.trainerId ?? "",
       startDate: c.startDate ?? "",
       endDate: c.endDate ?? "",
@@ -99,10 +133,17 @@ export default function AdminKelasListPage() {
     let savedKind: "add" | "edit" | null = null;
     if (classModalMode === "add") {
       const trainer = trainers.find((t) => t.id === classForm.trainerId) ?? null;
+      const level = levels.find((l) => l.id === classForm.levelId) ?? null;
+      const subjects = classForm.levelId ? subjectsByLevel[classForm.levelId] ?? [] : [];
+      const subject = subjects.find((s) => s.id === classForm.subjectId) ?? null;
       const created: AdminClass = {
         id: uid("class"),
         title: classForm.title.trim(),
         description: classForm.description.trim() || undefined,
+        levelId: classForm.levelId || undefined,
+        levelName: level?.name ?? undefined,
+        subjectId: classForm.subjectId || undefined,
+        subjectName: subject?.name ?? undefined,
         trainerId: classForm.trainerId || undefined,
         trainerName: trainer?.name ?? undefined,
         startDate: classForm.startDate || undefined,
@@ -115,6 +156,9 @@ export default function AdminKelasListPage() {
       setClasses((prev) => [created, ...prev]);
       savedKind = "add";
     } else if (classModalMode === "edit" && editingClassId) {
+      const level = levels.find((l) => l.id === classForm.levelId) ?? null;
+      const subjects = classForm.levelId ? subjectsByLevel[classForm.levelId] ?? [] : [];
+      const subject = subjects.find((s) => s.id === classForm.subjectId) ?? null;
       setClasses((prev) =>
         prev.map((c) =>
           c.id === editingClassId
@@ -122,6 +166,10 @@ export default function AdminKelasListPage() {
                 ...c,
                 title: classForm.title.trim(),
                 description: classForm.description.trim() || undefined,
+                levelId: classForm.levelId || undefined,
+                levelName: level?.name ?? undefined,
+                subjectId: classForm.subjectId || undefined,
+                subjectName: subject?.name ?? undefined,
                 trainerId: classForm.trainerId || undefined,
                 trainerName:
                   (trainers.find((t) => t.id === classForm.trainerId)?.name ?? c.trainerName) || undefined,
@@ -196,7 +244,7 @@ export default function AdminKelasListPage() {
             Daftar kelas (disimpan di browser). Untuk mengatur <strong>module, konten, dan materi</strong>, buka{" "}
             <strong>Kelola modul</strong> pada baris kelas. Untuk kelas dari Master Data (API), gunakan{" "}
             <Link href="/admin/master-data/kelas" className="font-medium text-emerald-700 underline">
-              Master Data → Kelas
+              Master Data → Bidang
             </Link>
             . Promo diskon untuk pembelian kelas dikelola di{" "}
             <Link href="/admin/vouchers" className="font-medium text-emerald-700 underline">
@@ -251,7 +299,48 @@ export default function AdminKelasListPage() {
 
       <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
         <div className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">Daftar kelas</div>
-        {classes.length === 0 ? (
+        <div className="grid grid-cols-1 gap-3 border-b border-zinc-100 bg-zinc-50/60 px-4 py-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">Filter jenjang pendidikan</label>
+            <select
+              value={filterLevelId}
+              onChange={(e) => {
+                const lid = e.target.value;
+                setFilterLevelId(lid);
+                setFilterSubjectId("");
+                if (lid && !subjectsByLevel[lid]) {
+                  adminGetLevelSubjects(lid)
+                    .then((rows) => setSubjectsByLevel((prev) => ({ ...prev, [lid]: rows ?? [] })))
+                    .catch(() => setSubjectsByLevel((prev) => ({ ...prev, [lid]: [] })));
+                }
+              }}
+              className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Semua jenjang</option>
+              {levels.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">Filter bidang</label>
+            <select
+              value={filterSubjectId}
+              onChange={(e) => setFilterSubjectId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Semua bidang</option>
+              {(filterLevelId ? subjectsByLevel[filterLevelId] ?? [] : []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {filteredClasses.length === 0 ? (
           <div className="p-6 text-sm text-zinc-600">Belum ada kelas. Klik &quot;Tambah Kelas&quot;.</div>
         ) : (
           <>
@@ -260,6 +349,7 @@ export default function AdminKelasListPage() {
                 <thead className="bg-zinc-50">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Kelas</th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-600">Bidang / Jenjang</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Status</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Modul</th>
                     <th className="px-4 py-3 text-right font-medium text-zinc-600">Aksi</th>
@@ -271,6 +361,10 @@ export default function AdminKelasListPage() {
                       <td className="px-4 py-3">
                         <p className="font-medium text-zinc-900">{c.title}</p>
                         <p className="text-xs text-zinc-500">{c.trainerName ?? "Trainer belum ditentukan"}</p>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-zinc-600">
+                        <div>{c.subjectName ?? "-"}</div>
+                        <div>{c.levelName ?? "-"}</div>
                       </td>
                       <td className="px-4 py-3 text-zinc-700">{statusLabel(c.status)}</td>
                       <td className="px-4 py-3">
@@ -303,7 +397,7 @@ export default function AdminKelasListPage() {
                 </tbody>
               </table>
             </div>
-            <Pagination currentPage={page} totalItems={classes.length} onPageChange={setPage} label="kelas" />
+            <Pagination currentPage={page} totalItems={filteredClasses.length} onPageChange={setPage} label="kelas" />
           </>
         )}
       </section>
@@ -332,6 +426,41 @@ export default function AdminKelasListPage() {
                   onChange={(e) => setClassForm((f) => ({ ...f, description: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600">Jenjang pendidikan</label>
+                  <select
+                    value={classForm.levelId}
+                    onChange={(e) =>
+                      setClassForm((f) => ({ ...f, levelId: e.target.value, subjectId: "" }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  >
+                    <option value="">— Pilih jenjang —</option>
+                    {levels.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600">Bidang</label>
+                  <select
+                    value={classForm.subjectId}
+                    onChange={(e) => setClassForm((f) => ({ ...f, subjectId: e.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    disabled={!classForm.levelId}
+                  >
+                    <option value="">— Pilih bidang —</option>
+                    {(classForm.levelId ? subjectsByLevel[classForm.levelId] ?? [] : []).map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

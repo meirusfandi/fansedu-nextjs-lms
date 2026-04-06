@@ -1,7 +1,6 @@
 "use client";
 
 import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
-import Link from "next/link";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminCreateSubject,
@@ -14,201 +13,172 @@ import type { Level, Subject } from "@/lib/api-types";
 import { filterLevelsSDSMPSMA } from "@/features/admin/kelas-helpers";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type KelasLevelListProps = {
-  levelId: string;
-  subjects: Subject[];
-  subjectPage: number;
-  onSubjectPageChange: (p: number) => void;
-  openKelasEdit: (s: Subject, levelId: string) => void;
-  handleDeleteKelas: (subjectId: string, levelId: string) => void;
-};
+type FlatBidang = Subject & { levelId: string; levelName: string };
 
-function KelasLevelList({
-  levelId,
-  subjects,
-  subjectPage,
-  onSubjectPageChange,
-  openKelasEdit,
-  handleDeleteKelas,
-}: KelasLevelListProps) {
-  const paginated = useMemo(
-    () => subjects.slice((subjectPage - 1) * PAGE_SIZE, subjectPage * PAGE_SIZE),
-    [subjects, subjectPage]
-  );
-
-  useEffect(() => {
-    if (subjects.length > 0 && (subjectPage - 1) * PAGE_SIZE >= subjects.length) {
-      onSubjectPageChange(1);
-    }
-  }, [subjects.length, subjectPage, onSubjectPageChange]);
-
-  return (
-    <div>
-      <ul className="space-y-2">
-        {paginated.map((s) => (
-          <li
-            key={s.id}
-            className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="font-medium text-zinc-900">{s.name}</p>
-              {s.description && (
-                <p className="mt-0.5 text-sm text-zinc-500 line-clamp-2">{s.description}</p>
-              )}
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Link
-                href={`/admin/master-data/kelas/${encodeURIComponent(s.id)}?levelId=${encodeURIComponent(levelId)}`}
-                className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
-              >
-                Kelola modul
-              </Link>
-              <button
-                type="button"
-                onClick={() => openKelasEdit(s, levelId)}
-                className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-              >
-                Edit kelas
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteKelas(s.id, levelId)}
-                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
-              >
-                Hapus
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      {subjects.length > PAGE_SIZE && (
-        <div className="mt-4">
-          <Pagination
-            currentPage={subjectPage}
-            totalItems={subjects.length}
-            onPageChange={onSubjectPageChange}
-            label="kelas"
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function MasterDataKelasListPage() {
+export default function MasterDataBidangListPage() {
   const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [levels, setLevels] = useState<Level[]>([]);
+  const [subjectsByLevel, setSubjectsByLevel] = useState<Record<string, Subject[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedLevelId, setExpandedLevelId] = useState<string | null>(null);
-  const [subjectsByLevel, setSubjectsByLevel] = useState<Record<string, Subject[]>>({});
 
-  const [kelasModalLevelId, setKelasModalLevelId] = useState<string | null>(null);
-  const [kelasModalMode, setKelasModalMode] = useState<"add" | "edit" | null>(null);
+  const [filterLevelId, setFilterLevelId] = useState("");
+  const [page, setPage] = useState(1);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
-  const [kelasForm, setKelasForm] = useState({ name: "", slug: "", description: "" });
-
+  const [form, setForm] = useState({
+    levelId: "",
+    name: "",
+    slug: "",
+    description: "",
+  });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [subjectPage, setSubjectPage] = useState(1);
 
   const levelsSDSMPSMA = useMemo(() => filterLevelsSDSMPSMA(levels), [levels]);
 
-  useEffect(() => {
-    setSubjectPage(1);
-  }, [expandedLevelId]);
-
-  const loadLevels = useCallback(() => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
-    adminListLevels()
-      .then(setLevels)
-      .catch((e) => {
-        setError((e as Error).message ?? "Gagal memuat daftar level");
-        setLevels([]);
-      })
-      .finally(() => setLoading(false));
+    try {
+      const lv = await adminListLevels();
+      const filtered = filterLevelsSDSMPSMA(lv ?? []);
+      setLevels(filtered);
+
+      const entries = await Promise.all(
+        filtered.map(async (l) => {
+          try {
+            const subjects = await adminGetLevelSubjects(l.id);
+            return [l.id, subjects ?? []] as const;
+          } catch {
+            return [l.id, []] as const;
+          }
+        })
+      );
+      const map: Record<string, Subject[]> = {};
+      for (const [id, rows] of entries) map[id] = rows;
+      setSubjectsByLevel(map);
+    } catch (e) {
+      setError((e as Error).message ?? "Gagal memuat data bidang");
+      setLevels([]);
+      setSubjectsByLevel({});
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    loadLevels();
-  }, [loadLevels]);
+    void loadAll();
+  }, [loadAll]);
 
-  const loadSubjects = useCallback((levelId: string) => {
-    adminGetLevelSubjects(levelId)
-      .then((list) => setSubjectsByLevel((prev) => ({ ...prev, [levelId]: list })))
-      .catch(() => setSubjectsByLevel((prev) => ({ ...prev, [levelId]: [] })));
-  }, []);
+  const flatRows = useMemo<FlatBidang[]>(() => {
+    const out: FlatBidang[] = [];
+    for (const level of levelsSDSMPSMA) {
+      const rows = subjectsByLevel[level.id] ?? [];
+      for (const s of rows) {
+        out.push({ ...s, levelId: level.id, levelName: level.name });
+      }
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }, [levelsSDSMPSMA, subjectsByLevel]);
 
-  const toggleLevel = (levelId: string) => {
-    setExpandedLevelId((prev) => (prev === levelId ? null : levelId));
-    if (!subjectsByLevel[levelId]) loadSubjects(levelId);
-  };
+  const filteredRows = useMemo(() => {
+    if (!filterLevelId) return flatRows;
+    return flatRows.filter((r) => r.levelId === filterLevelId);
+  }, [flatRows, filterLevelId]);
 
-  const openKelasAdd = (levelId: string) => {
-    setKelasModalLevelId(levelId);
-    setKelasForm({ name: "", slug: "", description: "" });
+  const paginatedRows = useMemo(
+    () => filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredRows, page]
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterLevelId]);
+
+  useEffect(() => {
+    if (filteredRows.length > 0 && (page - 1) * PAGE_SIZE >= filteredRows.length) {
+      setPage(1);
+    }
+  }, [filteredRows.length, page]);
+
+  const openAdd = () => {
+    setModalMode("add");
     setEditingSubjectId(null);
-    setKelasModalMode("add");
-    setSubmitError(null);
-  };
-
-  const openKelasEdit = (s: Subject, levelId: string) => {
-    setKelasModalLevelId(levelId);
-    setKelasForm({
-      name: s.name,
-      slug: s.slug ?? "",
-      description: s.description ?? "",
+    setForm({
+      levelId: filterLevelId || "",
+      name: "",
+      slug: "",
+      description: "",
     });
-    setEditingSubjectId(s.id);
-    setKelasModalMode("edit");
     setSubmitError(null);
+    setModalOpen(true);
   };
 
-  const handleKelasSubmit = async (e: React.FormEvent) => {
+  const openEdit = (row: FlatBidang) => {
+    setModalMode("edit");
+    setEditingSubjectId(row.id);
+    setForm({
+      levelId: row.levelId,
+      name: row.name,
+      slug: row.slug ?? "",
+      description: row.description ?? "",
+    });
+    setSubmitError(null);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSubmitError(null);
+    setEditingSubjectId(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const levelId = kelasModalLevelId;
-    if (!levelId) return;
+    if (!form.levelId.trim()) {
+      setSubmitError("Jenjang pendidikan wajib dipilih.");
+      return;
+    }
     setSubmitError(null);
     setSubmitLoading(true);
-    const modalMode = kelasModalMode;
     try {
-      if (kelasModalMode === "add") {
+      if (modalMode === "add") {
         await adminCreateSubject({
-          name: kelasForm.name.trim(),
-          slug: kelasForm.slug.trim() || undefined,
-          description: kelasForm.description.trim() || undefined,
-          levelId,
+          levelId: form.levelId.trim(),
+          name: form.name.trim(),
+          slug: form.slug.trim() || undefined,
+          description: form.description.trim() || undefined,
         });
+        showSuccess("Bidang berhasil ditambahkan.");
       } else if (editingSubjectId) {
         await adminUpdateSubject(editingSubjectId, {
-          name: kelasForm.name.trim(),
-          slug: kelasForm.slug.trim() || undefined,
-          description: kelasForm.description.trim() || undefined,
+          name: form.name.trim(),
+          slug: form.slug.trim() || undefined,
+          description: form.description.trim() || undefined,
         });
+        showSuccess("Bidang berhasil diperbarui.");
       }
-      setKelasModalLevelId(null);
-      setKelasModalMode(null);
-      setEditingSubjectId(null);
-      loadSubjects(levelId);
-      showSuccess(
-        modalMode === "add" ? "Kelas berhasil ditambahkan." : "Kelas berhasil diperbarui."
-      );
+      closeModal();
+      await loadAll();
     } catch (err) {
-      setSubmitError((err as Error).message ?? "Gagal menyimpan");
+      setSubmitError((err as Error).message ?? "Gagal menyimpan bidang.");
     } finally {
       setSubmitLoading(false);
     }
   };
 
-  const handleDeleteKelas = async (subjectId: string, levelId: string) => {
-    if (!confirm("Hapus kelas ini? Semua modul di dalamnya ikut terhapus dari daftar.")) return;
+  const handleDelete = async (row: FlatBidang) => {
+    if (!confirm(`Hapus bidang "${row.name}"?`)) return;
     try {
-      await adminDeleteSubject(subjectId);
-      loadSubjects(levelId);
-      showSuccess("Kelas berhasil dihapus.");
+      await adminDeleteSubject(row.id);
+      showSuccess("Bidang berhasil dihapus.");
+      await loadAll();
     } catch (err) {
-      setError((err as Error).message ?? "Gagal menghapus");
+      setError((err as Error).message ?? "Gagal menghapus bidang.");
     }
   };
 
@@ -216,10 +186,9 @@ export default function MasterDataKelasListPage() {
     <div className="px-4 py-5 text-zinc-900 sm:px-6 md:px-8 md:py-8">
       <div className="mb-6 md:mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Master Data</p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">Kelas</h1>
+        <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">Bidang</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Buat dan kelola kelas per jenjang (SD, SMP, SMA). Untuk menambah modul, buka halaman detail lewat tombol{" "}
-          <strong className="font-medium text-zinc-800">Kelola modul</strong>.
+          Daftar bidang ditampilkan dalam satu list. Filter jenjang tersedia untuk mempersempit data.
         </p>
       </div>
 
@@ -230,87 +199,131 @@ export default function MasterDataKelasListPage() {
       )}
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
       )}
 
-      <div className="space-y-4">
-        {loading ? (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
-            Memuat level (SD, SMP, SMA)…
-          </div>
-        ) : levelsSDSMPSMA.length === 0 ? (
-          <div className="rounded-2xl border border-zinc-200 bg-white p-8 text-center text-sm text-zinc-500">
-            Belum ada level SD, SMP, atau SMA. Tambah jenjang di Master Data → Jenjang Pendidikan (slug: sd, smp, sma).
-          </div>
-        ) : (
-          levelsSDSMPSMA.map((level) => (
-            <div key={level.id} className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => toggleLevel(level.id)}
-                  className="flex flex-1 items-center gap-2 text-left"
-                >
-                  <span className="text-lg font-medium text-zinc-900">{level.name}</span>
-                  {level.description && (
-                    <span className="text-xs text-zinc-500">— {level.description}</span>
-                  )}
-                  <span className="text-zinc-400">{expandedLevelId === level.id ? "▼" : "▶"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openKelasAdd(level.id)}
-                  className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-50 hover:bg-zinc-800"
-                >
-                  + Tambah kelas
-                </button>
-              </div>
-
-              {expandedLevelId === level.id && (
-                <div className="border-t border-zinc-100 p-4">
-                  {!subjectsByLevel[level.id] ? (
-                    <p className="text-sm text-zinc-500">Memuat daftar kelas…</p>
-                  ) : subjectsByLevel[level.id].length === 0 ? (
-                    <p className="text-sm text-zinc-500">
-                      Belum ada kelas. Klik &quot;+ Tambah kelas&quot;, lalu atur modul lewat &quot;Kelola modul&quot;.
-                    </p>
-                  ) : (
-                    <KelasLevelList
-                      levelId={level.id}
-                      subjects={subjectsByLevel[level.id]}
-                      subjectPage={subjectPage}
-                      onSubjectPageChange={setSubjectPage}
-                      openKelasEdit={openKelasEdit}
-                      handleDeleteKelas={handleDeleteKelas}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <div>
+          <label className="block text-xs font-medium text-zinc-600">Filter jenjang pendidikan</label>
+          <select
+            value={filterLevelId}
+            onChange={(e) => setFilterLevelId(e.target.value)}
+            className="mt-1 w-full min-w-[240px] rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+          >
+            <option value="">Semua jenjang</option>
+            {levelsSDSMPSMA.map((level, idx) => (
+              <option key={`${level.id}-${idx}`} value={level.id}>
+                {level.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={openAdd}
+          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800"
+        >
+          + Tambah bidang
+        </button>
       </div>
 
-      {kelasModalMode && kelasModalLevelId && (
+      <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <div className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">
+          Daftar bidang
+        </div>
+        {loading ? (
+          <div className="p-8 text-center text-sm text-zinc-500">Memuat data bidang…</div>
+        ) : filteredRows.length === 0 ? (
+          <div className="p-8 text-center text-sm text-zinc-500">Belum ada bidang untuk filter ini.</div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-zinc-200 text-sm">
+                <thead className="bg-zinc-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-600">Bidang</th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-600">Jenjang</th>
+                    <th className="px-4 py-3 text-right font-medium text-zinc-600">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {paginatedRows.map((row, idx) => (
+                    <tr key={`${row.levelId}-${row.id}-${idx}`} className="hover:bg-zinc-50/80">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-zinc-900">{row.name}</div>
+                        {row.description ? (
+                          <div className="text-xs text-zinc-500 line-clamp-2">{row.description}</div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-700">{row.levelName}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(row)}
+                          className="mr-2 text-xs text-sky-700 underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(row)}
+                          className="text-xs text-red-600 underline"
+                        >
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              currentPage={page}
+              totalItems={filteredRows.length}
+              onPageChange={setPage}
+              label="bidang"
+            />
+          </>
+        )}
+      </section>
+
+      {modalOpen && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-zinc-900">
-              {kelasModalMode === "add" ? "Tambah kelas" : "Edit kelas"}
+              {modalMode === "add" ? "Tambah bidang" : "Edit bidang"}
             </h2>
             {submitError && (
               <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {submitError}
               </div>
             )}
-            <form onSubmit={handleKelasSubmit} className="mt-4 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-zinc-600">Nama kelas *</label>
+                <label className="block text-xs font-medium text-zinc-600">Jenjang pendidikan *</label>
+                <select
+                  value={form.levelId}
+                  onChange={(e) => setForm((f) => ({ ...f, levelId: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                  required
+                >
+                  <option value="">— Pilih jenjang —</option>
+                  {levelsSDSMPSMA.map((level, idx) => (
+                    <option key={`${level.id}-${idx}`} value={level.id}>
+                      {level.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">Nama bidang *</label>
                 <input
                   type="text"
                   required
-                  value={kelasForm.name}
-                  onChange={(e) => setKelasForm({ ...kelasForm, name: e.target.value })}
-                  placeholder="Mis. Algoritma Dasar"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
@@ -318,9 +331,8 @@ export default function MasterDataKelasListPage() {
                 <label className="block text-xs font-medium text-zinc-600">Slug (opsional)</label>
                 <input
                   type="text"
-                  value={kelasForm.slug}
-                  onChange={(e) => setKelasForm({ ...kelasForm, slug: e.target.value })}
-                  placeholder="algoritma-dasar"
+                  value={form.slug}
+                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
@@ -328,27 +340,23 @@ export default function MasterDataKelasListPage() {
                 <label className="block text-xs font-medium text-zinc-600">Deskripsi (opsional)</label>
                 <textarea
                   rows={2}
-                  value={kelasForm.description}
-                  onChange={(e) => setKelasForm({ ...kelasForm, description: e.target.value })}
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-4">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setKelasModalLevelId(null);
-                    setKelasModalMode(null);
-                    setEditingSubjectId(null);
-                  }}
-                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                  onClick={closeModal}
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitLoading}
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50"
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-zinc-50 hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {submitLoading ? "Menyimpan…" : "Simpan"}
                 </button>
@@ -360,3 +368,4 @@ export default function MasterDataKelasListPage() {
     </div>
   );
 }
+

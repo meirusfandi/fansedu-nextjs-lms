@@ -21,7 +21,7 @@ export const adminSidebarSections: NavSection[] = [
     items: [
       { href: "/admin/master-data/setting", label: "Setting" },
       { href: "/admin/master-data/role", label: "Role" },
-      { href: "/admin/master-data/kelas", label: "Kelas" },
+      { href: "/admin/master-data/kelas", label: "Bidang" },
       { href: "/admin/master-data/sekolah", label: "Sekolah" },
       { href: "/admin/master-data/jenjang", label: "Jenjang Pendidikan" },
       { href: "/admin/master-data/event", label: "Event" },

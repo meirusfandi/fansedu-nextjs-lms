@@ -5,12 +5,13 @@ import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminCreateUser,
   adminGetUser,
+  adminListLevels,
   adminListUsers,
   adminListSekolah,
   adminListSubjects,
   adminUpdateUser,
 } from "@/lib/api";
-import type { Sekolah, Subject, User, UserRole } from "@/lib/api-types";
+import type { Level, Sekolah, Subject, User, UserRole } from "@/lib/api-types";
 import { normalizeUserRoleFromApi } from "@/lib/user-role";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -36,21 +37,41 @@ export default function AdminUsersPage() {
     schoolId: "",
   });
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [levels, setLevels] = useState<Level[]>([]);
   const [schools, setSchools] = useState<Sekolah[]>([]);
+  const [filterLevelId, setFilterLevelId] = useState("");
+  const [filterSubjectId, setFilterSubjectId] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [page, setPage] = useState(1);
 
+  const filteredUsers = useMemo(() => {
+    const subjectLevelById = new Map<string, string>();
+    for (const s of subjects) {
+      const raw = s as Subject & { levelId?: string | null };
+      if (raw.levelId) subjectLevelById.set(s.id, raw.levelId);
+    }
+    return users.filter((u) => {
+      if (filterSubjectId && u.subjectId !== filterSubjectId) return false;
+      if (filterLevelId) {
+        const sid = u.subjectId ?? "";
+        const lid = sid ? subjectLevelById.get(sid) ?? "" : "";
+        if (lid !== filterLevelId) return false;
+      }
+      return true;
+    });
+  }, [users, subjects, filterLevelId, filterSubjectId]);
+
   const paginatedUsers = useMemo(
-    () => users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [users, page]
+    () => filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredUsers, page]
   );
   useEffect(() => {
-    if (users.length > 0 && (page - 1) * PAGE_SIZE >= users.length) {
+    if (filteredUsers.length > 0 && (page - 1) * PAGE_SIZE >= filteredUsers.length) {
       setPage(1);
     }
-  }, [users.length, page]);
+  }, [filteredUsers.length, page]);
 
   const loadUsers = useCallback(() => {
     setLoading(true);
@@ -70,6 +91,7 @@ export default function AdminUsersPage() {
 
   const loadOptions = useCallback(() => {
     adminListSubjects().then(setSubjects).catch(() => setSubjects([]));
+    adminListLevels().then(setLevels).catch(() => setLevels([]));
     adminListSekolah().then(setSchools).catch(() => setSchools([]));
   }, []);
   useEffect(() => {
@@ -224,12 +246,54 @@ export default function AdminUsersPage() {
           </div>
         )}
 
+        <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">Filter jenjang pendidikan</label>
+            <select
+              value={filterLevelId}
+              onChange={(e) => {
+                setFilterLevelId(e.target.value);
+                setFilterSubjectId("");
+              }}
+              className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+            >
+              <option value="">Semua jenjang</option>
+              {levels.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">Filter bidang / subject</label>
+            <select
+              value={filterSubjectId}
+              onChange={(e) => setFilterSubjectId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+            >
+              <option value="">Semua bidang</option>
+              {subjects
+                .filter((s) => {
+                  if (!filterLevelId) return true;
+                  const raw = s as Subject & { levelId?: string | null };
+                  return (raw.levelId ?? "") === filterLevelId;
+                })
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
           {loading ? (
             <div className="p-8 text-center text-sm text-zinc-500">
               Memuat daftar user...
             </div>
-          ) : users.length === 0 ? (
+          ) : filteredUsers.length === 0 ? (
             <div className="p-8 text-center text-sm text-zinc-500">
               <p>Belum ada user ditampilkan.</p>
               <p className="mt-2 text-xs">
@@ -296,10 +360,10 @@ export default function AdminUsersPage() {
               </table>
             </div>
           )}
-          {!loading && users.length > 0 && (
+          {!loading && filteredUsers.length > 0 && (
             <Pagination
               currentPage={page}
-              totalItems={users.length}
+              totalItems={filteredUsers.length}
               onPageChange={setPage}
               label="user"
             />

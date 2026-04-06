@@ -31,6 +31,10 @@ export type AdminClass = {
   id: string;
   title: string;
   description?: string;
+  levelId?: string;
+  levelName?: string;
+  subjectId?: string;
+  subjectName?: string;
   trainerId?: string;
   trainerName?: string;
   startDate?: string;
@@ -76,6 +80,8 @@ export function assetTypeLabel(type: AssetType): string {
 export const emptyClassForm = {
   title: "",
   description: "",
+  levelId: "",
+  subjectId: "",
   trainerId: "",
   startDate: "",
   endDate: "",
