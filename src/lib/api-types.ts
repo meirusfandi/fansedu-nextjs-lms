@@ -173,6 +173,11 @@ export interface TryoutSession {
   status: TryoutStatus;
   /** Kategori event: tryout, free_class, paid_class. Dari Master Data Event. */
   eventCategory?: EventCategorySlug | string | null;
+  /** Jenjang & bidang (jika backend mengirim) — untuk filter bank soal, dll. */
+  levelId?: string | null;
+  levelName?: string | null;
+  subjectId?: string | null;
+  subjectName?: string | null;
 }
 
 export interface StartTryoutResponse {

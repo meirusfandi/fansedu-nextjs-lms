@@ -78,6 +78,10 @@ export function normalizeQuestionBankEntries(raw: unknown): QuestionBankEntry[] 
     const body = String(o.body ?? "");
     const maxScore = typeof o.maxScore === "number" && Number.isFinite(o.maxScore) ? o.maxScore : 1;
     const options = Array.isArray(o.options) ? (o.options as QuestionBankEntry["options"]) : null;
+    const levelId = o.levelId != null ? String(o.levelId) : null;
+    const levelName = o.levelName != null ? String(o.levelName) : null;
+    const subjectId = o.subjectId != null ? String(o.subjectId) : null;
+    const subjectName = o.subjectName != null ? String(o.subjectName) : null;
     out.push({
       id,
       sourceTryoutId,
@@ -91,6 +95,10 @@ export function normalizeQuestionBankEntries(raw: unknown): QuestionBankEntry[] 
       correctText: o.correctText != null ? String(o.correctText) : null,
       imageUrl: o.imageUrl != null ? String(o.imageUrl) : null,
       importedAt: String(o.importedAt ?? new Date().toISOString()),
+      levelId: levelId && levelId.trim() ? levelId : null,
+      levelName: levelName && levelName.trim() ? levelName : null,
+      subjectId: subjectId && subjectId.trim() ? subjectId : null,
+      subjectName: subjectName && subjectName.trim() ? subjectName : null,
     });
   }
   return out;

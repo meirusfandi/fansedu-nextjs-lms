@@ -5,11 +5,14 @@ import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { QuestionBody } from "@/components/QuestionBody";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
+  adminGetLevelSubjects,
+  adminListLevels,
   adminListTryoutQuestions,
   adminListTryouts,
   getFriendlyApiErrorMessage,
 } from "@/lib/api";
-import type { Question, TryoutSession } from "@/lib/api-types";
+import type { Level, Question, TryoutSession } from "@/lib/api-types";
+import { filterLevelsSDSMPSMA } from "@/features/admin/kelas-helpers";
 import {
   appendQuestionBankEntries,
   buildBankEntryFromQuestion,
@@ -19,6 +22,23 @@ import {
 import type { QuestionBankEntry } from "@/lib/question-bank/types";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+type SubjectRow = { id: string; name: string; levelId: string; levelName: string };
+
+type SubjectOption = { id: string; label: string };
+
+/** Key React yang unik meski `e.id` bentrok di data lama / JSON korup. */
+function bankEntryListKey(e: QuestionBankEntry): string {
+  return `${e.sourceTryoutId}:${e.sourceQuestionId}:${e.id}`;
+}
+
+function dedupeTryoutsById(list: TryoutSession[]): TryoutSession[] {
+  const m = new Map<string, TryoutSession>();
+  for (const t of list) {
+    if (t.id && !m.has(t.id)) m.set(t.id, t);
+  }
+  return Array.from(m.values());
+}
 
 function typeLabel(t: string): string {
   if (t === "multiple_choice") return "Pilihan ganda";
@@ -33,8 +53,15 @@ export default function AdminQuestionBankPage() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
-  const [importOpen, setImportOpen] = useState(false);
+  const [levels, setLevels] = useState<Level[]>([]);
+  const [subjectsFlat, setSubjectsFlat] = useState<SubjectRow[]>([]);
   const [tryouts, setTryouts] = useState<TryoutSession[]>([]);
+  const [metaLoading, setMetaLoading] = useState(true);
+
+  const [filterLevelId, setFilterLevelId] = useState("");
+  const [filterSubjectId, setFilterSubjectId] = useState("");
+
+  const [importOpen, setImportOpen] = useState(false);
   const [tryoutsLoading, setTryoutsLoading] = useState(false);
   const [selectedTryoutId, setSelectedTryoutId] = useState<string>("");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -60,20 +87,117 @@ export default function AdminQuestionBankPage() {
     }
   }, []);
 
+  const loadMeta = useCallback(async () => {
+    setMetaLoading(true);
+    try {
+      const [lv, tlist] = await Promise.all([adminListLevels(), adminListTryouts()]);
+      const filteredLevels = filterLevelsSDSMPSMA(lv ?? []);
+      setLevels(filteredLevels);
+      const rows = await Promise.all(
+        filteredLevels.map(async (l) => {
+          try {
+            const subs = await adminGetLevelSubjects(l.id);
+            return (subs ?? []).map((s) => ({
+              id: s.id,
+              name: s.name,
+              levelId: l.id,
+              levelName: l.name,
+            }));
+          } catch {
+            return [];
+          }
+        })
+      );
+      setSubjectsFlat(rows.flat());
+      setTryouts(dedupeTryoutsById(Array.isArray(tlist) ? tlist : []));
+    } catch {
+      setLevels([]);
+      setSubjectsFlat([]);
+      setTryouts([]);
+    } finally {
+      setMetaLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadBank();
-  }, [loadBank]);
+    void loadMeta();
+  }, [loadBank, loadMeta]);
+
+  const tryoutById = useMemo(() => {
+    const m: Record<string, TryoutSession> = {};
+    for (const t of tryouts) {
+      if (t.id) m[t.id] = t;
+    }
+    return m;
+  }, [tryouts]);
+
+  const levelById = useMemo(() => new Map(levels.map((l) => [l.id, l] as const)), [levels]);
+
+  const subjectNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of subjectsFlat) {
+      if (!m.has(s.id)) m.set(s.id, s.name);
+    }
+    return m;
+  }, [subjectsFlat]);
+
+  /** Satu baris per subject id (subjek sama di banyak jenjang tidak boleh duplikat key `<option>`). */
+  const subjectSelectOptions = useMemo((): SubjectOption[] => {
+    const src = filterLevelId ? subjectsFlat.filter((s) => s.levelId === filterLevelId) : subjectsFlat;
+    const byId = new Map<string, { name: string; levels: Set<string> }>();
+    for (const s of src) {
+      let row = byId.get(s.id);
+      if (!row) {
+        row = { name: s.name, levels: new Set([s.levelName]) };
+        byId.set(s.id, row);
+      } else {
+        row.levels.add(s.levelName);
+      }
+    }
+    const opts: SubjectOption[] = [];
+    for (const [id, v] of byId) {
+      const levelsStr = Array.from(v.levels).sort().join(", ");
+      opts.push({
+        id,
+        label: filterLevelId ? v.name : `${v.name} (${levelsStr})`,
+      });
+    }
+    opts.sort((a, b) => a.label.localeCompare(b.label, "id"));
+    return opts;
+  }, [subjectsFlat, filterLevelId]);
+
+  useEffect(() => {
+    if (filterSubjectId && !subjectSelectOptions.some((o) => o.id === filterSubjectId)) {
+      setFilterSubjectId("");
+    }
+  }, [filterSubjectId, subjectSelectOptions]);
+
+  const filteredEntries = useMemo(() => {
+    return entries.filter((e) => {
+      const t = tryoutById[e.sourceTryoutId];
+      const levelId = (e.levelId ?? t?.levelId ?? "").trim();
+      const subjectId = (e.subjectId ?? t?.subjectId ?? "").trim();
+      if (filterLevelId && levelId !== filterLevelId) return false;
+      if (filterSubjectId && subjectId !== filterSubjectId) return false;
+      return true;
+    });
+  }, [entries, filterLevelId, filterSubjectId, tryoutById]);
 
   const paginated = useMemo(
-    () => entries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [entries, page]
+    () => filteredEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredEntries, page]
   );
 
   useEffect(() => {
-    if (entries.length > 0 && (page - 1) * PAGE_SIZE >= entries.length) {
+    if (filteredEntries.length > 0 && (page - 1) * PAGE_SIZE >= filteredEntries.length) {
       setPage(1);
     }
-  }, [entries.length, page]);
+  }, [filteredEntries.length, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterLevelId, filterSubjectId]);
 
   const openImport = async () => {
     setImportOpen(true);
@@ -81,10 +205,11 @@ export default function AdminQuestionBankPage() {
     setSelectedTryoutId("");
     setQuestions([]);
     setSelectedQIds(new Set());
+    if (tryouts.length > 0) return;
     setTryoutsLoading(true);
     try {
       const list = await adminListTryouts();
-      setTryouts(Array.isArray(list) ? list : []);
+      setTryouts(dedupeTryoutsById(Array.isArray(list) ? list : []));
     } catch (e) {
       setImportNotice(getFriendlyApiErrorMessage(e));
       setTryouts([]);
@@ -138,9 +263,21 @@ export default function AdminQuestionBankPage() {
       return;
     }
     const title = selectedTryout?.title ?? "Tryout";
+    const t = selectedTryout;
+    let levelId = t?.levelId?.trim() || null;
+    let levelName = t?.levelName?.trim() || null;
+    let subjectId = t?.subjectId?.trim() || null;
+    let subjectName = t?.subjectName?.trim() || null;
+    if (levelId && !levelName) levelName = levelById.get(levelId)?.name ?? null;
+    if (subjectId && !subjectName) subjectName = subjectNameById.get(subjectId) ?? null;
+    const importCtx =
+      levelId || subjectId || levelName || subjectName
+        ? { levelId, levelName, subjectId, subjectName }
+        : null;
+
     const toAdd = questions
       .filter((q) => selectedQIds.has(q.id))
-      .map((q) => buildBankEntryFromQuestion(q, selectedTryoutId, title));
+      .map((q) => buildBankEntryFromQuestion(q, selectedTryoutId, title, importCtx));
     setImportBusy(true);
     setImportNotice(null);
     try {
@@ -210,14 +347,99 @@ export default function AdminQuestionBankPage() {
             Klik <strong>Impor dari tryout</strong>, pilih event, lalu centang soal yang ingin dimasukkan.
           </p>
         </div>
+      ) : filteredEntries.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/80 px-6 py-10 text-center">
+          <p className="text-sm font-medium text-amber-950">Tidak ada soal untuk filter ini</p>
+          <p className="mt-1 text-sm text-amber-900/80">Sesuaikan jenjang atau bidang, atau setel kembali ke &quot;Semua&quot;.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setFilterLevelId("");
+              setFilterSubjectId("");
+            }}
+            className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+          >
+            Reset filter
+          </button>
+        </div>
       ) : (
         <>
-          <ul className="space-y-3">
-            {paginated.map((e) => (
-              <li
-                key={e.id}
-                className="rounded-xl border border-zinc-200 bg-white p-4 text-zinc-900 shadow-sm"
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/80 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-[200px] flex-1">
+              <label htmlFor="qb-filter-level" className="mb-1 block text-xs font-medium text-zinc-700">
+                Jenjang pendidikan
+              </label>
+              <select
+                id="qb-filter-level"
+                value={filterLevelId}
+                onChange={(ev) => {
+                  setFilterLevelId(ev.target.value);
+                }}
+                disabled={metaLoading}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
               >
+                <option value="">Semua jenjang</option>
+                {levels.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[220px] flex-1">
+              <label htmlFor="qb-filter-subject" className="mb-1 block text-xs font-medium text-zinc-700">
+                Bidang
+              </label>
+              <select
+                id="qb-filter-subject"
+                value={filterSubjectId}
+                onChange={(ev) => setFilterSubjectId(ev.target.value)}
+                disabled={metaLoading || (Boolean(filterLevelId) && subjectSelectOptions.length === 0)}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 disabled:opacity-60"
+              >
+                <option value="">Semua bidang{filterLevelId ? " (jenjang ini)" : ""}</option>
+                {subjectSelectOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {(filterLevelId || filterSubjectId) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterLevelId("");
+                  setFilterSubjectId("");
+                }}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100 sm:mb-0"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          <ul className="space-y-3">
+            {paginated.map((e) => {
+              const tMeta = tryoutById[e.sourceTryoutId];
+              const lid = (e.levelId ?? tMeta?.levelId ?? "").trim() || null;
+              const sid = (e.subjectId ?? tMeta?.subjectId ?? "").trim() || null;
+              const levelLabel =
+                e.levelName?.trim() ||
+                tMeta?.levelName?.trim() ||
+                (lid ? levelById.get(lid)?.name : null) ||
+                null;
+              const subjectLabel =
+                e.subjectName?.trim() ||
+                tMeta?.subjectName?.trim() ||
+                (sid ? subjectNameById.get(sid) : null) ||
+                null;
+
+              return (
+                <li
+                  key={bankEntryListKey(e)}
+                  className="rounded-xl border border-zinc-200 bg-white p-4 text-zinc-900 shadow-sm"
+                >
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
                   <div className="min-w-0 flex-1 text-zinc-900">
                     <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
@@ -225,6 +447,16 @@ export default function AdminQuestionBankPage() {
                         {typeLabel(e.type)}
                       </span>
                       <span>Skor maks: {e.maxScore}</span>
+                      {(levelLabel || subjectLabel) && (
+                        <>
+                          <span>·</span>
+                          <span className="text-zinc-500">
+                            {levelLabel && <span>Jenjang: {levelLabel}</span>}
+                            {levelLabel && subjectLabel ? " · " : null}
+                            {subjectLabel && <span>Bidang: {subjectLabel}</span>}
+                          </span>
+                        </>
+                      )}
                       {e.sourceTryoutTitle && (
                         <>
                           <span>·</span>
@@ -261,14 +493,15 @@ export default function AdminQuestionBankPage() {
                     </button>
                   </div>
                 </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
-          {entries.length > PAGE_SIZE && (
+          {filteredEntries.length > PAGE_SIZE && (
             <div className="mt-6">
               <Pagination
                 currentPage={page}
-                totalItems={entries.length}
+                totalItems={filteredEntries.length}
                 onPageChange={setPage}
                 label="soal"
               />
@@ -370,7 +603,7 @@ export default function AdminQuestionBankPage() {
                   ) : (
                     <ul className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-zinc-200 bg-zinc-100/80 p-2">
                       {questions.map((q) => (
-                        <li key={q.id}>
+                        <li key={`${q.tryoutSessionId}-${q.id}-${q.sortOrder}`}>
                           <label className="flex cursor-pointer gap-2 rounded-md border border-zinc-200 bg-white px-2 py-2 text-zinc-900 hover:border-zinc-300 hover:bg-zinc-50">
                             <input
                               type="checkbox"

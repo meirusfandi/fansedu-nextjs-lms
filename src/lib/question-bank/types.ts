@@ -14,4 +14,9 @@ export interface QuestionBankEntry {
   correctText?: string | null;
   imageUrl?: string | null;
   importedAt: string;
+  /** Snapshot saat impor / dari metadata tryout (opsional). */
+  levelId?: string | null;
+  levelName?: string | null;
+  subjectId?: string | null;
+  subjectName?: string | null;
 }

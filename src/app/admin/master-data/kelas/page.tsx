@@ -48,12 +48,12 @@ export default function MasterDataBidangListPage() {
       setLevels(filtered);
 
       const entries = await Promise.all(
-        filtered.map(async (l) => {
+        filtered.map(async (l): Promise<[string, Subject[]]> => {
           try {
             const subjects = await adminGetLevelSubjects(l.id);
-            return [l.id, subjects ?? []] as const;
+            return [l.id, subjects ?? []];
           } catch {
-            return [l.id, []] as const;
+            return [l.id, []];
           }
         })
       );

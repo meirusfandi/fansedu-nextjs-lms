@@ -344,6 +344,10 @@ function normalizeToTryoutSession(item: unknown): TryoutSession {
     status: String(obj.status ?? "draft") as TryoutSession["status"],
     eventCategory:
       obj.eventCategory != null ? String(obj.eventCategory) : null,
+    levelId: obj.levelId != null ? String(obj.levelId) : null,
+    levelName: obj.levelName != null ? String(obj.levelName) : null,
+    subjectId: obj.subjectId != null ? String(obj.subjectId) : null,
+    subjectName: obj.subjectName != null ? String(obj.subjectName) : null,
   };
 }
 

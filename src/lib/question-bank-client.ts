@@ -8,12 +8,24 @@ function newBankId(): string {
   return `qb-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
+export type QuestionBankImportContext = {
+  levelId?: string | null;
+  levelName?: string | null;
+  subjectId?: string | null;
+  subjectName?: string | null;
+};
+
 /** Bangun entri bank dari soal tryout (snapshot untuk disimpan di JSON). */
 export function buildBankEntryFromQuestion(
   q: Question,
   tryoutId: string,
-  tryoutTitle: string
+  tryoutTitle: string,
+  context?: QuestionBankImportContext | null
 ): QuestionBankEntry {
+  const trimOrNull = (s: string | null | undefined) => {
+    const t = s != null ? String(s).trim() : "";
+    return t ? t : null;
+  };
   return {
     id: newBankId(),
     sourceTryoutId: tryoutId,
@@ -27,6 +39,10 @@ export function buildBankEntryFromQuestion(
     correctText: q.correctText ?? null,
     imageUrl: q.imageUrl ?? null,
     importedAt: new Date().toISOString(),
+    levelId: trimOrNull(context?.levelId),
+    levelName: trimOrNull(context?.levelName),
+    subjectId: trimOrNull(context?.subjectId),
+    subjectName: trimOrNull(context?.subjectName),
   };
 }
 

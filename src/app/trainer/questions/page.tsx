@@ -7,6 +7,10 @@ import type { QuestionBankEntry } from "@/lib/question-bank/types";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+function bankEntryListKey(e: QuestionBankEntry): string {
+  return `${e.sourceTryoutId}:${e.sourceQuestionId}:${e.id}`;
+}
+
 function typeLabel(t: string): string {
   if (t === "multiple_choice") return "Pilihan ganda";
   if (t === "true_false") return "Benar/salah";
@@ -59,7 +63,7 @@ export default function TrainerQuestionBankReadPage() {
       ) : (
         <ul className="mt-6 space-y-3">
           {entries.map((e) => (
-            <li key={e.id} className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+            <li key={bankEntryListKey(e)} className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
                 <span className="rounded bg-zinc-100 px-2 py-0.5 font-medium text-zinc-700">
                   {typeLabel(e.type)}
