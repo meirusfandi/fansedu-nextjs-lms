@@ -642,6 +642,12 @@ export interface Payment {
   notes?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  /** Tanggal pembelian yang dicatat (boleh berbeda dari createdAt). */
+  purchasedAt?: string | null;
+  /** Relasi ke order jika pembayaran berasal dari order checkout/manual. */
+  orderId?: string | null;
+  /** Waktu dibayar (opsional, jika backend memisahkan paidAt vs createdAt). */
+  paidAt?: string | null;
   [key: string]: unknown;
 }
 
@@ -651,6 +657,69 @@ export interface CreatePaymentRequest {
   referenceId: string;
   proofUrl?: string;
 }
+
+/** Permintaan admin membuat order manual (pending). */
+export interface AdminManualOrderCreateRequest {
+  userId: string;
+  courseIds: string[];
+  /** Opsional: jika tidak dikirim backend hitung dari harga kelas di DB. */
+  totalPrice?: number;
+}
+
+/** Metadata order minimal yang dipakai frontend admin. */
+export interface AdminOrder {
+  id: string;
+  userId?: string | null;
+  status?: string | null;
+  totalPrice?: number | null;
+  createdAt?: string | null;
+  purchasedAt?: string | null;
+  paymentProofAt?: string | null;
+  [key: string]: unknown;
+}
+
+/** Body verify order; purchasedAt opsional (RFC3339). */
+export interface AdminVerifyOrderRequest {
+  purchasedAt?: string | null;
+}
+
+/** Patch metadata pembelian order. */
+export type AdminOrderPurchaseMetaPatchRequest = Partial<{
+  purchasedAt: string | null;
+  paymentProofAt: string | null;
+}>;
+
+/** Grant akses kelas tanpa order. */
+export interface AdminGrantEnrollmentRequest {
+  userId: string;
+  courseId: string;
+  enrolledAt?: string | null;
+}
+
+/** Patch tanggal enrollment. */
+export interface AdminUpdateEnrollmentRequest {
+  enrolledAt: string;
+}
+
+/** Permintaan admin mencatat pembayaran (versi diperluas). */
+export interface AdminCreatePaymentRequest {
+  userId: string;
+  amount: number;
+  currency?: string;
+  type: string;
+  /** pending | paid | failed | dst. */
+  status?: PaymentStatus;
+  description?: string | null;
+  orderId?: string | null;
+  proofUrl?: string | null;
+  paidAt?: string | null;
+}
+
+/** Pembaruan parsial pembayaran oleh admin. */
+export type AdminUpdatePaymentRequest = Partial<{
+  purchasedAt: string | null;
+  notes: string | null;
+}>;
 
 // --- Course messages & discussions (untuk user yang ter-enroll) ---
 export interface CourseMessage {

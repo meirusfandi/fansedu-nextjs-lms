@@ -24,9 +24,29 @@ import {
   adminListPayments,
   adminConfirmPayment,
   adminRejectPayment,
+  adminCreatePayment,
+  adminCreateManualOrder,
+  adminUploadOrderPaymentProof,
+  adminVerifyOrder,
+  adminPatchOrderPurchaseMeta,
+  adminGrantEnrollment,
+  adminUpdateEnrollment,
+  adminUpdatePayment,
+  adminListUsers,
+  adminListCourses,
   trainerListPayments,
 } from "@/lib/api";
-import type { TrainerCourseCreateRequest, CreatePaymentRequest } from "@/lib/api-types";
+import type {
+  TrainerCourseCreateRequest,
+  CreatePaymentRequest,
+  AdminCreatePaymentRequest,
+  AdminGrantEnrollmentRequest,
+  AdminManualOrderCreateRequest,
+  AdminOrderPurchaseMetaPatchRequest,
+  AdminUpdateEnrollmentRequest,
+  AdminVerifyOrderRequest,
+  AdminUpdatePaymentRequest,
+} from "@/lib/api-types";
 
 export const queryKeys = {
   studentDashboard: ["student", "dashboard"] as const,
@@ -240,6 +260,136 @@ export function useAdminRejectPayment() {
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
     },
+  });
+}
+
+/** Catat pembayaran atas nama siswa/user. */
+export function useAdminCreatePayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AdminCreatePaymentRequest) => adminCreatePayment(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.payments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
+    },
+  });
+}
+
+/** Ubah tanggal pembelian / catatan. */
+export function useAdminUpdatePayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, body }: { paymentId: string; body: AdminUpdatePaymentRequest }) =>
+      adminUpdatePayment(paymentId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.payments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
+    },
+  });
+}
+
+export function useAdminCreateManualOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AdminManualOrderCreateRequest) => adminCreateManualOrder(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+    },
+  });
+}
+
+export function useAdminUploadOrderPaymentProof() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      orderId,
+      proofFile,
+      senderAccountNo,
+      senderName,
+    }: {
+      orderId: string;
+      proofFile: File;
+      senderAccountNo?: string;
+      senderName?: string;
+    }) => adminUploadOrderPaymentProof(orderId, proofFile, { senderAccountNo, senderName }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+    },
+  });
+}
+
+export function useAdminVerifyOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, body }: { orderId: string; body?: AdminVerifyOrderRequest }) =>
+      adminVerifyOrder(orderId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.payments });
+      qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
+    },
+  });
+}
+
+export function useAdminPatchOrderPurchaseMeta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, body }: { orderId: string; body: AdminOrderPurchaseMetaPatchRequest }) =>
+      adminPatchOrderPurchaseMeta(orderId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
+    },
+  });
+}
+
+export function useAdminGrantEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AdminGrantEnrollmentRequest) => adminGrantEnrollment(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "courses"] });
+      qc.invalidateQueries({ queryKey: queryKeys.studentCourses });
+    },
+  });
+}
+
+export function useAdminUpdateEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ enrollmentId, body }: { enrollmentId: string; body: AdminUpdateEnrollmentRequest }) =>
+      adminUpdateEnrollment(enrollmentId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "courses"] });
+      qc.invalidateQueries({ queryKey: queryKeys.studentCourses });
+    },
+  });
+}
+
+/** Muat user admin untuk modal pembayaran. */
+export function useAdminUsersForPaymentModal(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "users", "payment-modal"],
+    queryFn: adminListUsers,
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+/** Muat daftar kelas untuk referensi pembayaran kelas. */
+export function useAdminCoursesForPaymentModal(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "courses", "payment-modal"],
+    queryFn: adminListCourses,
+    enabled,
+    staleTime: 30_000,
   });
 }
 

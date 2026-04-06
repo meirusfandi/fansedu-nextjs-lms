@@ -6,8 +6,14 @@
 import type {
   AdminCourseLinkedTryoutsRequest,
   AdminCourseManageResponse,
+  AdminGrantEnrollmentRequest,
   AdminCreateCourseRequest,
   AdminCreateLevelRequest,
+  AdminManualOrderCreateRequest,
+  AdminOrder,
+  AdminOrderPurchaseMetaPatchRequest,
+  AdminUpdateEnrollmentRequest,
+  AdminVerifyOrderRequest,
   AdminCreateQuestionRequest,
   AdminUpdateQuestionRequest,
   AdminCreateSubjectRequest,
@@ -71,7 +77,9 @@ import type {
   LandingPackage,
   AdminLandingPackageCreateRequest,
   AdminLandingPackageUpdateRequest,
+  AdminCreatePaymentRequest,
   AdminCreateVoucherRequest,
+  AdminUpdatePaymentRequest,
   AdminUpdateVoucherRequest,
   AdminVoucher,
   StudentVoucherClaim,
@@ -255,6 +263,33 @@ async function request<T>(
       message = "Layanan sementara tidak tersedia. Silakan coba lagi nanti.";
     }
     const err = new Error(message);
+    (err as Error & { status: number }).status = res.status;
+    throw err;
+  }
+  return data as T;
+}
+
+async function requestFormData<T>(
+  path: string,
+  formData: FormData,
+  overrides?: { baseUrl?: string }
+): Promise<T> {
+  const base = overrides?.baseUrl ?? BASE;
+  const url = `${base}${path}`;
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  if (res.status === 204) return undefined as T;
+  const rawData = await res.json().catch(() => ({}));
+  const data = deepToCamelCase(rawData);
+  if (!res.ok) {
+    const d = data as { error?: string; message?: string };
+    const err = new Error(d?.error ?? d?.message ?? res.statusText);
     (err as Error & { status: number }).status = res.status;
     throw err;
   }
@@ -522,6 +557,17 @@ export async function markNotificationRead(id: string): Promise<{ ok?: boolean }
 }
 
 // --- Payments (user) ---
+function unwrapPaymentResponse(raw: unknown): Payment {
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj.id === "string") return raw as Payment;
+    if (obj.data && typeof obj.data === "object" && typeof (obj.data as { id?: unknown }).id === "string") {
+      return obj.data as Payment;
+    }
+  }
+  throw new Error("Respons pembayaran tidak valid");
+}
+
 /** GET /payments — riwayat pembayaran user (Bearer). */
 export async function listPayments(): Promise<Payment[]> {
   try {
@@ -563,6 +609,83 @@ export async function adminConfirmPayment(paymentId: string): Promise<Payment> {
 /** POST /admin/payments/:id/reject — tolak pembayaran (admin). */
 export async function adminRejectPayment(paymentId: string, body?: { reason?: string }): Promise<Payment> {
   return request(`/admin/payments/${paymentId}/reject`, { method: "POST", body: body ?? {} });
+}
+
+/** Admin mencatat pembayaran atas nama user (mis. siswa + kelas). */
+export async function adminCreatePayment(body: AdminCreatePaymentRequest): Promise<Payment> {
+  const raw = await request<unknown>("/admin/payments", { method: "POST", body });
+  return unwrapPaymentResponse(raw);
+}
+
+/** Admin memperbarui tanggal pembelian atau catatan. */
+export async function adminUpdatePayment(
+  paymentId: string,
+  body: AdminUpdatePaymentRequest
+): Promise<Payment> {
+  const id = encodeURIComponent(paymentId.trim());
+  const raw = await request<unknown>(`/admin/payments/${id}`, { method: "PATCH", body });
+  return unwrapPaymentResponse(raw);
+}
+
+/** Buat order manual (pending) untuk user + item kelas. */
+export async function adminCreateManualOrder(
+  body: AdminManualOrderCreateRequest
+): Promise<AdminOrder> {
+  const raw = await request<unknown>("/admin/orders/manual", { method: "POST", body });
+  const obj = unwrapApiData<Record<string, unknown>>(raw);
+  if (obj && typeof obj.id === "string") return obj as AdminOrder;
+  if (raw && typeof raw === "object" && typeof (raw as { id?: unknown }).id === "string") {
+    return raw as AdminOrder;
+  }
+  throw new Error("Respons order manual tidak valid");
+}
+
+/** Upload bukti pembayaran untuk order manual/admin. */
+export async function adminUploadOrderPaymentProof(
+  orderId: string,
+  proofFile: File,
+  body?: { senderAccountNo?: string; senderName?: string }
+): Promise<Record<string, unknown>> {
+  const id = encodeURIComponent(orderId.trim());
+  const fd = new FormData();
+  fd.append("proof", proofFile);
+  if (body?.senderAccountNo) fd.append("senderAccountNo", body.senderAccountNo);
+  if (body?.senderName) fd.append("senderName", body.senderName);
+  return requestFormData(`/admin/orders/${id}/payment-proof`, fd);
+}
+
+/** Verifikasi order (bayar + enroll), opsional purchasedAt (RFC3339). */
+export async function adminVerifyOrder(
+  orderId: string,
+  body?: AdminVerifyOrderRequest
+): Promise<Record<string, unknown>> {
+  const id = encodeURIComponent(orderId.trim());
+  return request(`/admin/orders/${id}/verify`, { method: "PUT", body: body ?? {} });
+}
+
+/** Update purchasedAt/paymentProofAt order tanpa verify ulang. */
+export async function adminPatchOrderPurchaseMeta(
+  orderId: string,
+  body: AdminOrderPurchaseMetaPatchRequest
+): Promise<Record<string, unknown>> {
+  const id = encodeURIComponent(orderId.trim());
+  return request(`/admin/orders/${id}/purchase-meta`, { method: "PATCH", body });
+}
+
+/** Beri akses kelas ke user tanpa order. */
+export async function adminGrantEnrollment(
+  body: AdminGrantEnrollmentRequest
+): Promise<CourseEnrollment> {
+  return request("/admin/enrollments/grant", { method: "POST", body });
+}
+
+/** Ubah tanggal enrolled_at enrollment. */
+export async function adminUpdateEnrollment(
+  enrollmentId: string,
+  body: AdminUpdateEnrollmentRequest
+): Promise<CourseEnrollment> {
+  const id = encodeURIComponent(enrollmentId.trim());
+  return request(`/admin/enrollments/${id}`, { method: "PATCH", body });
 }
 
 /** GET /trainer/payments — riwayat pembayaran milik trainer (slot, dll). 404/405 = []. */

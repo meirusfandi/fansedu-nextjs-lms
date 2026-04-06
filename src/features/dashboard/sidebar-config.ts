@@ -19,7 +19,6 @@ export const adminSidebarSections: NavSection[] = [
   {
     title: "Master Data",
     items: [
-      { href: "/admin/master-data", label: "Overview" },
       { href: "/admin/master-data/setting", label: "Setting" },
       { href: "/admin/master-data/role", label: "Role" },
       { href: "/admin/master-data/kelas", label: "Kelas" },

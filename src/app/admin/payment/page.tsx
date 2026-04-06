@@ -1,15 +1,30 @@
 "use client";
 
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
-import { useEffect, useMemo, useState } from "react";
 import {
-  useAdminPayments,
   useAdminConfirmPayment,
+  useAdminCoursesForPaymentModal,
+  useAdminCreateManualOrder,
+  useAdminPayments,
+  useAdminPatchOrderPurchaseMeta,
   useAdminRejectPayment,
+  useAdminUploadOrderPaymentProof,
+  useAdminVerifyOrder,
+  useAdminUpdatePayment,
+  useAdminUsersForPaymentModal,
 } from "@/hooks/useDashboardQueries";
-import { getFriendlyApiErrorMessage } from "@/lib/api";
-import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/paymentDisplay";
+import { adminListCourses, getFriendlyApiErrorMessage } from "@/lib/api";
 import type { Payment } from "@/lib/api-types";
+import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/paymentDisplay";
+import { normalizeUserRoleFromApi } from "@/lib/user-role";
+import { datetimeLocalToIsoOrNull, isoToDatetimeLocal } from "@/lib/voucher-utils";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+
+function paymentPurchaseAt(p: Payment): string | undefined {
+  const v = p.paidAt ?? p.purchasedAt ?? p.createdAt;
+  return v != null && String(v).trim() !== "" ? String(v) : undefined;
+}
 
 function getPaymentCreatedAt(p: Payment): string | undefined {
   return p.createdAt;
@@ -31,12 +46,78 @@ function getPaymentProofUrl(p: Payment): string | null {
   return p.proofUrl ?? null;
 }
 
+function isCoursePayment(p: Payment): boolean {
+  const t = (p.type ?? "").toLowerCase();
+  return t.includes("course");
+}
+
 export default function AdminPaymentPage() {
   const { data: payments = [], isLoading, error, refetch, isFetching } = useAdminPayments();
   const confirmMutation = useAdminConfirmPayment();
   const rejectMutation = useAdminRejectPayment();
+  const createOrderMutation = useAdminCreateManualOrder();
+  const uploadProofMutation = useAdminUploadOrderPaymentProof();
+  const verifyOrderMutation = useAdminVerifyOrder();
+  const patchOrderMetaMutation = useAdminPatchOrderPurchaseMeta();
+  const updateMutation = useAdminUpdatePayment();
+
   const [filter, setFilter] = useState<"all" | "pending">("all");
   const [page, setPage] = useState(1);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createUserId, setCreateUserId] = useState("");
+  const [createCourseIds, setCreateCourseIds] = useState<string[]>([]);
+  const [createTotalPriceRp, setCreateTotalPriceRp] = useState("");
+  const [createPurchasedAtLocal, setCreatePurchasedAtLocal] = useState(() =>
+    isoToDatetimeLocal(new Date().toISOString())
+  );
+  const [verifyImmediately, setVerifyImmediately] = useState(true);
+  const [createProofFile, setCreateProofFile] = useState<File | null>(null);
+  const [createSenderAccountNo, setCreateSenderAccountNo] = useState("");
+  const [createSenderName, setCreateSenderName] = useState("");
+  const [createFormError, setCreateFormError] = useState<string | null>(null);
+
+  const [editPayment, setEditPayment] = useState<Payment | null>(null);
+  const [editPurchasedAtLocal, setEditPurchasedAtLocal] = useState("");
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+
+  const { data: modalUsers = [], isLoading: loadingModalUsers } = useAdminUsersForPaymentModal(createOpen);
+  const { data: modalCourses = [], isLoading: loadingModalCourses } = useAdminCoursesForPaymentModal(createOpen);
+
+  const { data: coursesForTable = [] } = useQuery({
+    queryKey: ["admin", "courses", "payment-table"],
+    queryFn: adminListCourses,
+    staleTime: 60_000,
+  });
+
+  const courseTitleById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of coursesForTable) {
+      m.set(c.id, c.title);
+    }
+    return m;
+  }, [coursesForTable]);
+
+  const students = useMemo(
+    () => modalUsers.filter((u) => normalizeUserRoleFromApi(u.role) === "student"),
+    [modalUsers]
+  );
+
+  useEffect(() => {
+    if (!createOpen) {
+      setCreateFormError(null);
+      return;
+    }
+    setCreatePurchasedAtLocal(isoToDatetimeLocal(new Date().toISOString()));
+  }, [createOpen]);
+
+  useEffect(() => {
+    if (editPayment) {
+      const iso = paymentPurchaseAt(editPayment);
+      setEditPurchasedAtLocal(iso ? isoToDatetimeLocal(iso) : "");
+      setEditFormError(null);
+    }
+  }, [editPayment]);
 
   const filtered = useMemo(() => {
     if (filter === "pending") {
@@ -60,6 +141,91 @@ export default function AdminPaymentPage() {
     }
   }, [filtered.length, page]);
 
+  const openCreate = () => {
+    setCreateUserId("");
+    setCreateCourseIds([]);
+    setCreateTotalPriceRp("");
+    setCreateProofFile(null);
+    setCreateSenderAccountNo("");
+    setCreateSenderName("");
+    setVerifyImmediately(true);
+    setCreateFormError(null);
+    setCreateOpen(true);
+  };
+
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateFormError(null);
+    if (!createUserId.trim()) {
+      setCreateFormError("Pilih siswa.");
+      return;
+    }
+    if (createCourseIds.length === 0) {
+      setCreateFormError("Pilih minimal satu kelas.");
+      return;
+    }
+    const totalPriceText = String(createTotalPriceRp).trim();
+    if (totalPriceText && (!Number.isFinite(Number(totalPriceText)) || Number(totalPriceText) <= 0)) {
+      setCreateFormError("Total harga harus angka positif atau dikosongkan.");
+      return;
+    }
+    const purchasedIso = datetimeLocalToIsoOrNull(createPurchasedAtLocal);
+    try {
+      const order = await createOrderMutation.mutateAsync({
+        userId: createUserId.trim(),
+        courseIds: createCourseIds,
+        totalPrice: totalPriceText ? Number(totalPriceText) : undefined,
+      });
+      const orderId = String(order.id ?? "").trim();
+      if (!orderId) throw new Error("Order berhasil dibuat tapi id order tidak ditemukan.");
+      if (createProofFile) {
+        await uploadProofMutation.mutateAsync({
+          orderId,
+          proofFile: createProofFile,
+          senderAccountNo: createSenderAccountNo.trim() || undefined,
+          senderName: createSenderName.trim() || undefined,
+        });
+      }
+      if (verifyImmediately) {
+        await verifyOrderMutation.mutateAsync({
+          orderId,
+          body: purchasedIso ? { purchasedAt: purchasedIso } : {},
+        });
+      }
+      setCreateOpen(false);
+    } catch (err) {
+      setCreateFormError(getFriendlyApiErrorMessage(err));
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editPayment) return;
+    setEditFormError(null);
+    const purchasedIso = datetimeLocalToIsoOrNull(editPurchasedAtLocal);
+    if (purchasedIso == null) {
+      setEditFormError("Tanggal pembelian tidak valid.");
+      return;
+    }
+    try {
+      const orderId = editPayment.orderId != null ? String(editPayment.orderId).trim() : "";
+      if (orderId) {
+        await patchOrderMetaMutation.mutateAsync({
+          orderId,
+          body: { purchasedAt: purchasedIso },
+        });
+      } else {
+        await updateMutation.mutateAsync({
+          paymentId: editPayment.id,
+          body: { purchasedAt: purchasedIso },
+        });
+      }
+      setEditPayment(null);
+    } catch (err) {
+      setEditFormError(getFriendlyApiErrorMessage(err));
+    }
+  };
+
   const handleConfirm = async (p: Payment) => {
     if (!confirm("Konfirmasi pembayaran ini? Status akan menjadi disetujui.")) return;
     try {
@@ -79,25 +245,23 @@ export default function AdminPaymentPage() {
     }
   };
 
+  const modalLoading = loadingModalUsers || loadingModalCourses;
+
   return (
     <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
       <div className="mb-6 md:mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Manage</p>
         <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Payment &amp; konfirmasi</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Verifikasi pembayaran dari trainer maupun siswa (jika tercatat di sistem). Hanya admin yang dapat
-          menyetujui atau menolak.
+          Verifikasi pembayaran dari trainer maupun siswa. Admin bisa membuat order manual untuk pembelian kelas siswa,
+          upload bukti pembayaran, verifikasi order, dan mengubah tanggal pembelian.
         </p>
       </div>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {getFriendlyApiErrorMessage(error)}
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="ml-2 font-medium underline"
-          >
+          <button type="button" onClick={() => refetch()} className="ml-2 font-medium underline">
             Muat ulang
           </button>
         </div>
@@ -123,6 +287,13 @@ export default function AdminPaymentPage() {
         >
           Menunggu verifikasi
         </button>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-800"
+        >
+          + Buat order manual kelas
+        </button>
         <span className="text-xs text-zinc-400">
           {isFetching ? "Memuat…" : `${filtered.length} transaksi`}
         </span>
@@ -138,6 +309,13 @@ export default function AdminPaymentPage() {
               Jika seharusnya ada transaksi, periksa koneksi ke server dan hak akses admin. Dokumentasi alur ada di{" "}
               <code className="rounded bg-zinc-100 px-1">docs/PAYMENT_AND_CONFIRMATION_FLOW.md</code>.
             </p>
+            <button
+              type="button"
+              onClick={openCreate}
+              className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+            >
+              Buat order manual
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -145,7 +323,10 @@ export default function AdminPaymentPage() {
               <thead className="bg-zinc-50/80">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Tanggal
+                    Tanggal pembelian
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                    Dicatat
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
                     Pembayar
@@ -154,7 +335,7 @@ export default function AdminPaymentPage() {
                     Peran
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Tipe
+                    Tipe / Kelas
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500">
                     Nominal
@@ -168,76 +349,104 @@ export default function AdminPaymentPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">
-                {paginated.map((p) => (
-                  <tr key={p.id} className="hover:bg-zinc-50/80">
-                    <td className="whitespace-nowrap px-4 py-3 text-zinc-600">
-                      {getPaymentCreatedAt(p)
-                        ? new Date(getPaymentCreatedAt(p) as string).toLocaleString("id-ID", {
-                            dateStyle: "short",
-                            timeStyle: "short",
-                          })
-                        : "–"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900">{getPaymentUserName(p)}</div>
-                      <div className="text-xs text-zinc-500">{getPaymentUserEmail(p)}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">
-                        {getPaymentPayerRole(p)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-600">{p.type ?? "–"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-zinc-900">
-                      {formatPaymentMoney(p)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          isPendingStatus(p.status)
-                            ? "bg-amber-100 text-amber-900"
-                            : (p.status ?? "").toLowerCase() === "rejected"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-emerald-100 text-emerald-800"
-                        }`}
-                      >
-                        {paymentStatusLabel(p.status)}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-right">
-                      {getPaymentProofUrl(p) && (
-                        <a
-                          href={String(getPaymentProofUrl(p))}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mr-2 text-xs font-medium text-sky-600 hover:underline"
+                {paginated.map((p) => {
+                  const purchase = paymentPurchaseAt(p);
+                  const created = getPaymentCreatedAt(p);
+                  const refId = p.referenceId != null ? String(p.referenceId) : "";
+                  const courseLabel =
+                    isCoursePayment(p) && refId
+                      ? courseTitleById.get(refId) ?? `Kelas ${refId.slice(0, 8)}…`
+                      : (p.type ?? "–");
+                  return (
+                    <tr key={p.id} className="hover:bg-zinc-50/80">
+                      <td className="whitespace-nowrap px-4 py-3 text-zinc-600">
+                        {purchase
+                          ? new Date(purchase).toLocaleString("id-ID", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })
+                          : "–"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
+                        {created
+                          ? new Date(created).toLocaleString("id-ID", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })
+                          : "–"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-zinc-900">{getPaymentUserName(p)}</div>
+                        <div className="text-xs text-zinc-500">{getPaymentUserEmail(p)}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">
+                          {getPaymentPayerRole(p)}
+                        </span>
+                      </td>
+                      <td className="max-w-[200px] px-4 py-3 text-zinc-600">
+                        <span className="line-clamp-2" title={courseLabel}>
+                          {courseLabel}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-zinc-900">
+                        {formatPaymentMoney(p)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            isPendingStatus(p.status)
+                              ? "bg-amber-100 text-amber-900"
+                              : (p.status ?? "").toLowerCase() === "rejected"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-emerald-100 text-emerald-800"
+                          }`}
                         >
-                          Bukti
-                        </a>
-                      )}
-                      {isPendingStatus(p.status) && (
-                        <>
-                          <button
-                            type="button"
-                            disabled={confirmMutation.isPending || rejectMutation.isPending}
-                            onClick={() => handleConfirm(p)}
-                            className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                          {paymentStatusLabel(p.status)}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setEditPayment(p)}
+                          className="mr-2 text-xs font-medium text-sky-700 hover:underline"
+                        >
+                          Ubah tanggal
+                        </button>
+                        {getPaymentProofUrl(p) && (
+                          <a
+                            href={String(getPaymentProofUrl(p))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mr-2 text-xs font-medium text-sky-600 hover:underline"
                           >
-                            Setujui
-                          </button>
-                          <button
-                            type="button"
-                            disabled={confirmMutation.isPending || rejectMutation.isPending}
-                            onClick={() => handleReject(p)}
-                            className="ml-2 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            Tolak
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                            Bukti
+                          </a>
+                        )}
+                        {isPendingStatus(p.status) && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={confirmMutation.isPending || rejectMutation.isPending}
+                              onClick={() => handleConfirm(p)}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Setujui
+                            </button>
+                            <button
+                              type="button"
+                              disabled={confirmMutation.isPending || rejectMutation.isPending}
+                              onClick={() => handleReject(p)}
+                              className="ml-2 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Tolak
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -253,8 +462,199 @@ export default function AdminPaymentPage() {
       </div>
 
       <p className="mt-6 text-xs text-zinc-500">
-        Setujui atau tolak pembayaran menunggu diproses memerlukan dukungan server; penolakan dapat menyertakan alasan.
+        Pembaruan tanggal pembelian memakai metadata order bila transaksi terhubung ke order. Untuk data lama tanpa
+        order, sistem fallback ke update pembayaran langsung.
       </p>
+
+      {createOpen && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4 [color-scheme:light]">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-zinc-900">Buat order manual kelas</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Buat order pending untuk siswa, lalu opsional upload bukti dan verifikasi langsung agar enroll diproses.
+            </p>
+            <form onSubmit={(e) => void handleCreateSubmit(e)} className="mt-4 space-y-4">
+              {createFormError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {createFormError}
+                </div>
+              )}
+              {modalLoading ? (
+                <p className="text-sm text-zinc-500">Memuat daftar siswa dan kelas…</p>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700">Siswa *</label>
+                    <select
+                      value={createUserId}
+                      onChange={(e) => setCreateUserId(e.target.value)}
+                      required
+                      className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    >
+                      <option value="">— Pilih siswa —</option>
+                      {students.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.email})
+                        </option>
+                      ))}
+                    </select>
+                    {students.length === 0 && !loadingModalUsers ? (
+                      <p className="mt-1 text-xs text-amber-700">Tidak ada akun siswa di daftar user.</p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700">Kelas (boleh lebih dari satu) *</label>
+                    <div className="mt-1 max-h-44 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 p-2">
+                      {modalCourses.map((c) => {
+                        const checked = createCourseIds.includes(c.id);
+                        return (
+                          <label key={c.id} className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) =>
+                                setCreateCourseIds((prev) =>
+                                  e.target.checked ? [...prev, c.id] : prev.filter((id) => id !== c.id)
+                                )
+                              }
+                              className="h-4 w-4"
+                            />
+                            <span>{c.title}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700">Total harga (opsional)</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={createTotalPriceRp}
+                      onChange={(e) => setCreateTotalPriceRp(e.target.value)}
+                      placeholder="Kosongkan untuk hitung otomatis"
+                      className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700">Tanggal pembelian *</label>
+                    <input
+                      type="datetime-local"
+                      value={createPurchasedAtLocal}
+                      onChange={(e) => setCreatePurchasedAtLocal(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
+                      <input
+                        type="checkbox"
+                        checked={verifyImmediately}
+                        onChange={(e) => setVerifyImmediately(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      Verifikasi otomatis setelah order dibuat
+                    </label>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700">Bukti pembayaran (opsional)</label>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.pdf"
+                      onChange={(e) => setCreateProofFile(e.target.files?.[0] ?? null)}
+                      className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <input
+                      type="text"
+                      placeholder="No rekening pengirim (opsional)"
+                      value={createSenderAccountNo}
+                      onChange={(e) => setCreateSenderAccountNo(e.target.value)}
+                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Nama pengirim (opsional)"
+                      value={createSenderName}
+                      onChange={(e) => setCreateSenderName(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(false)}
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    createOrderMutation.isPending ||
+                    uploadProofMutation.isPending ||
+                    verifyOrderMutation.isPending ||
+                    modalLoading
+                  }
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                >
+                  {createOrderMutation.isPending || uploadProofMutation.isPending || verifyOrderMutation.isPending
+                    ? "Memproses…"
+                    : "Simpan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editPayment && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/50 p-4 [color-scheme:light]">
+          <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-zinc-900">Ubah tanggal pembelian</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Siswa: {getPaymentUserName(editPayment)} · {formatPaymentMoney(editPayment)}
+            </p>
+            <form onSubmit={(e) => void handleEditSubmit(e)} className="mt-4 space-y-4">
+              {editFormError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {editFormError}
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-zinc-700">Tanggal &amp; jam pembelian *</label>
+                <input
+                  type="datetime-local"
+                  value={editPurchasedAtLocal}
+                  onChange={(e) => setEditPurchasedAtLocal(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditPayment(null)}
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? "Menyimpan…" : "Simpan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
