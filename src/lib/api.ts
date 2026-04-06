@@ -82,7 +82,18 @@ import type {
   AdminUpdatePaymentRequest,
   AdminUpdateVoucherRequest,
   AdminVoucher,
+  CheckoutPaymentSessionRequest,
+  CheckoutPaymentSessionResponse,
   StudentVoucherClaim,
+  AiAnalysisResponse,
+  AiQuestionItem,
+  CreateSubscriptionRequest,
+  GenerateQuestionsRequest,
+  QuestionsQuery,
+  RankingEntry,
+  SubmitAnswerRequest,
+  SubmitAnswerResponse,
+  Subscription,
 } from "./api-types";
 import { deepToCamelCase } from "./json-case";
 
@@ -255,8 +266,16 @@ async function request<T>(
     if (auth && res.status === 401) {
       scheduleUnauthorizedRedirect();
     }
-    const d = data as { error?: string; message?: string };
-    let message = d?.error ?? d?.message ?? res.statusText;
+    const d = data as {
+      error?: string | { code?: string; message?: string };
+      message?: string;
+    };
+    const nestedErrorMessage =
+      d?.error && typeof d.error === "object" ? d.error.message : undefined;
+    const directErrorMessage =
+      typeof d?.error === "string" ? d.error : undefined;
+    let message =
+      nestedErrorMessage ?? directErrorMessage ?? d?.message ?? res.statusText;
     if (res.status === 500 || message.toLowerCase().includes("internal server error")) {
       message = "Layanan sedang mengalami gangguan. Silakan coba lagi dalam beberapa saat.";
     } else if (res.status === 502 || res.status === 503) {
@@ -625,6 +644,17 @@ export async function adminUpdatePayment(
   const id = encodeURIComponent(paymentId.trim());
   const raw = await request<unknown>(`/admin/payments/${id}`, { method: "PATCH", body });
   return unwrapPaymentResponse(raw);
+}
+
+/** Sesi pembayaran Snap Midtrans untuk order/checkout. POST /checkout/payment-session */
+export async function checkoutCreatePaymentSession(
+  body: CheckoutPaymentSessionRequest
+): Promise<CheckoutPaymentSessionResponse> {
+  const raw = await request<unknown>("/checkout/payment-session", { method: "POST", body });
+  const u = unwrapApiData<Record<string, unknown>>(raw);
+  if (u && typeof u === "object") return u as CheckoutPaymentSessionResponse;
+  if (raw && typeof raw === "object") return raw as CheckoutPaymentSessionResponse;
+  return {};
 }
 
 /** Buat order manual (pending) untuk user + item kelas. */
@@ -2563,4 +2593,75 @@ export async function studentListMyVouchers(): Promise<StudentVoucherClaim[]> {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
   }
+}
+
+function extractAiQuestionArray(raw: unknown): AiQuestionItem[] {
+  const nested = unwrapApiData(raw as Record<string, unknown>);
+  if (Array.isArray(nested)) return nested as AiQuestionItem[];
+  if (Array.isArray(raw)) return raw as AiQuestionItem[];
+  return [];
+}
+
+function toQueryString(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null) continue;
+    const text = String(value).trim();
+    if (!text) continue;
+    search.set(key, text);
+  }
+  const built = search.toString();
+  return built ? `?${built}` : "";
+}
+
+/** Generate pertanyaan AI. POST /generate-questions */
+export async function aiGenerateQuestions(body: GenerateQuestionsRequest): Promise<AiQuestionItem[]> {
+  const raw = await request<unknown>("/generate-questions", { method: "POST", body });
+  return extractAiQuestionArray(raw);
+}
+
+/** Submit jawaban satu soal. POST /submit-answer */
+export async function aiSubmitAnswer(body: SubmitAnswerRequest): Promise<SubmitAnswerResponse> {
+  return request<SubmitAnswerResponse>("/submit-answer", { method: "POST", body });
+}
+
+/** Analisis akurasi & rekomendasi. GET /analysis?topic=&grade= */
+export async function aiGetAnalysis(params: {
+  topic?: string;
+  grade?: string;
+}): Promise<AiAnalysisResponse> {
+  const query = toQueryString({ topic: params.topic, grade: params.grade });
+  return request<AiAnalysisResponse>(`/analysis${query}`, { method: "GET" });
+}
+
+/** Ranking nasional. GET /ranking?limit= */
+export async function aiGetRanking(limit = 20): Promise<RankingEntry[]> {
+  const raw = await request<unknown>(`/ranking${toQueryString({ limit })}`, {
+    method: "GET",
+    auth: false,
+  });
+  const nested = unwrapApiData(raw as Record<string, unknown>);
+  if (Array.isArray(nested)) return nested as RankingEntry[];
+  if (Array.isArray(raw)) return raw as RankingEntry[];
+  return [];
+}
+
+/** List pertanyaan dengan filter. GET /questions?subject=&grade=&topic=&difficulty=&limit= */
+export async function aiListQuestions(params: QuestionsQuery): Promise<AiQuestionItem[]> {
+  const query = toQueryString({
+    subject: params.subject,
+    grade: params.grade,
+    topic: params.topic,
+    difficulty: params.difficulty,
+    limit: params.limit,
+  });
+  const raw = await request<unknown>(`/questions${query}`, { method: "GET" });
+  return extractAiQuestionArray(raw);
+}
+
+/** Buat subscription user saat ini. POST /subscription */
+export async function aiCreateSubscription(
+  body: CreateSubscriptionRequest
+): Promise<Subscription> {
+  return request<Subscription>("/subscription", { method: "POST", body });
 }

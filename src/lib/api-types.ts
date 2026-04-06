@@ -721,6 +721,98 @@ export type AdminUpdatePaymentRequest = Partial<{
   notes: string | null;
 }>;
 
+// --- Checkout / Midtrans Snap (POST /checkout/payment-session) ---
+export interface CheckoutPaymentSessionRequest {
+  checkoutId: string;
+  paymentMethod: "midtrans";
+}
+
+/** Respons umum: redirect ke Snap; field tambahan tergantung backend. */
+export interface CheckoutPaymentSessionResponse {
+  redirectUrl?: string | null;
+  snapToken?: string | null;
+  transactionId?: string | null;
+  [key: string]: unknown;
+}
+
+// --- AI Question Engine ---
+export interface AiQuestionItem {
+  id: string;
+  subject: string;
+  grade: string;
+  topic: string;
+  difficulty: string;
+  questionText: string;
+  choicesJson?: string[] | null;
+  correctAnswer?: string | null;
+  explanation?: string | null;
+  solutionSteps?: string[] | null;
+  conceptTags?: string[] | null;
+  estimatedSec?: number | null;
+}
+
+export interface GenerateQuestionsRequest {
+  subject: string;
+  grade: string;
+  topic: string;
+  difficulty: string;
+  count: number;
+}
+
+export interface SubmitAnswerRequest {
+  questionId: string;
+  answer: string;
+  timeSpentMs?: number;
+}
+
+export interface SubmitAnswerResponse {
+  questionId: string;
+  isCorrect: boolean;
+  correctAnswer?: string | null;
+  explanation?: string | null;
+}
+
+export interface AnalysisRecommendation extends AiQuestionItem {}
+
+export interface AiAnalysisResponse {
+  accuracyPercent: number;
+  totalAttempts: number;
+  correctAttempts: number;
+  avgTimeMs: number;
+  weakTopic?: string | null;
+  recommendations?: AnalysisRecommendation[];
+}
+
+export interface RankingEntry {
+  userId: string;
+  score: number;
+  accuracyPct?: number;
+}
+
+export interface QuestionsQuery {
+  subject?: string;
+  grade?: string;
+  topic?: string;
+  difficulty?: string;
+  limit?: number;
+}
+
+export interface CreateSubscriptionRequest {
+  planCode: string;
+  startAt?: string;
+  endAt?: string;
+}
+
+export interface Subscription {
+  id: string;
+  userId: string;
+  planCode: string;
+  status: string;
+  startAt: string;
+  endAt: string;
+  createdAt?: string;
+}
+
 // --- Course messages & discussions (untuk user yang ter-enroll) ---
 export interface CourseMessage {
   id: string;

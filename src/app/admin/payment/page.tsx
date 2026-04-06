@@ -13,8 +13,8 @@ import {
   useAdminUpdatePayment,
   useAdminUsersForPaymentModal,
 } from "@/hooks/useDashboardQueries";
-import { adminListCourses, getFriendlyApiErrorMessage } from "@/lib/api";
-import type { Payment } from "@/lib/api-types";
+import { adminListCourses, checkoutCreatePaymentSession, getFriendlyApiErrorMessage } from "@/lib/api";
+import type { CheckoutPaymentSessionResponse, Payment } from "@/lib/api-types";
 import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/paymentDisplay";
 import { normalizeUserRoleFromApi } from "@/lib/user-role";
 import { datetimeLocalToIsoOrNull, isoToDatetimeLocal } from "@/lib/voucher-utils";
@@ -80,6 +80,11 @@ export default function AdminPaymentPage() {
   const [editPayment, setEditPayment] = useState<Payment | null>(null);
   const [editPurchasedAtLocal, setEditPurchasedAtLocal] = useState("");
   const [editFormError, setEditFormError] = useState<string | null>(null);
+
+  const [midtransCheckoutId, setMidtransCheckoutId] = useState("");
+  const [midtransLoading, setMidtransLoading] = useState(false);
+  const [midtransError, setMidtransError] = useState<string | null>(null);
+  const [midtransResult, setMidtransResult] = useState<CheckoutPaymentSessionResponse | null>(null);
 
   const { data: modalUsers = [], isLoading: loadingModalUsers } = useAdminUsersForPaymentModal(createOpen);
   const { data: modalCourses = [], isLoading: loadingModalCourses } = useAdminCoursesForPaymentModal(createOpen);
@@ -192,6 +197,7 @@ export default function AdminPaymentPage() {
           body: purchasedIso ? { purchasedAt: purchasedIso } : {},
         });
       }
+      setMidtransCheckoutId(orderId);
       setCreateOpen(false);
     } catch (err) {
       setCreateFormError(getFriendlyApiErrorMessage(err));
@@ -247,6 +253,29 @@ export default function AdminPaymentPage() {
 
   const modalLoading = loadingModalUsers || loadingModalCourses;
 
+  const handleMidtransSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMidtransError(null);
+    setMidtransResult(null);
+    const id = midtransCheckoutId.trim();
+    if (!id) {
+      setMidtransError("Isi order / checkout ID.");
+      return;
+    }
+    setMidtransLoading(true);
+    try {
+      const res = await checkoutCreatePaymentSession({
+        checkoutId: id,
+        paymentMethod: "midtrans",
+      });
+      setMidtransResult(res);
+    } catch (err) {
+      setMidtransError(getFriendlyApiErrorMessage(err));
+    } finally {
+      setMidtransLoading(false);
+    }
+  };
+
   return (
     <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
       <div className="mb-6 md:mb-8">
@@ -254,9 +283,75 @@ export default function AdminPaymentPage() {
         <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Payment &amp; konfirmasi</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Verifikasi pembayaran dari trainer maupun siswa. Admin bisa membuat order manual untuk pembelian kelas siswa,
-          upload bukti pembayaran, verifikasi order, dan mengubah tanggal pembelian.
+          upload bukti pembayaran, verifikasi order, mengarahkan ke pembayaran Midtrans Snap, dan mengubah tanggal
+          pembelian.
         </p>
       </div>
+
+      <section className="mb-6 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-zinc-900">Pembayaran Midtrans (Snap)</h2>
+        <p className="mt-1 text-xs text-zinc-500">
+          Buat sesi pembayaran untuk order yang sudah ada. Backend mengembalikan alamat redirect ke halaman Snap.
+          Konfigurasi kunci server Midtrans ada di lingkungan server backend (bukan di frontend).
+        </p>
+        <form onSubmit={(e) => void handleMidtransSession(e)} className="mt-3 flex flex-wrap items-end gap-2">
+          <div className="min-w-[200px] flex-1">
+            <label className="block text-xs font-medium text-zinc-700">Order / checkout ID</label>
+            <input
+              value={midtransCheckoutId}
+              onChange={(e) => setMidtransCheckoutId(e.target.value)}
+              placeholder="UUID order"
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={midtransLoading}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {midtransLoading ? "Membuat sesi…" : "Buat sesi pembayaran"}
+          </button>
+        </form>
+        {midtransError ? (
+          <p className="mt-2 text-sm text-red-700">{midtransError}</p>
+        ) : null}
+        {midtransResult && Object.keys(midtransResult).length > 0 ? (
+          <div className="mt-3 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-zinc-800">
+            {midtransResult.redirectUrl != null && String(midtransResult.redirectUrl).trim() !== "" ? (
+              <div>
+                <p className="text-xs font-medium text-zinc-600">Redirect URL</p>
+                <a
+                  href={String(midtransResult.redirectUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all text-sky-700 underline"
+                >
+                  {String(midtransResult.redirectUrl)}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void navigator.clipboard.writeText(String(midtransResult.redirectUrl))}
+                  className="ml-2 text-xs font-medium text-zinc-600 underline"
+                >
+                  Salin
+                </button>
+              </div>
+            ) : null}
+            {midtransResult.snapToken != null && String(midtransResult.snapToken).trim() !== "" ? (
+              <p>
+                <span className="text-xs font-medium text-zinc-600">Snap token: </span>
+                <code className="text-xs">{String(midtransResult.snapToken).slice(0, 40)}…</code>
+              </p>
+            ) : null}
+            {midtransResult.transactionId != null && String(midtransResult.transactionId).trim() !== "" ? (
+              <p>
+                <span className="text-xs font-medium text-zinc-600">Transaction ID: </span>
+                {String(midtransResult.transactionId)}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

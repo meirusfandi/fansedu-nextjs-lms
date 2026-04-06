@@ -93,3 +93,10 @@ flowchart LR
 3. **Trainer** membuka **Pembayaran** → melihat status terbaru (read-only).
 
 Untuk **detail integrasi** modul lain (tryout, kelas), sesuaikan dengan `type` / `reference_id` pada objek `Payment` di backend.
+
+---
+
+## Midtrans Snap (opsional)
+
+- Variabel lingkungan server backend (bukan Next.js): lihat `docs/midtrans-payment.md`.
+- Panel admin: **Manage → Payment** → **Pembayaran Midtrans (Snap)** membuat sesi pembayaran dari order/checkout ID.
