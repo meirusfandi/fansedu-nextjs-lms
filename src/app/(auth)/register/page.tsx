@@ -30,7 +30,7 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await authRegister({
+      const regRes = await authRegister({
         name: form.name,
         email: form.email,
         password: form.password,
@@ -38,6 +38,13 @@ export default function RegisterPage() {
       });
       const role = useAuthStore.getState().role;
       const dest = getDashboardPathForRole(role) ?? "/trainer/dashboard";
+      const forcePassword =
+        regRes.mustSetPassword === true ||
+        String(regRes.nextAction ?? "").toUpperCase() === "SET_PASSWORD";
+      if (forcePassword) {
+        router.replace(`/set-password?next=${encodeURIComponent(dest)}`);
+        return;
+      }
       router.push(dest);
     } catch (err) {
       setError((err as Error).message || "Gagal mendaftar. Coba lagi atau gunakan email lain.");

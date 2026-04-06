@@ -25,6 +25,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 const quickLinks = [
+  { href: "/admin/master-data/setting", label: "Pengaturan sistem", desc: "Key API, Midtrans, env" },
   { href: "/admin/master-data", label: "Master Data", desc: "Jenjang, bidang, sekolah" },
   { href: "/admin/users", label: "Management User", desc: "Siswa, pengajar, admin" },
   { href: "/admin/kelas", label: "Management Kelas", desc: "Kelas dan enrollment" },

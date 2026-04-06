@@ -60,6 +60,20 @@ export interface LoginRequest {
 export interface LoginResponse {
   user: User;
   token: string;
+  mustSetPassword?: boolean;
+  nextAction?: string | null;
+}
+
+/** GET /auth/me — profil dari JWT (bisa flat atau { user }). */
+export interface AuthMeResponse extends User {
+  mustSetPassword?: boolean;
+  nextAction?: string | null;
+  roleCode?: string | null;
+}
+
+/** POST /auth/set-password — set password pertama kali. */
+export interface SetPasswordRequest {
+  newPassword: string;
 }
 
 export interface RegisterRequest {
@@ -73,6 +87,8 @@ export interface RegisterRequest {
 export interface RegisterResponse {
   user: User;
   token: string;
+  mustSetPassword?: boolean;
+  nextAction?: string | null;
 }
 
 /** Status guru/trainer: slot bayar vs siswa terdaftar. Dari GET /trainer/status atau setara. */
@@ -439,6 +455,32 @@ export interface Sekolah {
   kabupatenKota?: string | null;
   telepon?: string | null;
   alamat?: string | null;
+}
+
+// --- Admin settings (master-data.manage) ---
+/** Satu baris setting dari GET/POST/PUT /admin/settings. */
+export interface AdminSetting {
+  id: string;
+  key: string;
+  slug?: string | null;
+  value: string;
+  description?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AdminCreateSettingRequest {
+  key: string;
+  slug?: string | null;
+  value: string;
+  description?: string | null;
+}
+
+export interface AdminUpdateSettingRequest {
+  key?: string;
+  slug?: string | null;
+  value?: string;
+  description?: string | null;
 }
 
 // --- Admin ---

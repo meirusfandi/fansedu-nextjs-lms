@@ -67,7 +67,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await authLogin(
+      const loginRes = await authLogin(
         { email: form.email, password: form.password },
         rememberMe
       );
@@ -79,6 +79,13 @@ export default function LoginPage() {
       const role = useAuthStore.getState().role;
       const byRole = getDashboardPathForRole(role) ?? "/trainer/dashboard";
       const dest = returnPath ?? byRole;
+      const forcePassword =
+        loginRes.mustSetPassword === true ||
+        String(loginRes.nextAction ?? "").toUpperCase() === "SET_PASSWORD";
+      if (forcePassword) {
+        router.replace(`/set-password?next=${encodeURIComponent(dest)}`);
+        return;
+      }
       router.replace(dest);
     } catch (err) {
       const message = (err as Error)?.message ?? "";

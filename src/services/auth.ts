@@ -6,8 +6,7 @@
 
 import { login as apiLogin, register as apiRegister, logout as apiLogout } from "@/lib/api";
 import { useAuthStore } from "@/store/auth";
-import type { LoginRequest, RegisterRequest } from "@/lib/api-types";
-import type { User } from "@/lib/api-types";
+import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse, User } from "@/lib/api-types";
 
 /** Normalisasi role dari API ke User["role"]. Menolak siswa untuk login/register di app ini. */
 function normalizeRoleFromApi(raw: string | undefined): User["role"] {
@@ -21,7 +20,7 @@ function normalizeRoleFromApi(raw: string | undefined): User["role"] {
   throw new Error("Peran akun tidak didukung di aplikasi ini.");
 }
 
-export async function login(credentials: LoginRequest, rememberMe = false) {
+export async function login(credentials: LoginRequest, rememberMe = false): Promise<LoginResponse> {
   const res = await apiLogin(credentials);
   const maxAge = rememberMe ? 2592000 : 604800;
   const user = res.user as User & { role?: string; displayName?: string };
@@ -37,7 +36,7 @@ export async function login(credentials: LoginRequest, rememberMe = false) {
 }
 
 /** Pendaftaran self-service: hanya Trainer (backend memakai alias `guru` jika perlu). */
-export async function register(data: RegisterRequest) {
+export async function register(data: RegisterRequest): Promise<RegisterResponse> {
   const res = await apiRegister(data);
   const user = res.user as User & { role?: string; displayName?: string };
   const name = (user.name ?? user.displayName ?? "").trim() || user.email;

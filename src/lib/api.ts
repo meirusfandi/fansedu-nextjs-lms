@@ -16,16 +16,20 @@ import type {
   AdminVerifyOrderRequest,
   AdminCreateQuestionRequest,
   AdminUpdateQuestionRequest,
+  AdminCreateSettingRequest,
   AdminCreateSubjectRequest,
   AdminCreateTryoutRequest,
   AdminCreateUserRequest,
   AdminIssueCertificateRequest,
   AdminOverviewResponse,
+  AdminSetting,
   AdminTryoutAnalysis,
   AdminTryoutAttemptAiAnalysis,
   AdminTryoutStudent,
   AdminUpdateLevelRequest,
+  AdminUpdateSettingRequest,
   AdminUpdateUserRequest,
+  AuthMeResponse,
   Attempt,
   AttemptAnswerReviewSaveResponse,
   AttemptReviewItem,
@@ -94,6 +98,7 @@ import type {
   SubmitAnswerRequest,
   SubmitAnswerResponse,
   Subscription,
+  SetPasswordRequest,
 } from "./api-types";
 import { deepToCamelCase } from "./json-case";
 
@@ -554,6 +559,57 @@ export async function resetPassword(
 /** Ubah kata sandi (user sudah login). POST /auth/change-password. */
 export async function changePassword(body: ChangePasswordRequest): Promise<{ ok: boolean }> {
   return request("/auth/change-password", { method: "POST", body });
+}
+
+function normalizeUserRoleFromMe(raw: unknown): UserRole {
+  const s = raw != null ? String(raw).toLowerCase() : "";
+  if (s === "admin") return "admin";
+  if (s === "trainer" || s === "guru" || s === "teacher") return "trainer";
+  return "student";
+}
+
+/** GET /auth/me — profil dari JWT. */
+export async function getAuthMe(): Promise<AuthMeResponse> {
+  const raw = await request<Record<string, unknown>>("/auth/me", { method: "GET" });
+  const inner =
+    raw.user && typeof raw.user === "object" && !Array.isArray(raw.user)
+      ? (raw.user as Record<string, unknown>)
+      : raw;
+  const id = inner.id != null ? String(inner.id) : "";
+  if (!id) {
+    throw new Error("Respons profil tidak valid.");
+  }
+  const name =
+    String(inner.name ?? inner.displayName ?? inner.fullName ?? "").trim() ||
+    String(inner.email ?? "");
+  const email = String(inner.email ?? "");
+  const role = normalizeUserRoleFromMe(inner.role ?? inner.roleCode ?? raw.role);
+  return {
+    id,
+    name,
+    email,
+    role,
+    avatarUrl: inner.avatarUrl != null ? String(inner.avatarUrl) : null,
+    subjectId: inner.subjectId != null ? String(inner.subjectId) : null,
+    schoolId: inner.schoolId != null ? String(inner.schoolId) : null,
+    subjectName: inner.subjectName != null ? String(inner.subjectName) : null,
+    schoolName: inner.schoolName != null ? String(inner.schoolName) : null,
+    mustSetPassword:
+      raw.mustSetPassword === true ||
+      inner.mustSetPassword === true,
+    nextAction:
+      raw.nextAction != null
+        ? String(raw.nextAction)
+        : inner.nextAction != null
+          ? String(inner.nextAction)
+          : null,
+    roleCode: inner.roleCode != null ? String(inner.roleCode) : null,
+  };
+}
+
+/** Set password pertama kali. POST /auth/set-password. */
+export async function authSetPassword(body: SetPasswordRequest): Promise<void> {
+  await request("/auth/set-password", { method: "POST", body });
 }
 
 // --- Notifications ---
@@ -1312,6 +1368,119 @@ export async function getAdminOverview(): Promise<AdminOverviewResponse | null> 
     if (isNotFoundOrMethodNotAllowed(e)) return null;
     throw e;
   }
+}
+
+function normalizeAdminSettingRow(row: unknown): AdminSetting | null {
+  if (!row || typeof row !== "object") return null;
+  const o = row as Record<string, unknown>;
+  const id = o.id != null ? String(o.id) : "";
+  if (!id) return null;
+  return {
+    id,
+    key: String(o.key ?? ""),
+    slug: o.slug != null ? String(o.slug) : null,
+    value: o.value != null ? String(o.value) : "",
+    description: o.description != null ? String(o.description) : null,
+    createdAt: o.createdAt != null ? String(o.createdAt) : null,
+    updatedAt: o.updatedAt != null ? String(o.updatedAt) : null,
+  };
+}
+
+function extractAdminSettingsFromResponse(raw: unknown): AdminSetting[] {
+  if (Array.isArray(raw)) {
+    return raw.map(normalizeAdminSettingRow).filter((x): x is AdminSetting => x != null);
+  }
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    for (const k of ["settings", "data", "items"]) {
+      const v = r[k];
+      if (Array.isArray(v)) {
+        return v.map(normalizeAdminSettingRow).filter((x): x is AdminSetting => x != null);
+      }
+    }
+  }
+  return [];
+}
+
+function unwrapAdminSettingMutationResponse(raw: unknown): AdminSetting {
+  const one = normalizeAdminSettingRow(raw);
+  if (one) return one;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    const nested = o.data ?? o.setting;
+    const n = normalizeAdminSettingRow(nested);
+    if (n) return n;
+  }
+  throw new Error("Respons setting tidak valid");
+}
+
+/** GET /admin/settings/env-keys — daftar key env yang boleh diisi lewat settings. */
+export async function adminListSettingsEnvKeys(): Promise<string[]> {
+  try {
+    const raw = await request<unknown>("/admin/settings/env-keys", { method: "GET" });
+    if (Array.isArray(raw)) return raw.map((x) => String(x));
+    if (raw && typeof raw === "object") {
+      const o = raw as Record<string, unknown>;
+      const keys = o.keys ?? o.envKeys ?? o.data;
+      if (Array.isArray(keys)) return keys.map((x) => String(x));
+    }
+    return [];
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** GET /admin/settings — semua settings. */
+export async function adminListSettings(): Promise<AdminSetting[]> {
+  try {
+    const raw = await request<unknown>("/admin/settings", { method: "GET" });
+    return extractAdminSettingsFromResponse(raw);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** GET /admin/settings/:id — detail (nilai sensitif utuh). */
+export async function adminGetSetting(settingId: string): Promise<AdminSetting | null> {
+  const id = encodeURIComponent(settingId.trim());
+  try {
+    const raw = await request<unknown>(`/admin/settings/${id}`, { method: "GET" });
+    const one = normalizeAdminSettingRow(raw);
+    if (one) return one;
+    if (raw && typeof raw === "object") {
+      const o = raw as Record<string, unknown>;
+      const nested = o.data ?? o.setting;
+      return normalizeAdminSettingRow(nested);
+    }
+    return null;
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
+}
+
+/** POST /admin/settings */
+export async function adminCreateSetting(body: AdminCreateSettingRequest): Promise<AdminSetting> {
+  const raw = await request<unknown>("/admin/settings", { method: "POST", body });
+  return unwrapAdminSettingMutationResponse(raw);
+}
+
+/** PUT /admin/settings/:id */
+export async function adminUpdateSetting(
+  settingId: string,
+  body: AdminUpdateSettingRequest
+): Promise<AdminSetting> {
+  const id = encodeURIComponent(settingId.trim());
+  const raw = await request<unknown>(`/admin/settings/${id}`, { method: "PUT", body });
+  return unwrapAdminSettingMutationResponse(raw);
+}
+
+/** DELETE /admin/settings/:id */
+export async function adminDeleteSetting(settingId: string): Promise<void> {
+  const id = encodeURIComponent(settingId.trim());
+  await request(`/admin/settings/${id}`, { method: "DELETE" });
 }
 
 /** Data gabungan untuk dashboard admin: overview + users + tryouts dari API. */
