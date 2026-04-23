@@ -44,10 +44,21 @@ export interface User {
   avatarUrl?: string | null;
   subjectId?: string | null;
   schoolId?: string | null;
+  /** Jenjang pendidikan (dari API atau lookup lewat subject). */
+  levelId?: string | null;
+  levelName?: string | null;
+  /** Kelas / tingkat (mis. XI IPA) dari GET /admin/users. */
+  classLevel?: string | null;
   /** Nama subject/bidang (dari API atau lookup) */
   subjectName?: string | null;
   /** Nama sekolah (dari API atau lookup) */
   schoolName?: string | null;
+  /** GET /admin/users/:id — objek jenjang lengkap (sama pola subject). */
+  level?: Level | null;
+  /** GET detail — bidang lengkap. */
+  subject?: Subject | null;
+  /** GET detail — sekolah lengkap. */
+  school?: Sekolah | null;
 }
 
 // --- Auth ---
@@ -156,6 +167,8 @@ export interface ChangePasswordRequest {
 // --- Tryouts ---
 export type TryoutLevel = "easy" | "medium" | "hard";
 export type TryoutStatus = "draft" | "open" | "closed";
+/** Penilaian: otomatis (kunci) vs manual (review pengajar). */
+export type TryoutGradingMode = "auto" | "manual";
 
 export type EventCategorySlug = "tryout" | "free_class" | "paid_class";
 
@@ -171,6 +184,8 @@ export interface TryoutSession {
   closesAt: string;
   maxParticipants?: number | null;
   status: TryoutStatus;
+  /** Default backend biasanya `auto` jika tidak dikirim. */
+  gradingMode?: TryoutGradingMode | null;
   /** Kategori event: tryout, free_class, paid_class. Dari Master Data Event. */
   eventCategory?: EventCategorySlug | string | null;
   /** Jenjang & bidang (jika backend mengirim) — untuk filter bank soal, dll. */
@@ -257,9 +272,12 @@ export interface AttemptFeedback {
 
 export interface SubmitAttemptResponse {
   attemptId: string;
-  score: number;
-  percentile: number;
-  feedback: AttemptFeedback;
+  /** Untuk tryout manual: biasanya null sampai pengajar menilai. */
+  score?: number | null;
+  percentile?: number | null;
+  /** `true` = nilai akhir belum siap (penilaian manual). */
+  gradingPending?: boolean;
+  feedback?: AttemptFeedback;
 }
 
 export interface Attempt {
@@ -273,6 +291,7 @@ export interface Attempt {
   maxScore: number | null;
   percentile: number | null;
   timeSecondsSpent: number | null;
+  gradingPending?: boolean;
 }
 
 /** Satu soal dalam review attempt (jawaban benar/salah). */
@@ -388,6 +407,8 @@ export interface Subject {
   sortOrder?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  /** Jenjang induk bidang (jika backend mengirim). */
+  levelId?: string | null;
 }
 
 // --- Courses ---
@@ -509,10 +530,15 @@ export interface AdminCreateTryoutRequest {
   durationMinutes: number;
   questionsCount: number;
   level: TryoutLevel;
+  /** Jenjang pendidikan (SD/SMP/SMA) dari master level. */
+  levelId?: string | null;
+  /** Bidang/subject tryout dari master subject. */
+  subjectId?: string | null;
   opensAt: string;
   closesAt: string;
   maxParticipants?: number | null;
   status?: TryoutStatus;
+  gradingMode?: TryoutGradingMode;
   /** Kategori event: tryout, free_class, paid_class. */
   eventCategory?: EventCategorySlug | string | null;
 }

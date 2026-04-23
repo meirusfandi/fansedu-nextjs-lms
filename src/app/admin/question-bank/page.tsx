@@ -1,8 +1,13 @@
 "use client";
 
+import { AiGenerateToTryoutBlock } from "@/components/admin/AiGenerateToTryoutBlock";
 import { QuestionBankEntryModal } from "@/components/admin/QuestionBankEntryModal";
 import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { QuestionBody } from "@/components/QuestionBody";
+import {
+  QuestionBankOskPracticeView,
+  type QuestionBankOskRow,
+} from "@/components/question-bank/QuestionBankOskPracticeView";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import {
   adminGetLevelSubjects,
@@ -18,6 +23,7 @@ import {
   buildBankEntryFromQuestion,
   deleteQuestionBankEntry,
   fetchQuestionBank,
+  type QuestionBankImportContext,
 } from "@/lib/question-bank-client";
 import type { QuestionBankEntry } from "@/lib/question-bank/types";
 import Link from "next/link";
@@ -72,6 +78,9 @@ export default function AdminQuestionBankPage() {
 
   const [bankModalEntry, setBankModalEntry] = useState<QuestionBankEntry | null>(null);
   const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "osk">("list");
+  const [aiGenOpen, setAiGenOpen] = useState(false);
+  const [aiGenTryoutId, setAiGenTryoutId] = useState("");
 
   const loadBank = useCallback(async () => {
     setLoading(true);
@@ -142,6 +151,18 @@ export default function AdminQuestionBankPage() {
     return m;
   }, [subjectsFlat]);
 
+  const bankImportCtxForAi = useMemo((): QuestionBankImportContext | null => {
+    const sid = filterSubjectId.trim();
+    const lid = filterLevelId.trim();
+    if (!sid && !lid) return null;
+    return {
+      subjectId: sid || null,
+      subjectName: sid ? subjectNameById.get(sid) ?? null : null,
+      levelId: lid || null,
+      levelName: lid ? levelById.get(lid)?.name ?? null : null,
+    };
+  }, [filterLevelId, filterSubjectId, levelById, subjectNameById]);
+
   /** Satu baris per subject id (subjek sama di banyak jenjang tidak boleh duplikat key `<option>`). */
   const subjectSelectOptions = useMemo((): SubjectOption[] => {
     const src = filterLevelId ? subjectsFlat.filter((s) => s.levelId === filterLevelId) : subjectsFlat;
@@ -188,6 +209,73 @@ export default function AdminQuestionBankPage() {
     () => filteredEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [filteredEntries, page]
   );
+
+  const oskRows = useMemo((): QuestionBankOskRow[] => {
+    return paginated.map((e, idx) => {
+      const tMeta = tryoutById[e.sourceTryoutId];
+      const lid = (e.levelId ?? tMeta?.levelId ?? "").trim() || null;
+      const sid = (e.subjectId ?? tMeta?.subjectId ?? "").trim() || null;
+      const levelLabel =
+        e.levelName?.trim() ||
+        tMeta?.levelName?.trim() ||
+        (lid ? levelById.get(lid)?.name : null) ||
+        null;
+      const subjectLabel =
+        e.subjectName?.trim() ||
+        tMeta?.subjectName?.trim() ||
+        (sid ? subjectNameById.get(sid) : null) ||
+        null;
+      const parts = [subjectLabel, levelLabel].filter(Boolean) as string[];
+      const topicLine = parts.length > 0 ? parts.join(" · ") : typeLabel(e.type);
+
+      const tl = tMeta?.level;
+      let diffClass: QuestionBankOskRow["diffClass"] = "medium";
+      let diffLabel = "Sedang";
+      if (tl === "easy") {
+        diffClass = "easy";
+        diffLabel = "Mudah";
+      } else if (tl === "hard") {
+        diffClass = "hard";
+        diffLabel = "Sulit";
+      }
+
+      const co = e.correctOption?.trim();
+      const fromOpt = e.options?.find((o) => o.correct)?.key;
+      const answerKey = co
+        ? co.toUpperCase()
+        : fromOpt
+          ? String(fromOpt).trim().toUpperCase()
+          : null;
+
+      return {
+        entry: e,
+        serial: (page - 1) * PAGE_SIZE + idx + 1,
+        topicLine,
+        diffClass,
+        diffLabel,
+        answerKey,
+      };
+    });
+  }, [paginated, tryoutById, levelById, subjectNameById]);
+
+  const oskCoverPills = useMemo(() => {
+    const p: string[] = [];
+    if (filterLevelId) {
+      const name = levelById.get(filterLevelId)?.name;
+      if (name) p.push(`Jenjang: ${name}`);
+    }
+    if (filterSubjectId) {
+      const name = subjectNameById.get(filterSubjectId);
+      if (name) p.push(`Bidang: ${name}`);
+    }
+    return p;
+  }, [filterLevelId, filterSubjectId, levelById, subjectNameById]);
+
+  const oskPageHint = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredEntries.length / PAGE_SIZE));
+    if (filteredEntries.length <= PAGE_SIZE) return null;
+    return `Halaman ${page} dari ${totalPages} · ${filteredEntries.length} soal sesuai filter`;
+  }, [filteredEntries.length, page]);
 
   useEffect(() => {
     if (filteredEntries.length > 0 && (page - 1) * PAGE_SIZE >= filteredEntries.length) {
@@ -319,13 +407,26 @@ export default function AdminQuestionBankPage() {
             deployment read-only, nanti bisa dipindah ke API backend.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void openImport()}
-          className="shrink-0 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-        >
-          Impor dari tryout
-        </button>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={() => {
+              setAiGenTryoutId(selectedTryoutId || tryouts[0]?.id || "");
+              setAiGenOpen(true);
+            }}
+            disabled={metaLoading || tryouts.length === 0}
+            className="rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-950 hover:bg-violet-100 disabled:opacity-50"
+          >
+            Generate soal (AI)
+          </button>
+          <button
+            type="button"
+            onClick={() => void openImport()}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+          >
+            Impor dari tryout
+          </button>
+        </div>
       </div>
 
       {notice && (
@@ -417,8 +518,58 @@ export default function AdminQuestionBankPage() {
                 Reset
               </button>
             )}
+            <div className="flex w-full flex-wrap gap-2 border-t border-zinc-200 pt-3 sm:ml-auto sm:w-auto sm:border-0 sm:pt-0">
+              <span className="self-center text-xs font-medium text-zinc-500">Tampilan:</span>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                  viewMode === "list"
+                    ? "bg-zinc-900 text-white"
+                    : "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"
+                }`}
+              >
+                Daftar
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("osk")}
+                className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                  viewMode === "osk"
+                    ? "bg-zinc-900 text-white"
+                    : "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"
+                }`}
+              >
+                Latihan (gaya OSK)
+              </button>
+            </div>
           </div>
 
+          {viewMode === "osk" ? (
+            <>
+              <QuestionBankOskPracticeView
+                key={oskRows.map((r) => r.entry.id).join("|")}
+                rows={oskRows}
+                coverTitle="Bank soal"
+                coverSubtitle="Pratinjau set soal ala dokumen OSK — dari data bank yang sama dengan tampilan daftar."
+                coverPills={oskCoverPills}
+                pageHint={oskPageHint}
+              />
+              {filteredEntries.length > PAGE_SIZE && (
+                <div className="mt-6">
+                  <Pagination
+                    currentPage={page}
+                    totalItems={filteredEntries.length}
+                    onPageChange={setPage}
+                    label="soal"
+                  />
+                </div>
+              )}
+            </>
+          ) : null}
+
+          {viewMode === "list" ? (
+            <>
           <ul className="space-y-3">
             {paginated.map((e) => {
               const tMeta = tryoutById[e.sourceTryoutId];
@@ -507,7 +658,60 @@ export default function AdminQuestionBankPage() {
               />
             </div>
           )}
+            </>
+          ) : null}
         </>
+      )}
+
+      {aiGenOpen && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4 [color-scheme:light]">
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl">
+            <div className="flex items-start justify-between border-b border-zinc-100 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-zinc-900">Generate soal AI</h2>
+                <p className="mt-1 text-xs text-zinc-600">
+                  Soal dibuat di tryout backend, lalu disalin ke bank soal (opsional di bawah).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiGenOpen(false)}
+                className="rounded-lg px-2 py-1 text-sm text-zinc-700 hover:bg-zinc-100"
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              {tryouts.length === 0 ? (
+                <p className="text-sm text-zinc-600">Belum ada tryout. Buat sesi tryout dulu di menu Tryout.</p>
+              ) : (
+                <>
+                  <label className="block text-xs font-medium text-zinc-700">Tryout tujuan</label>
+                  <select
+                    value={aiGenTryoutId}
+                    onChange={(e) => setAiGenTryoutId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900"
+                  >
+                    {tryouts.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.title}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="mt-4">
+                    <AiGenerateToTryoutBlock
+                      tryoutId={aiGenTryoutId}
+                      tryoutHint={tryoutById[aiGenTryoutId]?.title}
+                      importCtx={bankImportCtxForAi}
+                      onDone={() => void loadBank()}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       <QuestionBankEntryModal

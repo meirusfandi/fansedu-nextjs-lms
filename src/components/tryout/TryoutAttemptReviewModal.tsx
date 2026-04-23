@@ -81,9 +81,18 @@ type Props = {
   api: TryoutReviewApiClient;
   onClose: () => void;
   onSaved?: () => void | Promise<void>;
+  /** False untuk tryout `gradingMode: manual` — tombol auto-grade disembunyikan. */
+  allowAutoGrade?: boolean;
 };
 
-export function TryoutAttemptReviewModal({ tryoutId, student, api, onClose, onSaved }: Props) {
+export function TryoutAttemptReviewModal({
+  tryoutId,
+  student,
+  api,
+  onClose,
+  onSaved,
+  allowAutoGrade = true,
+}: Props) {
   const [reviewItems, setReviewItems] = useState<AttemptReviewItem[]>([]);
   const [rowEdits, setRowEdits] = useState<Record<string, RowEdit>>({});
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -288,10 +297,12 @@ export function TryoutAttemptReviewModal({ tryoutId, student, api, onClose, onSa
                             }))
                           }
                           className="mt-0.5 w-full max-w-[10rem] rounded border border-zinc-200 px-2 py-1 text-sm sm:w-32"
-                          placeholder="Kosong = otomatis"
+                          placeholder={allowAutoGrade ? "Kosong = otomatis" : "0 … max skor"}
                         />
                         <p className="mt-0.5 text-[11px] text-zinc-400">
-                          Isi angka untuk override; kosongkan untuk menghapus override dan kembali ke nilai otomatis.
+                          {allowAutoGrade
+                            ? "Isi angka untuk override; kosongkan untuk menghapus override dan kembali ke nilai otomatis."
+                            : "Isi skor per soal (0 … bobot soal). Simpan perubahan review untuk mengirim ke server."}
                         </p>
                       </div>
                       <div>
@@ -320,26 +331,30 @@ export function TryoutAttemptReviewModal({ tryoutId, student, api, onClose, onSa
           </div>
         )}
         <div className="mt-5 flex flex-col gap-3 border-t border-zinc-100 pt-4">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-600">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={autoGradeClearComments}
-                onChange={(e) => setAutoGradeClearComments(e.target.checked)}
-                className="rounded border-zinc-300"
-              />
-              Saat auto-grade, hapus juga komentar reviewer
-            </label>
-          </div>
+          {allowAutoGrade && (
+            <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-600">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={autoGradeClearComments}
+                  onChange={(e) => setAutoGradeClearComments(e.target.checked)}
+                  className="rounded border-zinc-300"
+                />
+                Saat auto-grade, hapus juga komentar reviewer
+              </label>
+            </div>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              disabled={reviewSaving || reviewLoading || !attemptId}
-              onClick={runAutoGrade}
-              className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-            >
-              Jalankan penilaian ulang otomatis
-            </button>
+            {allowAutoGrade && (
+              <button
+                type="button"
+                disabled={reviewSaving || reviewLoading || !attemptId}
+                onClick={runAutoGrade}
+                className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+              >
+                Jalankan penilaian ulang otomatis
+              </button>
+            )}
             <button
               type="button"
               disabled={reviewSaving || reviewLoading}

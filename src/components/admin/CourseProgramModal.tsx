@@ -1,5 +1,6 @@
 "use client";
 
+import { AiGenerateToTryoutBlock } from "@/components/admin/AiGenerateToTryoutBlock";
 import {
   adminGetCourseManage,
   adminGetCourseProgram,
@@ -8,14 +9,12 @@ import {
   getFriendlyApiErrorMessage,
 } from "@/lib/api";
 import type { CourseMeeting, CourseProgramPayload, CourseTrackType } from "@/lib/api-types";
+import type { QuestionBankImportContext } from "@/lib/question-bank-client";
+import {
+  parseTryoutIdLines,
+  syncTryoutsToQuestionBank,
+} from "@/lib/question-bank/tryout-to-bank-sync";
 import { useCallback, useEffect, useState } from "react";
-
-function parseTryoutIdLines(text: string): string[] {
-  return text
-    .split(/[\n,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 function emptyMeetingRow(meetingNumber: number): CourseMeeting {
   return {
@@ -35,9 +34,18 @@ type Props = {
   courseTitle: string;
   onClose: () => void;
   onSaved: () => void;
+  /** Untuk metadata entri bank saat sinkron / generate AI dari halaman kelas. */
+  questionBankSyncContext?: QuestionBankImportContext | null;
 };
 
-export function CourseProgramModal({ open, courseId, courseTitle, onClose, onSaved }: Props) {
+export function CourseProgramModal({
+  open,
+  courseId,
+  courseTitle,
+  onClose,
+  onSaved,
+  questionBankSyncContext = null,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +56,8 @@ export function CourseProgramModal({ open, courseId, courseTitle, onClose, onSav
   );
   const [pretestTryoutSessionId, setPretestTryoutSessionId] = useState("");
   const [linkedTryoutIdsText, setLinkedTryoutIdsText] = useState("");
+  const [syncBankAfterSave, setSyncBankAfterSave] = useState(true);
+  const [targetTryoutIdForAi, setTargetTryoutIdForAi] = useState("");
 
   const load = useCallback(async () => {
     if (!courseId) return;
@@ -112,7 +122,32 @@ export function CourseProgramModal({ open, courseId, courseTitle, onClose, onSav
           : null,
       };
       const res = await adminPutCourseProgram(courseId, payload);
-      setNotice(res?.message ?? "Program tersimpan; learning journey diperbarui.");
+      let noticeText = res?.message ?? "Program tersimpan; learning journey diperbarui.";
+
+      if (syncBankAfterSave) {
+        const ids = new Set<string>();
+        const pret = pretestTryoutSessionId.trim();
+        if (pret) ids.add(pret);
+        if (trackType === "tryout") {
+          for (const id of linkedIds) ids.add(id);
+        }
+        if (ids.size > 0) {
+          try {
+            const sync = await syncTryoutsToQuestionBank(
+              [...ids],
+              questionBankSyncContext ?? null
+            );
+            noticeText += ` Bank soal: +${sync.totalAdded} entri baru, ${sync.totalSkipped} duplikat dilewati.`;
+            if (sync.errors.length > 0) {
+              noticeText += ` (${sync.errors.length} sesi tidak bisa di-sync; cek UUID.)`;
+            }
+          } catch (syncErr) {
+            noticeText += ` Bank soal: sinkron gagal — ${getFriendlyApiErrorMessage(syncErr)}`;
+          }
+        }
+      }
+
+      setNotice(noticeText);
       onSaved();
     } catch (err) {
       setError(getFriendlyApiErrorMessage(err));
@@ -205,6 +240,43 @@ export function CourseProgramModal({ open, courseId, courseTitle, onClose, onSav
                     </p>
                   </div>
                 )}
+
+                <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2 text-xs text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={syncBankAfterSave}
+                    onChange={(e) => setSyncBankAfterSave(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-400 accent-zinc-900"
+                  />
+                  <span>
+                    Setelah simpan, sinkronkan semua soal dari pre-test & tryout terhubung ke{" "}
+                    <strong>bank soal</strong> (entri baru saja; duplikat dilewati).
+                  </span>
+                </label>
+
+                <div className="rounded-xl border border-dashed border-violet-200 bg-white px-3 py-3">
+                  <p className="text-xs font-medium text-violet-900">Generate soal AI ke satu tryout</p>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    Isi UUID sesi tryout yang sudah ada (bisa sama dengan salah satu di daftar di atas). Soal baru
+                    ditambahkan di backend; centang “bank soal” di blok bawah untuk salinan JSON.
+                  </p>
+                  <label className="mt-2 block text-xs font-medium text-zinc-600">UUID tryout tujuan</label>
+                  <input
+                    type="text"
+                    value={targetTryoutIdForAi}
+                    onChange={(e) => setTargetTryoutIdForAi(e.target.value)}
+                    placeholder="uuid…"
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 font-mono text-sm"
+                  />
+                  {targetTryoutIdForAi.trim() ? (
+                    <div className="mt-3">
+                      <AiGenerateToTryoutBlock
+                        tryoutId={targetTryoutIdForAi.trim()}
+                        importCtx={questionBankSyncContext ?? null}
+                      />
+                    </div>
+                  ) : null}
+                </div>
 
                 {trackType === "meetings" && (
                   <div className="space-y-4">

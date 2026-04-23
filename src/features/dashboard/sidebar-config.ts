@@ -48,6 +48,7 @@ export const trainerSidebarSections: NavSection[] = [
     items: [
       { href: "/guru/laporan", label: "Laporan" },
       { href: "/guru/pembayaran", label: "Pembayaran" },
+      { href: "/guru/berlangganan-ai", label: "Berlangganan AI" },
       { href: "/guru/pengaturan", label: "Pengaturan" },
     ],
   },

@@ -41,6 +41,7 @@ export function GuruSidebar({ currentPath = "", onLogout }: GuruSidebarProps) {
   const isKelolaKelas = currentPath.startsWith("/guru/kelola-kelas");
   const isLaporan = currentPath.startsWith("/guru/laporan");
   const isPembayaran = currentPath.startsWith("/guru/pembayaran");
+  const isBerlanggananAi = currentPath.startsWith("/guru/berlangganan-ai");
   const isPengaturan = currentPath.startsWith("/guru/pengaturan");
 
   return (
@@ -75,6 +76,7 @@ export function GuruSidebar({ currentPath = "", onLogout }: GuruSidebarProps) {
           </p>
           <NavLink href="/guru/laporan" label="Laporan" isActive={isLaporan} />
           <NavLink href="/guru/pembayaran" label="Riwayat Pembayaran" isActive={isPembayaran} />
+          <NavLink href="/guru/berlangganan-ai" label="Berlangganan AI" isActive={isBerlanggananAi} />
           <NavLink href="/guru/pengaturan" label="Pengaturan" isActive={isPengaturan} />
         </div>
       </nav>

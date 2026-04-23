@@ -10,6 +10,11 @@ import {
   trainerPutTryoutAttemptReviewBatch,
 } from "@/lib/api";
 import type { AdminTryoutStudent, TryoutSession } from "@/lib/api-types";
+
+const GRADING_MODE_LABEL: Record<string, string> = {
+  auto: "Penilaian otomatis",
+  manual: "Penilaian manual",
+};
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -111,6 +116,11 @@ export default function TrainerTryoutDetailPage() {
       <p className="mt-1 text-sm text-zinc-500">
         {tryout?.title ?? tryout?.shortTitle ?? tryoutId}
       </p>
+      {tryout && (
+        <p className="mt-1 text-xs text-zinc-500">
+          Mode: {GRADING_MODE_LABEL[tryout.gradingMode === "manual" ? "manual" : "auto"]}
+        </p>
+      )}
       {error && (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
@@ -170,6 +180,7 @@ export default function TrainerTryoutDetailPage() {
           onClose={() => setReviewStudent(null)}
           onSaved={refreshTrainerTryoutFromApi}
           api={tryoutReviewApi}
+          allowAutoGrade={tryout?.gradingMode !== "manual"}
         />
       )}
     </div>

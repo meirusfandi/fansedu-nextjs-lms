@@ -525,6 +525,16 @@ function KelasDetailInner() {
           void loadModules();
           showSuccess("Program kelas berhasil disimpan.");
         }}
+        questionBankSyncContext={
+          subject
+            ? {
+                subjectId: subject.id,
+                subjectName: subject.name ?? null,
+                levelId: subject.levelId?.trim() || null,
+                levelName: null,
+              }
+            : null
+        }
       />
     </div>
   );

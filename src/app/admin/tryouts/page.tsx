@@ -2,18 +2,22 @@
 
 import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import {
+  adminGetLevelSubjects,
   adminCreateTryout,
   adminDeleteTryout,
+  adminListLevels,
   adminListTryouts,
   adminUpdateTryout,
 } from "@/lib/api";
 import Link from "next/link";
 import type {
   AdminCreateTryoutRequest,
+  Level,
   TryoutSession,
 } from "@/lib/api-types";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { filterLevelsSDSMPSMA } from "@/features/admin/kelas-helpers";
 
 const LEVEL_LABEL: Record<string, string> = {
   easy: "Mudah",
@@ -29,6 +33,17 @@ const EVENT_CATEGORY_LABEL: Record<string, string> = {
   tryout: "Tryout",
   free_class: "Free Class",
   paid_class: "Paid Class",
+};
+const GRADING_MODE_LABEL: Record<string, string> = {
+  auto: "Otomatis",
+  manual: "Manual",
+};
+
+type SubjectRow = {
+  id: string;
+  name: string;
+  levelId: string;
+  levelName: string;
 };
 
 function formatDate(iso: string) {
@@ -63,10 +78,13 @@ const emptyForm: AdminCreateTryoutRequest = {
   durationMinutes: 90,
   questionsCount: 25,
   level: "medium",
+  levelId: "",
+  subjectId: "",
   opensAt: "",
   closesAt: "",
   maxParticipants: 200,
   status: "draft",
+  gradingMode: "auto",
   eventCategory: "tryout",
 };
 
@@ -82,16 +100,54 @@ export default function AdminTryoutsPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [levels, setLevels] = useState<Level[]>([]);
+  const [subjectsFlat, setSubjectsFlat] = useState<SubjectRow[]>([]);
+  const [metaLoading, setMetaLoading] = useState(true);
+  const [filterLevelId, setFilterLevelId] = useState("");
+  const [filterSubjectId, setFilterSubjectId] = useState("");
+
+  const subjectOptions = useMemo(
+    () =>
+      (filterLevelId ? subjectsFlat.filter((s) => s.levelId === filterLevelId) : subjectsFlat).sort((a, b) =>
+        a.name.localeCompare(b.name, "id")
+      ),
+    [subjectsFlat, filterLevelId]
+  );
+  const formSubjectOptions = useMemo(
+    () =>
+      (form.levelId ? subjectsFlat.filter((s) => s.levelId === form.levelId) : subjectsFlat).sort((a, b) =>
+        a.name.localeCompare(b.name, "id")
+      ),
+    [subjectsFlat, form.levelId]
+  );
+
+  const filteredList = useMemo(() => {
+    return list.filter((t) => {
+      if (filterLevelId && (t.levelId ?? "") !== filterLevelId) return false;
+      if (filterSubjectId && (t.subjectId ?? "") !== filterSubjectId) return false;
+      return true;
+    });
+  }, [filterLevelId, filterSubjectId, list]);
 
   const paginatedList = useMemo(
-    () => list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [list, page]
+    () => filteredList.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredList, page]
   );
   useEffect(() => {
-    if (list.length > 0 && (page - 1) * PAGE_SIZE >= list.length) {
+    if (filteredList.length > 0 && (page - 1) * PAGE_SIZE >= filteredList.length) {
       setPage(1);
     }
-  }, [list.length, page]);
+  }, [filteredList.length, page]);
+  useEffect(() => {
+    if (filterSubjectId && !subjectOptions.some((s) => s.id === filterSubjectId)) {
+      setFilterSubjectId("");
+    }
+  }, [filterSubjectId, subjectOptions]);
+  useEffect(() => {
+    if (form.subjectId && !formSubjectOptions.some((s) => s.id === form.subjectId)) {
+      setForm((prev) => ({ ...prev, subjectId: "" }));
+    }
+  }, [form.subjectId, formSubjectOptions]);
 
   const loadList = useCallback(() => {
     setLoading(true);
@@ -108,6 +164,40 @@ export default function AdminTryoutsPage() {
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  const loadMeta = useCallback(async () => {
+    setMetaLoading(true);
+    try {
+      const lv = await adminListLevels();
+      const filteredLevels = filterLevelsSDSMPSMA(lv ?? []);
+      const rows = await Promise.all(
+        filteredLevels.map(async (l) => {
+          try {
+            const subs = await adminGetLevelSubjects(l.id);
+            return (subs ?? []).map((s) => ({
+              id: s.id,
+              name: s.name,
+              levelId: l.id,
+              levelName: l.name,
+            }));
+          } catch {
+            return [];
+          }
+        })
+      );
+      setLevels(filteredLevels);
+      setSubjectsFlat(rows.flat());
+    } catch {
+      setLevels([]);
+      setSubjectsFlat([]);
+    } finally {
+      setMetaLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMeta();
+  }, [loadMeta]);
 
   const openAdd = () => {
     const now = new Date();
@@ -130,10 +220,13 @@ export default function AdminTryoutsPage() {
       durationMinutes: t.durationMinutes ?? 90,
       questionsCount: t.questionsCount ?? 25,
       level: t.level ?? "medium",
+      levelId: t.levelId ?? "",
+      subjectId: t.subjectId ?? "",
       opensAt: toDatetimeLocalValue(t.opensAt),
       closesAt: toDatetimeLocalValue(t.closesAt),
       maxParticipants: t.maxParticipants ?? undefined,
       status: t.status ?? "draft",
+      gradingMode: t.gradingMode === "manual" ? "manual" : "auto",
       eventCategory: (t.eventCategory as "tryout" | "free_class" | "paid_class") ?? "tryout",
     });
     setEditingId(t.id);
@@ -189,6 +282,8 @@ export default function AdminTryoutsPage() {
         durationMinutes: duration,
         questionsCount: questionCount,
         level: form.level,
+        levelId: form.levelId?.trim() ? form.levelId.trim() : null,
+        subjectId: form.subjectId?.trim() ? form.subjectId.trim() : null,
         opensAt: opensAt,
         closesAt: closesAt,
         status: form.status ?? "draft",
@@ -200,6 +295,7 @@ export default function AdminTryoutsPage() {
             ? Number(form.maxParticipants)
             : null,
         eventCategory: form.eventCategory ?? "tryout",
+        gradingMode: form.gradingMode ?? "auto",
       };
       if (modalOpen === "add") {
         await adminCreateTryout(payload);
@@ -269,13 +365,49 @@ export default function AdminTryoutsPage() {
         )}
 
         <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="grid grid-cols-1 gap-3 border-b border-zinc-200 bg-zinc-50 p-4 md:grid-cols-4">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">Filter Jenjang</label>
+              <select
+                value={filterLevelId}
+                onChange={(e) => setFilterLevelId(e.target.value)}
+                disabled={metaLoading}
+                className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:bg-zinc-100"
+              >
+                <option value="">Semua Jenjang</option>
+                {levels.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600">Filter Subject</label>
+              <select
+                value={filterSubjectId}
+                onChange={(e) => setFilterSubjectId(e.target.value)}
+                disabled={metaLoading}
+                className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:bg-zinc-100"
+              >
+                <option value="">Semua Subject</option>
+                {subjectOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           {loading ? (
             <div className="p-8 text-center text-sm text-zinc-500">
               Memuat daftar tryout...
             </div>
-          ) : list.length === 0 ? (
+          ) : filteredList.length === 0 ? (
             <div className="p-8 text-center text-sm text-zinc-500">
-              Belum ada event. Klik &quot;Tambah Event&quot; untuk membuat.
+              {list.length === 0
+                ? "Belum ada event. Klik \"Tambah Event\" untuk membuat."
+                : "Tidak ada event yang cocok dengan filter saat ini."}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -301,7 +433,16 @@ export default function AdminTryoutsPage() {
                       Level
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Jenjang
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Subject
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
                       Status
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Penilaian
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-500">
                       Buka – Tutup
@@ -333,9 +474,16 @@ export default function AdminTryoutsPage() {
                       <td className="px-4 py-3">
                         {LEVEL_LABEL[t.level] ?? t.level}
                       </td>
+                      <td className="px-4 py-3">{t.levelName ?? "–"}</td>
+                      <td className="px-4 py-3">{t.subjectName ?? "–"}</td>
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                           {STATUS_LABEL[t.status] ?? t.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                          {GRADING_MODE_LABEL[t.gradingMode === "manual" ? "manual" : "auto"]}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-zinc-500">
@@ -395,10 +543,10 @@ export default function AdminTryoutsPage() {
               </table>
             </div>
           )}
-          {!loading && list.length > 0 && (
+          {!loading && filteredList.length > 0 && (
             <Pagination
               currentPage={page}
-              totalItems={list.length}
+              totalItems={filteredList.length}
               onPageChange={setPage}
               label="event"
             />
@@ -516,6 +664,56 @@ export default function AdminTryoutsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-zinc-600">
+                    Jenjang *
+                  </label>
+                  <select
+                    value={form.levelId ?? ""}
+                    required
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        levelId: e.target.value,
+                        subjectId: "",
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                  >
+                    <option value="">Pilih jenjang</option>
+                    {levels.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600">
+                    Subject *
+                  </label>
+                  <select
+                    value={form.subjectId ?? ""}
+                    required
+                    disabled={!form.levelId}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        subjectId: e.target.value,
+                      })
+                    }
+                    className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  >
+                    <option value="">{form.levelId ? "Pilih subject" : "Pilih jenjang dulu"}</option>
+                    {formSubjectOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-600">
                     Level
                   </label>
                   <select
@@ -552,6 +750,27 @@ export default function AdminTryoutsPage() {
                     <option value="closed">Ditutup</option>
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">
+                  Mode penilaian
+                </label>
+                <select
+                  value={form.gradingMode ?? "auto"}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      gradingMode: e.target.value as "auto" | "manual",
+                    })
+                  }
+                  className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10"
+                >
+                  <option value="auto">Otomatis (kunci jawaban)</option>
+                  <option value="manual">Manual (review pengajar)</option>
+                </select>
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  Mode otomatis memerlukan kunci lengkap per soal; backend menolak jika belum lengkap.
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-zinc-600">

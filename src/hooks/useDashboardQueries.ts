@@ -35,11 +35,14 @@ import {
   adminListUsers,
   adminListCourses,
   trainerListPayments,
+  getMySubscription,
+  aiCreateSubscription,
 } from "@/lib/api";
 import type {
   TrainerCourseCreateRequest,
   CreatePaymentRequest,
   AdminCreatePaymentRequest,
+  CreateSubscriptionRequest,
   AdminGrantEnrollmentRequest,
   AdminManualOrderCreateRequest,
   AdminOrderPurchaseMetaPatchRequest,
@@ -68,6 +71,7 @@ export const queryKeys = {
   payments: ["payments"] as const,
   adminPayments: ["admin", "payments"] as const,
   trainerPayments: ["trainer", "payments"] as const,
+  trainerAiSubscription: ["trainer", "ai-subscription"] as const,
 };
 
 export function useStudentDashboard() {
@@ -232,6 +236,26 @@ export function useTrainerPayments() {
       const fromTrainer = await trainerListPayments();
       if (fromTrainer.length > 0) return fromTrainer;
       return listPayments();
+    },
+  });
+}
+
+/** Langganan AI (GET /subscription) untuk akun trainer yang sedang login. */
+export function useMyAiSubscription() {
+  return useQuery({
+    queryKey: queryKeys.trainerAiSubscription,
+    queryFn: getMySubscription,
+    staleTime: 60_000,
+  });
+}
+
+/** Aktivasi / perpanjang langganan AI (POST /subscription). */
+export function useCreateAiSubscription() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CreateSubscriptionRequest) => aiCreateSubscription(body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.trainerAiSubscription });
     },
   });
 }

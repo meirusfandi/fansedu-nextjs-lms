@@ -30,6 +30,13 @@ export default function GuruPembayaranPage() {
           Transaksi Anda (mis. pembayaran slot peserta). Status <strong>Menunggu verifikasi</strong> berarti admin
           belum mengonfirmasi; setelah disetujui, slot biasanya bertambah sesuai kebijakan backend.
         </p>
+        <p className="mt-3 rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-2 text-sm text-sky-950">
+          Untuk status langganan fitur AI (paket, periode), buka{" "}
+          <Link href="/guru/berlangganan-ai" className="font-semibold underline hover:text-sky-900">
+            Berlangganan AI
+          </Link>
+          .
+        </p>
       </div>
 
       {error && (

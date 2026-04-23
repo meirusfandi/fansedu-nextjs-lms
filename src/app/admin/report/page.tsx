@@ -357,7 +357,11 @@ export default function AdminReportPage() {
         </form>
         <p className="mt-2 text-xs text-zinc-500">
           Bisa kirim `planCode` saja, atau sertakan tanggal mulai/selesai jika perlu override
-          periode.
+          periode. Trainer biasanya memakai halaman{" "}
+          <a href="/guru/berlangganan-ai" className="font-medium text-zinc-800 underline">
+            /guru/berlangganan-ai
+          </a>{" "}
+          untuk cek status & aktivasi mandiri (JWT trainer).
         </p>
         {subMessage ? <p className="mt-2 text-sm text-zinc-700">{subMessage}</p> : null}
       </section>

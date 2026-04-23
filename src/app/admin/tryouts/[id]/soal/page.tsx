@@ -1,5 +1,6 @@
 "use client";
 
+import { AiGenerateToTryoutBlock } from "@/components/admin/AiGenerateToTryoutBlock";
 import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { QuestionBody } from "@/components/QuestionBody";
@@ -12,6 +13,7 @@ import {
   adminUpdateQuestion,
 } from "@/lib/api";
 import type { AdminCreateQuestionRequest, Question, TryoutSession } from "@/lib/api-types";
+import type { QuestionBankImportContext } from "@/lib/question-bank-client";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -72,6 +74,7 @@ export default function AdminTryoutSoalPage() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const sortedQuestions = useMemo(
     () => [...questions].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -125,6 +128,16 @@ export default function AdminTryoutSoalPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const bankImportCtxForAi = useMemo((): QuestionBankImportContext | null => {
+    if (!tryout) return null;
+    return {
+      levelId: tryout.levelId?.trim() || null,
+      levelName: tryout.levelName?.trim() || null,
+      subjectId: tryout.subjectId?.trim() || null,
+      subjectName: tryout.subjectName?.trim() || null,
+    };
+  }, [tryout]);
 
   const openAdd = () => {
     setForm({
@@ -317,13 +330,23 @@ export default function AdminTryoutSoalPage() {
               {tryout ? tryout.title : "..."} — tambah dan kelola soal.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openAdd}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800"
-          >
-            + Tambah Soal
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setAiModalOpen(true)}
+              disabled={!tryoutId}
+              className="rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-950 hover:bg-violet-100 disabled:opacity-50"
+            >
+              Generate (AI)
+            </button>
+            <button
+              type="button"
+              onClick={openAdd}
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800"
+            >
+              + Tambah Soal
+            </button>
+          </div>
         </div>
 
         {notice && (
@@ -597,6 +620,30 @@ export default function AdminTryoutSoalPage() {
           </div>
         </div>
       )}
+
+      {aiModalOpen && tryoutId ? (
+        <div className="fixed inset-0 z-[15] flex items-center justify-center bg-black/50 p-4 [color-scheme:light]">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-2">
+              <h2 className="text-lg font-semibold text-zinc-900">Generate soal AI</h2>
+              <button
+                type="button"
+                onClick={() => setAiModalOpen(false)}
+                className="rounded-lg px-2 py-1 text-sm text-zinc-600 hover:bg-zinc-100"
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+            </div>
+            <AiGenerateToTryoutBlock
+              tryoutId={tryoutId}
+              tryoutHint={tryout?.title}
+              importCtx={bankImportCtxForAi}
+              onDone={() => loadData()}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

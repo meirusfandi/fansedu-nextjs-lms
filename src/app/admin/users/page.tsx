@@ -49,8 +49,7 @@ export default function AdminUsersPage() {
   const filteredUsers = useMemo(() => {
     const subjectLevelById = new Map<string, string>();
     for (const s of subjects) {
-      const raw = s as Subject & { levelId?: string | null };
-      if (raw.levelId) subjectLevelById.set(s.id, raw.levelId);
+      if (s.levelId) subjectLevelById.set(s.id, s.levelId);
     }
     return users.filter((u) => {
       if (filterSubjectId && u.subjectId !== filterSubjectId) return false;
@@ -67,6 +66,40 @@ export default function AdminUsersPage() {
     () => filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [filteredUsers, page]
   );
+
+  /** Label sekolah / jenjang / bidang untuk tabel (API + lookup master data). */
+  const userSchoolJenjangBidang = useMemo(() => {
+    const levelById = new Map(levels.map((l) => [l.id, l.name]));
+    const subjectById = new Map(subjects.map((s) => [s.id, s]));
+    const schoolById = new Map(schools.map((s) => [s.id, s.namaSekolah]));
+
+    return (u: User) => {
+      const school =
+        (u.school?.namaSekolah?.trim() && u.school.namaSekolah) ||
+        (u.schoolName?.trim() && u.schoolName) ||
+        (u.schoolId ? schoolById.get(u.schoolId) : undefined) ||
+        "–";
+
+      const bidang =
+        (u.subject?.name?.trim() && u.subject.name) ||
+        (u.subjectName?.trim() && u.subjectName) ||
+        (u.subjectId ? subjectById.get(u.subjectId)?.name : undefined) ||
+        "–";
+
+      let jenjang = "–";
+      if (u.level?.name?.trim()) jenjang = u.level.name;
+      else if (u.levelName?.trim()) jenjang = u.levelName;
+      else if (u.levelId && levelById.has(u.levelId)) jenjang = levelById.get(u.levelId) ?? "–";
+      else if (u.subjectId) {
+        const sub = subjectById.get(u.subjectId);
+        const lid = sub?.levelId;
+        if (lid && levelById.has(lid)) jenjang = levelById.get(lid) ?? "–";
+      }
+
+      return { school, jenjang, bidang };
+    };
+  }, [levels, subjects, schools]);
+
   useEffect(() => {
     if (filteredUsers.length > 0 && (page - 1) * PAGE_SIZE >= filteredUsers.length) {
       setPage(1);
@@ -276,8 +309,7 @@ export default function AdminUsersPage() {
               {subjects
                 .filter((s) => {
                   if (!filterLevelId) return true;
-                  const raw = s as Subject & { levelId?: string | null };
-                  return (raw.levelId ?? "") === filterLevelId;
+                  return (s.levelId ?? "") === filterLevelId;
                 })
                 .map((s) => (
                   <option key={s.id} value={s.id}>
@@ -314,13 +346,27 @@ export default function AdminUsersPage() {
                     <th className="px-4 py-3 text-left font-medium text-zinc-500">
                       Role
                     </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Sekolah
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Jenjang
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Kelas
+                    </th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-500">
+                      Bidang
+                    </th>
                     <th className="px-4 py-3 text-right font-medium text-zinc-500">
                       Aksi
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {paginatedUsers.map((u) => (
+                  {paginatedUsers.map((u) => {
+                    const { school, jenjang, bidang } = userSchoolJenjangBidang(u);
+                    return (
                     <tr
                       key={u.id}
                       className="hover:bg-zinc-50"
@@ -334,6 +380,22 @@ export default function AdminUsersPage() {
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
                           {ROLE_LABEL[u.role] ?? u.role}
+                        </span>
+                      </td>
+                      <td className="max-w-[14rem] px-4 py-3 text-zinc-700">
+                        <span className="line-clamp-2" title={school}>
+                          {school}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-700">{jenjang}</td>
+                      <td className="max-w-[10rem] px-4 py-3 text-zinc-700">
+                        <span className="line-clamp-2" title={u.classLevel ?? ""}>
+                          {u.classLevel?.trim() ? u.classLevel : "–"}
+                        </span>
+                      </td>
+                      <td className="max-w-[12rem] px-4 py-3 text-zinc-700">
+                        <span className="line-clamp-2" title={bidang}>
+                          {bidang}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -355,7 +417,8 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -373,7 +436,11 @@ export default function AdminUsersPage() {
       {/* Modal: Detail / Add / Edit */}
       {modalMode && (
         <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl">
+          <div
+            className={`w-full rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl ${
+              modalMode === "detail" ? "max-w-lg" : "max-w-md"
+            }`}
+          >
             {modalMode === "detail" ? (
               <>
                 <h2 className="text-lg font-semibold text-zinc-900">
@@ -406,19 +473,65 @@ export default function AdminUsersPage() {
                         {ROLE_LABEL[selectedUser.role] ?? selectedUser.role}
                       </p>
                     </div>
-                    {(selectedUser.subjectId || selectedUser.subjectName) && (
+                    <div>
+                      <p className="text-xs font-medium text-zinc-500">Sekolah</p>
+                      <p className="text-zinc-900">
+                        {userSchoolJenjangBidang(selectedUser).school}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-zinc-500">Jenjang pendidikan</p>
+                      <p className="text-zinc-900">
+                        {userSchoolJenjangBidang(selectedUser).jenjang}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-zinc-500">Bidang / Subject</p>
+                      <p className="text-zinc-900">
+                        {userSchoolJenjangBidang(selectedUser).bidang}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-zinc-500">Kelas (classLevel)</p>
+                      <p className="text-zinc-900">
+                        {selectedUser.classLevel?.trim() ? selectedUser.classLevel : "–"}
+                      </p>
+                    </div>
+                    {selectedUser.level && (
                       <div>
-                        <p className="text-xs font-medium text-zinc-500">Bidang / Subject</p>
-                        <p className="text-zinc-900">
-                          {selectedUser.subjectName ?? subjects.find((s) => s.id === selectedUser.subjectId)?.name ?? selectedUser.subjectId}
+                        <p className="text-xs font-medium text-zinc-500">Jenjang — objek API</p>
+                        <p className="mt-0.5 text-zinc-800">
+                          <span className="font-medium">{selectedUser.level.name}</span>
+                          <span className="ml-1 font-mono text-[11px] text-zinc-500">
+                            ({selectedUser.level.id}
+                            {selectedUser.level.slug ? ` · ${selectedUser.level.slug}` : ""})
+                          </span>
                         </p>
                       </div>
                     )}
-                    {(selectedUser.schoolId || selectedUser.schoolName) && (
+                    {selectedUser.subject && (
                       <div>
-                        <p className="text-xs font-medium text-zinc-500">Sekolah</p>
-                        <p className="text-zinc-900">
-                          {selectedUser.schoolName ?? schools.find((s) => s.id === selectedUser.schoolId)?.namaSekolah ?? selectedUser.schoolId}
+                        <p className="text-xs font-medium text-zinc-500">Bidang — objek API</p>
+                        <p className="mt-0.5 text-zinc-800">
+                          <span className="font-medium">{selectedUser.subject.name}</span>
+                          <span className="ml-1 font-mono text-[11px] text-zinc-500">
+                            ({selectedUser.subject.id}
+                            {selectedUser.subject.levelId
+                              ? ` · levelId ${selectedUser.subject.levelId}`
+                              : ""}
+                            )
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                    {selectedUser.school && (
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500">Sekolah — objek API</p>
+                        <p className="mt-0.5 text-zinc-800">
+                          <span className="font-medium">{selectedUser.school.namaSekolah}</span>
+                          <span className="ml-1 font-mono text-[11px] text-zinc-500">
+                            ({selectedUser.school.id})
+                          </span>
                         </p>
                       </div>
                     )}

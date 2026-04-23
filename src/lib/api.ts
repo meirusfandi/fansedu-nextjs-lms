@@ -101,6 +101,7 @@ import type {
   SetPasswordRequest,
 } from "./api-types";
 import { deepToCamelCase } from "./json-case";
+import { normalizeUserRoleFromApi } from "./user-role";
 
 /**
  * Mengubah error dari API/jaringan menjadi pesan yang ramah pengguna.
@@ -342,6 +343,10 @@ function normalizeToTryoutSession(item: unknown): TryoutSession {
     maxParticipants:
       obj.maxParticipants != null ? Number(obj.maxParticipants) : null,
     status: String(obj.status ?? "draft") as TryoutSession["status"],
+    gradingMode:
+      obj.gradingMode === "manual" || obj.gradingMode === "auto"
+        ? obj.gradingMode
+        : undefined,
     eventCategory:
       obj.eventCategory != null ? String(obj.eventCategory) : null,
     levelId: obj.levelId != null ? String(obj.levelId) : null,
@@ -934,11 +939,17 @@ export async function createTrainerCourse(body: TrainerCourseCreateRequest): Pro
 /** Daftar tryout yang buka. GET api/v1/tryouts/open. 404 = daftar kosong. */
 export async function listOpenTryouts(): Promise<TryoutSession[]> {
   try {
-    const raw = await request<TryoutSession[] | { tryouts?: TryoutSession[]; data?: TryoutSession[] }>("/tryouts/open", { method: "GET", auth: false });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    const raw = await request<unknown>("/tryouts/open", { method: "GET", auth: false });
+    const list: unknown[] = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object"
+        ? Array.isArray((raw as { tryouts?: unknown[] }).tryouts)
+          ? (raw as { tryouts: unknown[] }).tryouts
+          : Array.isArray((raw as { data?: unknown[] }).data)
+            ? (raw as { data: unknown[] }).data
+            : []
+        : [];
+    return list.map(normalizeToTryoutSession);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -948,11 +959,17 @@ export async function listOpenTryouts(): Promise<TryoutSession[]> {
 /** Semua tryout (untuk siswa: tampil semua, pisah sudah selesai / akan datang). 404 = daftar kosong. */
 export async function listAllTryouts(): Promise<TryoutSession[]> {
   try {
-    const raw = await request<TryoutSession[] | { tryouts?: TryoutSession[]; data?: TryoutSession[] }>("/tryouts", { method: "GET", auth: false });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    const raw = await request<unknown>("/tryouts", { method: "GET", auth: false });
+    const list: unknown[] = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object"
+        ? Array.isArray((raw as { tryouts?: unknown[] }).tryouts)
+          ? (raw as { tryouts: unknown[] }).tryouts
+          : Array.isArray((raw as { data?: unknown[] }).data)
+            ? (raw as { data: unknown[] }).data
+            : []
+        : [];
+    return list.map(normalizeToTryoutSession);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -960,7 +977,8 @@ export async function listAllTryouts(): Promise<TryoutSession[]> {
 }
 
 export async function getTryout(tryoutId: string): Promise<TryoutSession> {
-  return request(`/tryouts/${tryoutId}`, { method: "GET", auth: false });
+  const raw = await request<unknown>(`/tryouts/${tryoutId}`, { method: "GET", auth: false });
+  return normalizeToTryoutSession(raw);
 }
 
 /** Leaderboard per tryout. GET /tryouts/:tryoutId/leaderboard. 404/405 = []. */
@@ -1162,13 +1180,17 @@ export async function getStudentDashboard(): Promise<StudentDashboardResponse> {
 /** Daftar tryout untuk siswa. GET api/v1/student/tryouts. 404 = daftar kosong. */
 export async function getStudentTryouts(): Promise<TryoutSession[]> {
   try {
-    const raw = await request<
-      TryoutSession[] | { tryouts?: TryoutSession[]; data?: TryoutSession[] }
-    >("/student/tryouts", { method: "GET" });
-    if (Array.isArray(raw)) return raw;
-    if (raw?.tryouts && Array.isArray(raw.tryouts)) return raw.tryouts;
-    if (raw?.data && Array.isArray(raw.data)) return raw.data;
-    return [];
+    const raw = await request<unknown>("/student/tryouts", { method: "GET" });
+    const list: unknown[] = Array.isArray(raw)
+      ? raw
+      : raw && typeof raw === "object"
+        ? Array.isArray((raw as { tryouts?: unknown[] }).tryouts)
+          ? (raw as { tryouts: unknown[] }).tryouts
+          : Array.isArray((raw as { data?: unknown[] }).data)
+            ? (raw as { data: unknown[] }).data
+            : []
+        : [];
+    return list.map(normalizeToTryoutSession);
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return [];
     throw e;
@@ -2414,6 +2436,62 @@ export async function adminGetLevelSubjects(
 
 // --- Admin Users (GET/POST/PUT api/v1/admin/users) ---
 
+function coerceNestedLevel(v: unknown): Level | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const id = o.id != null ? String(o.id) : "";
+  if (!id) return null;
+  return {
+    id,
+    name: String(o.name ?? ""),
+    slug: o.slug != null ? String(o.slug) : null,
+    description: o.description != null ? String(o.description) : null,
+    sortOrder: o.sortOrder != null ? Number(o.sortOrder) : null,
+    iconUrl: o.iconUrl != null ? String(o.iconUrl) : null,
+  };
+}
+
+function coerceNestedSubject(v: unknown): Subject | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const id = o.id != null ? String(o.id) : "";
+  if (!id) return null;
+  return {
+    id,
+    name: String(o.name ?? ""),
+    slug: o.slug != null ? String(o.slug) : null,
+    description: o.description != null ? String(o.description) : null,
+    sortOrder: o.sortOrder != null ? Number(o.sortOrder) : null,
+    createdAt: o.createdAt != null ? String(o.createdAt) : null,
+    updatedAt: o.updatedAt != null ? String(o.updatedAt) : null,
+    levelId: o.levelId != null ? String(o.levelId) : null,
+  };
+}
+
+function coerceNestedSchool(v: unknown): Sekolah | null {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const id = o.id != null ? String(o.id) : "";
+  if (!id) return null;
+  const namaSekolah =
+    String(o.namaSekolah ?? o.nama ?? o.name ?? "").trim() || "—";
+  return {
+    id,
+    namaSekolah,
+    npsn: o.npsn != null ? String(o.npsn) : null,
+    kabupatenKota:
+      o.kabupatenKota != null
+        ? String(o.kabupatenKota)
+        : o.kabupaten != null
+          ? String(o.kabupaten)
+          : o.kota != null
+            ? String(o.kota)
+            : null,
+    telepon: o.telepon != null ? String(o.telepon) : o.phone != null ? String(o.phone) : null,
+    alamat: o.alamat != null ? String(o.alamat) : o.address != null ? String(o.address) : null,
+  };
+}
+
 /** Backend kadang membungkus array user (users, data, items, nested data.users). */
 function extractUsersFromAdminUsersResponse(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw;
@@ -2439,8 +2517,92 @@ function extractUsersFromAdminUsersResponse(raw: unknown): unknown[] {
 function coerceAdminUserRow(row: unknown): User | null {
   if (!row || typeof row !== "object") return null;
   const obj = row as Record<string, unknown>;
+  const top =
+    obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)
+      ? (obj.data as Record<string, unknown>)
+      : obj;
   const inner =
-    obj.user && typeof obj.user === "object" ? (obj.user as Record<string, unknown>) : obj;
+    top.user && typeof top.user === "object" ? (top.user as Record<string, unknown>) : top;
+
+  const pickLevelId = (o: Record<string, unknown>): string | null => {
+    const lv = o.level;
+    if (lv && typeof lv === "object" && !Array.isArray(lv)) {
+      const eid = (lv as Record<string, unknown>).id;
+      if (eid != null && String(eid).trim()) return String(eid);
+    }
+    const direct = o.levelId ?? o.educationLevelId ?? o.jenjangId;
+    if (direct != null && String(direct).trim()) return String(direct);
+    const el = o.educationLevel;
+    if (el && typeof el === "object" && !Array.isArray(el)) {
+      const eid = (el as Record<string, unknown>).id;
+      if (eid != null && String(eid).trim()) return String(eid);
+    }
+    return null;
+  };
+
+  const pickLevelName = (o: Record<string, unknown>): string | null => {
+    const lv = o.level;
+    if (lv && typeof lv === "object" && !Array.isArray(lv)) {
+      const n = (lv as Record<string, unknown>).name;
+      if (n != null && String(n).trim()) return String(n);
+    }
+    const direct = o.levelName ?? o.educationLevelName ?? o.jenjangName ?? o.jenjang;
+    if (direct != null && String(direct).trim()) return String(direct);
+    const el = o.educationLevel;
+    if (el && typeof el === "object" && !Array.isArray(el)) {
+      const n = (el as Record<string, unknown>).name;
+      if (n != null && String(n).trim()) return String(n);
+    }
+    return null;
+  };
+
+  const pickSubjectId = (o: Record<string, unknown>): string | null => {
+    const s = o.subject;
+    if (s && typeof s === "object" && !Array.isArray(s)) {
+      const sid = (s as Record<string, unknown>).id;
+      if (sid != null && String(sid).trim()) return String(sid);
+    }
+    if (o.subjectId != null && String(o.subjectId).trim()) return String(o.subjectId);
+    return null;
+  };
+
+  const pickSubjectName = (o: Record<string, unknown>): string | null => {
+    const s = o.subject;
+    if (s && typeof s === "object" && !Array.isArray(s)) {
+      const n = (s as Record<string, unknown>).name;
+      if (n != null && String(n).trim()) return String(n);
+    }
+    if (o.subjectName != null && String(o.subjectName).trim()) return String(o.subjectName);
+    return null;
+  };
+
+  const pickSchoolId = (o: Record<string, unknown>): string | null => {
+    const sch = o.school;
+    if (sch && typeof sch === "object" && !Array.isArray(sch)) {
+      const sid = (sch as Record<string, unknown>).id;
+      if (sid != null && String(sid).trim()) return String(sid);
+    }
+    if (o.schoolId != null && String(o.schoolId).trim()) return String(o.schoolId);
+    return null;
+  };
+
+  const pickSchoolName = (o: Record<string, unknown>): string | null => {
+    const sch = o.school;
+    if (sch && typeof sch === "object" && !Array.isArray(sch)) {
+      const sh = sch as Record<string, unknown>;
+      const n = sh.namaSekolah ?? sh.nama ?? sh.name;
+      if (n != null && String(n).trim()) return String(n);
+    }
+    if (o.schoolName != null && String(o.schoolName).trim()) return String(o.schoolName);
+    return null;
+  };
+
+  const mergeSources: Record<string, unknown>[] = [inner];
+  for (const key of ["student", "profile", "studentProfile"] as const) {
+    const v = inner[key];
+    if (v && typeof v === "object" && !Array.isArray(v)) mergeSources.push(v as Record<string, unknown>);
+  }
+
   const id = inner.id != null ? String(inner.id) : "";
   if (!id) return null;
   const nameRaw = inner.name ?? inner.fullName ?? inner.displayName;
@@ -2448,24 +2610,99 @@ function coerceAdminUserRow(row: unknown): User | null {
     String(nameRaw ?? "").trim() || String(inner.email ?? "").trim() || "(Tanpa nama)";
   const email = String(inner.email ?? "").trim();
   const roleRaw = inner.role ?? inner.roleSlug;
-  const role = String(roleRaw ?? "student").trim();
+  const role = normalizeUserRoleFromApi(String(roleRaw ?? "student"));
+
+  let levelId: string | null = null;
+  let levelName: string | null = null;
+  let subjectId: string | null = null;
+  let subjectName: string | null = null;
+  let schoolId: string | null = null;
+  let schoolName: string | null = null;
+  let classLevel: string | null = null;
+  for (const src of mergeSources) {
+    if (!levelId) levelId = pickLevelId(src);
+    if (!levelName) levelName = pickLevelName(src);
+    if (!subjectId) {
+      const sid = pickSubjectId(src);
+      if (sid) subjectId = sid;
+    }
+    if (!subjectName) {
+      const sn = pickSubjectName(src);
+      if (sn) subjectName = sn;
+    }
+    if (!schoolId) {
+      const scid = pickSchoolId(src);
+      if (scid) schoolId = scid;
+    }
+    if (!schoolName) {
+      const sn = pickSchoolName(src);
+      if (sn) schoolName = sn;
+    }
+    if (!classLevel && src.classLevel != null && String(src.classLevel).trim()) {
+      classLevel = String(src.classLevel);
+    }
+  }
+
+  const levelObj =
+    coerceNestedLevel(inner.level) ??
+    mergeSources.map((s) => coerceNestedLevel(s.level)).find((x) => x != null) ??
+    null;
+  const subjectObj =
+    coerceNestedSubject(inner.subject) ??
+    mergeSources.map((s) => coerceNestedSubject(s.subject)).find((x) => x != null) ??
+    null;
+  const schoolObj =
+    coerceNestedSchool(inner.school) ??
+    mergeSources.map((s) => coerceNestedSchool(s.school)).find((x) => x != null) ??
+    null;
+
+  if (levelObj) {
+    if (!levelId) levelId = levelObj.id;
+    if (!levelName) levelName = levelObj.name;
+  }
+  if (subjectObj) {
+    if (!subjectId) subjectId = subjectObj.id;
+    if (!subjectName) subjectName = subjectObj.name;
+    if (!levelId && subjectObj.levelId) levelId = subjectObj.levelId;
+  }
+  if (schoolObj) {
+    if (!schoolId) schoolId = schoolObj.id;
+    if (!schoolName) schoolName = schoolObj.namaSekolah;
+  }
+
   return {
     id,
     name,
     email,
-    role: role as User["role"],
+    role,
     avatarUrl: inner.avatarUrl != null ? String(inner.avatarUrl) : null,
-    subjectId: inner.subjectId != null ? String(inner.subjectId) : null,
-    schoolId: inner.schoolId != null ? String(inner.schoolId) : null,
-    subjectName: inner.subjectName != null ? String(inner.subjectName) : null,
-    schoolName: inner.schoolName != null ? String(inner.schoolName) : null,
+    subjectId,
+    schoolId,
+    levelId,
+    levelName,
+    classLevel,
+    subjectName,
+    schoolName,
+    level: levelObj,
+    subject: subjectObj,
+    school: schoolObj,
   };
 }
 
-/** Daftar semua user. GET api/v1/admin/users. 404 = daftar kosong. */
-export async function adminListUsers(): Promise<User[]> {
+/** Query opsional GET /admin/users?role=student|guru|admin|... */
+export type AdminListUsersParams = {
+  role?: string | null;
+};
+
+/** Daftar user. GET api/v1/admin/users (?role= opsional). 404 = daftar kosong. */
+export async function adminListUsers(params?: AdminListUsersParams | null): Promise<User[]> {
   try {
-    const raw = await request<unknown>("/admin/users", { method: "GET" });
+    const role = params?.role?.trim();
+    const path =
+      role && role.length > 0
+        ? `/admin/users?role=${encodeURIComponent(role)}`
+        : "/admin/users";
+    const raw = await request<unknown>(path, { method: "GET" });
     const rows = extractUsersFromAdminUsersResponse(raw);
     return rows.map(coerceAdminUserRow).filter((u): u is User => u != null);
   } catch (e) {
@@ -2481,7 +2718,10 @@ export async function adminCreateUser(
 }
 
 export async function adminGetUser(userId: string): Promise<User> {
-  return request(`/admin/users/${userId}`, { method: "GET" });
+  const raw = await request<unknown>(`/admin/users/${userId}`, { method: "GET" });
+  const coerced = coerceAdminUserRow(raw);
+  if (coerced) return coerced;
+  return raw as User;
 }
 
 export async function adminUpdateUser(
@@ -2787,6 +3027,50 @@ function toQueryString(params: Record<string, string | number | undefined>): str
   return built ? `?${built}` : "";
 }
 
+/** Normalisasi respons GET /subscription (flat, { data }, { subscription }, atau array). */
+function normalizeSubscriptionPayload(raw: unknown): Subscription | null {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const one = normalizeSubscriptionPayload(item);
+      if (one) return one;
+    }
+    return null;
+  }
+  if (typeof raw !== "object") return null;
+  const top = raw as Record<string, unknown>;
+  const inner =
+    unwrapApiData<Record<string, unknown>>(top) ??
+    (top.subscription && typeof top.subscription === "object"
+      ? (top.subscription as Record<string, unknown>)
+      : null) ??
+    (top.current && typeof top.current === "object" ? (top.current as Record<string, unknown>) : null) ??
+    top;
+  if (!inner || typeof inner !== "object") return null;
+  const id = inner.id != null ? String(inner.id) : "";
+  if (!id) return null;
+  return {
+    id,
+    userId: inner.userId != null ? String(inner.userId) : "",
+    planCode: String(inner.planCode ?? inner.plan ?? ""),
+    status: String(inner.status ?? ""),
+    startAt: String(inner.startAt ?? inner.startsAt ?? ""),
+    endAt: String(inner.endAt ?? inner.expiresAt ?? ""),
+    createdAt: inner.createdAt != null ? String(inner.createdAt) : undefined,
+  };
+}
+
+/** Langganan AI untuk user Bearer saat ini. GET /subscription — 404/405 = null. */
+export async function getMySubscription(): Promise<Subscription | null> {
+  try {
+    const raw = await request<unknown>("/subscription", { method: "GET" });
+    return normalizeSubscriptionPayload(raw);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
+}
+
 /** Generate pertanyaan AI. POST /generate-questions */
 export async function aiGenerateQuestions(body: GenerateQuestionsRequest): Promise<AiQuestionItem[]> {
   const raw = await request<unknown>("/generate-questions", { method: "POST", body });
@@ -2832,9 +3116,18 @@ export async function aiListQuestions(params: QuestionsQuery): Promise<AiQuestio
   return extractAiQuestionArray(raw);
 }
 
-/** Buat subscription user saat ini. POST /subscription */
+/**
+ * Buat / perpanjang langganan AI untuk Bearer saat ini. POST /subscription
+ * (biasanya setelah pembayaran terverifikasi atau oleh admin).
+ */
 export async function aiCreateSubscription(
   body: CreateSubscriptionRequest
 ): Promise<Subscription> {
-  return request<Subscription>("/subscription", { method: "POST", body });
+  const raw = await request<unknown>("/subscription", { method: "POST", body });
+  const done = normalizeSubscriptionPayload(raw);
+  if (done) return done;
+  return raw as Subscription;
 }
+
+/** Alias eksplisit (sama dengan `aiCreateSubscription`). */
+export const createMyAiSubscription = aiCreateSubscription;

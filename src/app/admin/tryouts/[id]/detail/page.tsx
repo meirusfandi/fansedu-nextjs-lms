@@ -31,6 +31,10 @@ const STATUS_LABEL: Record<string, string> = {
   open: "Dibuka",
   closed: "Ditutup",
 };
+const GRADING_MODE_LABEL: Record<string, string> = {
+  auto: "Otomatis (kunci jawaban)",
+  manual: "Manual (review pengajar)",
+};
 const TYPE_LABEL: Record<string, string> = {
   short: "Isian singkat",
   multiple_choice: "Pilihan ganda",
@@ -211,7 +215,7 @@ export default function AdminTryoutDetailPage() {
     const text = encodeURIComponent(waMessage);
     return `https://wa.me/${phone}?text=${text}`;
   }, [waPhone, waMessage]);
-  const manualReviewCandidates = useMemo(() => students, [students]);
+  const allowAutoGradeUi = tryout?.gradingMode !== "manual";
 
   const tryoutReviewApi = useMemo(
     () => ({
@@ -435,7 +439,7 @@ export default function AdminTryoutDetailPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
               Informasi event
             </h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               <div>
                 <p className="text-xs text-zinc-500">Judul</p>
                 <p className="font-medium text-zinc-900">{tryout.title}</p>
@@ -457,7 +461,19 @@ export default function AdminTryoutDetailPage() {
                 <p className="text-xs text-zinc-500">Jumlah soal</p>
                 <p className="text-sm text-zinc-700">{tryout.questionsCount} soal</p>
               </div>
+              <div>
+                <p className="text-xs text-zinc-500">Mode penilaian</p>
+                <p className="text-sm text-zinc-700">
+                  {GRADING_MODE_LABEL[tryout.gradingMode === "manual" ? "manual" : "auto"]}
+                </p>
+              </div>
             </div>
+            {tryout.gradingMode === "manual" && (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Tryout ini dinilai manual. Siswa menunggu skor hingga Anda memberi nilai lewat{" "}
+                <strong>Review manual</strong> per peserta. Perintah auto-grade tidak tersedia.
+              </p>
+            )}
             {tryout.description && (
               <p className="mt-3 text-sm text-zinc-600">{tryout.description}</p>
             )}
@@ -469,6 +485,37 @@ export default function AdminTryoutDetailPage() {
           <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">
             Leaderboard
           </h2>
+          {tryout && allowAutoGradeUi && (
+            <div className="flex flex-col gap-2 border-b border-zinc-100 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-600">
+                <input
+                  type="checkbox"
+                  checked={bulkAutoGradeClearComments}
+                  onChange={(e) => setBulkAutoGradeClearComments(e.target.checked)}
+                  className="rounded border-zinc-300"
+                />
+                Saat auto-grade massal, hapus juga komentar reviewer
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={bulkAutoGradeLoading || leaderboard.length === 0}
+                  onClick={() => void runBulkAutoGrade()}
+                  className="rounded border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                  title={
+                    leaderboard.length === 0
+                      ? "Belum ada peserta di leaderboard"
+                      : "Jalankan penilaian otomatis untuk semua attempt submitted"
+                  }
+                >
+                  {bulkAutoGradeLoading ? "Memproses..." : "Auto-grade semua (submitted)"}
+                </button>
+                {bulkAutoGradeResult && (
+                  <span className="text-xs text-emerald-800">{bulkAutoGradeResult}</span>
+                )}
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             {leaderboard.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-zinc-500">Belum ada data leaderboard.</p>
@@ -632,6 +679,7 @@ export default function AdminTryoutDetailPage() {
           onClose={() => setReviewStudent(null)}
           onSaved={refreshTryoutSummaryFromApi}
           api={tryoutReviewApi}
+          allowAutoGrade={allowAutoGradeUi}
         />
       )}
 
