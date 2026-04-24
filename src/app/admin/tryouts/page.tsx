@@ -79,7 +79,9 @@ const emptyForm: AdminCreateTryoutRequest = {
   questionsCount: 25,
   level: "medium",
   levelId: "",
+  levelName: "",
   subjectId: "",
+  subject: "",
   opensAt: "",
   closesAt: "",
   maxParticipants: 200,
@@ -153,7 +155,14 @@ export default function AdminTryoutsPage() {
     setLoading(true);
     setError(null);
     adminListTryouts()
-      .then(setList)
+      .then((items) => {
+        const unique = new Map<string, TryoutSession>();
+        for (const item of items ?? []) {
+          if (!item?.id) continue;
+          unique.set(item.id, item);
+        }
+        setList(Array.from(unique.values()));
+      })
       .catch((e) => {
         setError((e as Error).message ?? "Gagal memuat daftar event");
         setList([]);
@@ -170,23 +179,36 @@ export default function AdminTryoutsPage() {
     try {
       const lv = await adminListLevels();
       const filteredLevels = filterLevelsSDSMPSMA(lv ?? []);
+      const uniqueLevels = Array.from(new Map(filteredLevels.map((l) => [l.id, l])).values());
+      const levelNameById = new Map(uniqueLevels.map((l) => [l.id, l.name]));
       const rows = await Promise.all(
-        filteredLevels.map(async (l) => {
+        uniqueLevels.map(async (l) => {
           try {
             const subs = await adminGetLevelSubjects(l.id);
-            return (subs ?? []).map((s) => ({
-              id: s.id,
-              name: s.name,
-              levelId: l.id,
-              levelName: l.name,
-            }));
+            return (subs ?? []).map((s) => {
+              const resolvedLevelId = (s.levelId ?? "").trim() || l.id;
+              return {
+                id: s.id,
+                name: s.name,
+                levelId: resolvedLevelId,
+                levelName: levelNameById.get(resolvedLevelId) ?? l.name,
+              };
+            });
           } catch {
             return [];
           }
         })
       );
-      setLevels(filteredLevels);
-      setSubjectsFlat(rows.flat());
+      const uniqueSubjects = Array.from(
+        new Map(
+          rows
+            .flat()
+            .filter((s) => s.id && s.levelId)
+            .map((s) => [`${s.levelId}::${s.id}`, s])
+        ).values()
+      );
+      setLevels(uniqueLevels);
+      setSubjectsFlat(uniqueSubjects);
     } catch {
       setLevels([]);
       setSubjectsFlat([]);
@@ -221,7 +243,9 @@ export default function AdminTryoutsPage() {
       questionsCount: t.questionsCount ?? 25,
       level: t.level ?? "medium",
       levelId: t.levelId ?? "",
+      levelName: t.levelName ?? "",
       subjectId: t.subjectId ?? "",
+      subject: t.subjectName ?? "",
       opensAt: toDatetimeLocalValue(t.opensAt),
       closesAt: toDatetimeLocalValue(t.closesAt),
       maxParticipants: t.maxParticipants ?? undefined,
@@ -277,13 +301,25 @@ export default function AdminTryoutsPage() {
         return;
       }
 
+      // Resolve human-readable names from loaded dropdown data
+      const resolvedLevelName =
+        (form.levelId ?? "").trim()
+          ? levels.find((l) => l.id === (form.levelId ?? "").trim())?.name ?? null
+          : null;
+      const resolvedSubjectName =
+        (form.subjectId ?? "").trim()
+          ? subjectsFlat.find((s) => s.id === (form.subjectId ?? "").trim())?.name ?? null
+          : null;
+
       const payload: AdminCreateTryoutRequest = {
         title: form.title.trim(),
         durationMinutes: duration,
         questionsCount: questionCount,
         level: form.level,
         levelId: form.levelId?.trim() ? form.levelId.trim() : null,
+        levelName: resolvedLevelName,
         subjectId: form.subjectId?.trim() ? form.subjectId.trim() : null,
+        subject: resolvedSubjectName,
         opensAt: opensAt,
         closesAt: closesAt,
         status: form.status ?? "draft",
@@ -392,7 +428,7 @@ export default function AdminTryoutsPage() {
               >
                 <option value="">Semua Subject</option>
                 {subjectOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
+                  <option key={`${s.levelId}-${s.id}`} value={s.id}>
                     {s.name}
                   </option>
                 ))}
@@ -474,7 +510,7 @@ export default function AdminTryoutsPage() {
                       <td className="px-4 py-3">
                         {LEVEL_LABEL[t.level] ?? t.level}
                       </td>
-                      <td className="px-4 py-3">{t.levelName ?? "–"}</td>
+                      <td className="px-4 py-3">{t.levelName ? t.levelName.toUpperCase() : "–"}</td>
                       <td className="px-4 py-3">{t.subjectName ?? "–"}</td>
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
@@ -704,7 +740,7 @@ export default function AdminTryoutsPage() {
                   >
                     <option value="">{form.levelId ? "Pilih subject" : "Pilih jenjang dulu"}</option>
                     {formSubjectOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
+                      <option key={`${s.levelId}-${s.id}`} value={s.id}>
                         {s.name}
                       </option>
                     ))}

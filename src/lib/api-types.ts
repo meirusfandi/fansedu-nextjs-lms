@@ -532,8 +532,12 @@ export interface AdminCreateTryoutRequest {
   level: TryoutLevel;
   /** Jenjang pendidikan (SD/SMP/SMA) dari master level. */
   levelId?: string | null;
+  /** Nama jenjang (e.g. "SD", "SMP", "SMA") — display value. */
+  levelName?: string | null;
   /** Bidang/subject tryout dari master subject. */
   subjectId?: string | null;
+  /** Nama subject (e.g. "Matematika", "Informatika") — display value. */
+  subject?: string | null;
   opensAt: string;
   closesAt: string;
   maxParticipants?: number | null;

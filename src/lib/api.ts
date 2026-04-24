@@ -350,9 +350,9 @@ function normalizeToTryoutSession(item: unknown): TryoutSession {
     eventCategory:
       obj.eventCategory != null ? String(obj.eventCategory) : null,
     levelId: obj.levelId != null ? String(obj.levelId) : null,
-    levelName: obj.levelName != null ? String(obj.levelName) : null,
+    levelName: obj.levelName != null ? String(obj.levelName) : obj.schoolLevel != null ? String(obj.schoolLevel) : null,
     subjectId: obj.subjectId != null ? String(obj.subjectId) : null,
-    subjectName: obj.subjectName != null ? String(obj.subjectName) : null,
+    subjectName: obj.subjectName != null ? String(obj.subjectName) : obj.subject != null ? String(obj.subject) : null,
   };
 }
 
@@ -2383,8 +2383,56 @@ export async function adminListRoles(): Promise<Role[]> {
 }
 
 // --- Admin Levels (Jenjang Pendidikan) ---
+async function requestInternalAdmin(path: string): Promise<unknown> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(path, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  });
+
+  if (res.status === 204) return undefined;
+  const raw = await res.json().catch(() => ({}));
+  const data = deepToCamelCase(raw);
+  if (!res.ok) {
+    const d = data as {
+      error?: string | { code?: string; message?: string };
+      message?: string;
+    };
+    const nestedErrorMessage =
+      d?.error && typeof d.error === "object" ? d.error.message : undefined;
+    const directErrorMessage = typeof d?.error === "string" ? d.error : undefined;
+    const message = nestedErrorMessage ?? directErrorMessage ?? d?.message ?? res.statusText;
+    const err = new Error(message);
+    (err as Error & { status: number }).status = res.status;
+    throw err;
+  }
+  return data;
+}
+
 /** Daftar levels. 404 = daftar kosong. */
 export async function adminListLevels(): Promise<Level[]> {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = await requestInternalAdmin("/api/admin/levels");
+      if (Array.isArray(raw)) return raw as Level[];
+      if (raw && typeof raw === "object") {
+        const payload = raw as { levels?: Level[]; data?: Level[] };
+        if (Array.isArray(payload.levels)) return payload.levels;
+        if (Array.isArray(payload.data)) return payload.data;
+      }
+      return [];
+    } catch (e) {
+      if (isNotFoundOrMethodNotAllowed(e)) return [];
+      // Fallback ke endpoint utama jika route internal gagal/disabled.
+    }
+  }
+
   try {
     const raw = await request<
       Level[] | { levels?: Level[]; data?: Level[] }
@@ -2420,6 +2468,24 @@ export async function adminUpdateLevel(
 export async function adminGetLevelSubjects(
   levelId: string
 ): Promise<Subject[]> {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = await requestInternalAdmin(
+        `/api/admin/levels/${encodeURIComponent(levelId)}/subjects`
+      );
+      if (Array.isArray(raw)) return raw as Subject[];
+      if (raw && typeof raw === "object") {
+        const payload = raw as { subjects?: Subject[]; data?: Subject[] };
+        if (Array.isArray(payload.subjects)) return payload.subjects;
+        if (Array.isArray(payload.data)) return payload.data;
+      }
+      return [];
+    } catch (e) {
+      if (isNotFoundOrMethodNotAllowed(e)) return [];
+      // Fallback ke endpoint utama jika route internal gagal/disabled.
+    }
+  }
+
   try {
     const raw = await request<
       Subject[] | { subjects?: Subject[]; data?: Subject[] }
