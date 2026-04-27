@@ -579,6 +579,8 @@ export interface AdminCreateUserRequest {
   email: string;
   password: string;
   role: "student" | "trainer";
+  levelId?: string | null;
+  classLevel?: string | null;
   subjectId?: string | null;
   schoolId?: string | null;
 }
@@ -588,6 +590,8 @@ export interface AdminUpdateUserRequest {
   email?: string;
   password?: string;
   role?: "student" | "trainer" | "admin";
+  levelId?: string | null;
+  classLevel?: string | null;
   subjectId?: string | null;
   schoolId?: string | null;
 }

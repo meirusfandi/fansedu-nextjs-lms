@@ -21,6 +21,39 @@ const ROLE_LABEL: Record<string, string> = {
   trainer: "Pengajar",
 };
 
+const ROLE_FILTERS: Array<{ value: "" | UserRole; label: string }> = [
+  { value: "", label: "Semua role" },
+  { value: "student", label: "Siswa" },
+  { value: "trainer", label: "Pengajar" },
+  { value: "admin", label: "Admin" },
+];
+
+function mapUsersListErrorMessage(err: unknown): string {
+  const e = err as Error & { status?: number };
+  if (e?.status === 401) {
+    return "Sesi login tidak valid atau sudah berakhir. Silakan login ulang dengan akun admin.";
+  }
+  if (e?.status === 403) {
+    return "Akses ditolak. Endpoint ini membutuhkan permission users.manage.";
+  }
+  return e?.message ?? "Gagal memuat daftar user";
+}
+
+function getSubjectLevelId(subject: Subject): string {
+  const s = subject as Subject & {
+    level?: { id?: string | null } | null;
+    educationLevelId?: string | null;
+    jenjangId?: string | null;
+  };
+  return (
+    s.levelId ??
+    s.level?.id ??
+    s.educationLevelId ??
+    s.jenjangId ??
+    ""
+  );
+}
+
 export default function AdminUsersPage() {
   const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [users, setUsers] = useState<User[]>([]);
@@ -33,12 +66,15 @@ export default function AdminUsersPage() {
     email: "",
     password: "",
     role: "trainer" as UserRole,
+    levelId: "",
+    classLevel: "",
     subjectId: "",
     schoolId: "",
   });
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
   const [schools, setSchools] = useState<Sekolah[]>([]);
+  const [filterRole, setFilterRole] = useState<"" | UserRole>("");
   const [filterLevelId, setFilterLevelId] = useState("");
   const [filterSubjectId, setFilterSubjectId] = useState("");
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -49,11 +85,14 @@ export default function AdminUsersPage() {
   const filteredUsers = useMemo(() => {
     const subjectLevelById = new Map<string, string>();
     for (const s of subjects) {
-      if (s.levelId) subjectLevelById.set(s.id, s.levelId);
+      const sid = getSubjectLevelId(s);
+      if (sid) subjectLevelById.set(s.id, sid);
     }
     return users.filter((u) => {
       if (filterSubjectId && u.subjectId !== filterSubjectId) return false;
       if (filterLevelId) {
+        if (u.levelId === filterLevelId) return true;
+        if (u.level?.id === filterLevelId) return true;
         const sid = u.subjectId ?? "";
         const lid = sid ? subjectLevelById.get(sid) ?? "" : "";
         if (lid !== filterLevelId) return false;
@@ -109,14 +148,14 @@ export default function AdminUsersPage() {
   const loadUsers = useCallback(() => {
     setLoading(true);
     setError(null);
-    adminListUsers()
+    adminListUsers({ role: filterRole || null })
       .then(setUsers)
       .catch((e) => {
-        setError((e as Error).message ?? "Gagal memuat daftar user");
+        setError(mapUsersListErrorMessage(e));
         setUsers([]);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [filterRole]);
 
   useEffect(() => {
     loadUsers();
@@ -137,6 +176,8 @@ export default function AdminUsersPage() {
       email: "",
       password: "",
       role: "trainer",
+      levelId: "",
+      classLevel: "",
       subjectId: "",
       schoolId: "",
     });
@@ -172,6 +213,8 @@ export default function AdminUsersPage() {
         email: full.email,
         password: "",
         role: normalizeUserRoleFromApi(full.role),
+        levelId: full.levelId ?? full.level?.id ?? "",
+        classLevel: full.classLevel ?? "",
         subjectId: full.subjectId ?? "",
         schoolId: full.schoolId ?? "",
       });
@@ -183,6 +226,8 @@ export default function AdminUsersPage() {
         email: u.email,
         password: "",
         role: normalizeUserRoleFromApi(u.role),
+        levelId: u.levelId ?? u.level?.id ?? "",
+        classLevel: u.classLevel ?? "",
         subjectId: u.subjectId ?? "",
         schoolId: u.schoolId ?? "",
       });
@@ -211,6 +256,8 @@ export default function AdminUsersPage() {
           // Backend create saat ini hanya menerima student/trainer.
           // Jika admin dipilih di UI, fallback ke trainer agar request tetap valid.
           role: form.role === "admin" ? "trainer" : form.role,
+          levelId: form.levelId.trim() || null,
+          classLevel: form.classLevel.trim() || null,
           subjectId: form.subjectId.trim() || null,
           schoolId: form.schoolId.trim() || null,
         });
@@ -220,12 +267,16 @@ export default function AdminUsersPage() {
           email?: string;
           password?: string;
           role?: "student" | "trainer" | "admin";
+          levelId?: string | null;
+          classLevel?: string | null;
           subjectId?: string | null;
           schoolId?: string | null;
         } = {
           name: form.name.trim(),
           email: form.email.trim(),
           role: form.role,
+          levelId: form.levelId.trim() || null,
+          classLevel: form.classLevel.trim() || null,
           subjectId: form.subjectId.trim() || null,
           schoolId: form.schoolId.trim() || null,
         };
@@ -279,7 +330,24 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-2">
+        <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:grid-cols-3">
+          <div>
+            <label className="block text-xs font-medium text-zinc-600">Filter role</label>
+            <select
+              value={filterRole}
+              onChange={(e) => {
+                setFilterRole(e.target.value as "" | UserRole);
+                setPage(1);
+              }}
+              className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+            >
+              {ROLE_FILTERS.map((r) => (
+                <option key={r.value || "all"} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-xs font-medium text-zinc-600">Filter jenjang pendidikan</label>
             <select
@@ -387,7 +455,12 @@ export default function AdminUsersPage() {
                           {school}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-zinc-700">{jenjang}</td>
+                      <td className="px-4 py-3 text-zinc-700">
+                        <p>{jenjang}</p>
+                        <p className="mt-0.5 font-mono text-[11px] text-zinc-500">
+                          {u.levelId ?? u.level?.id ?? "-"}
+                        </p>
+                      </td>
                       <td className="max-w-[10rem] px-4 py-3 text-zinc-700">
                         <span className="line-clamp-2" title={u.classLevel ?? ""}>
                           {u.classLevel?.trim() ? u.classLevel : "–"}
@@ -397,6 +470,9 @@ export default function AdminUsersPage() {
                         <span className="line-clamp-2" title={bidang}>
                           {bidang}
                         </span>
+                        <p className="mt-0.5 font-mono text-[11px] text-zinc-500">
+                          {u.subjectId ?? u.subject?.id ?? "-"}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-2">
@@ -481,14 +557,16 @@ export default function AdminUsersPage() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-zinc-500">Jenjang pendidikan</p>
-                      <p className="text-zinc-900">
-                        {userSchoolJenjangBidang(selectedUser).jenjang}
+                      <p className="text-zinc-900">{userSchoolJenjangBidang(selectedUser).jenjang}</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-zinc-500">
+                        levelId: {selectedUser.levelId ?? selectedUser.level?.id ?? "-"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs font-medium text-zinc-500">Bidang / Subject</p>
-                      <p className="text-zinc-900">
-                        {userSchoolJenjangBidang(selectedUser).bidang}
+                      <p className="text-zinc-900">{userSchoolJenjangBidang(selectedUser).bidang}</p>
+                      <p className="mt-0.5 font-mono text-[11px] text-zinc-500">
+                        subjectId: {selectedUser.subjectId ?? selectedUser.subject?.id ?? "-"}
                       </p>
                     </div>
                     <div>
@@ -633,19 +711,55 @@ export default function AdminUsersPage() {
                       )}
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-zinc-600">Jenjang / Level</label>
+                      <select
+                        value={form.levelId}
+                        onChange={(e) => {
+                          setForm({ ...form, levelId: e.target.value });
+                        }}
+                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                      >
+                        <option value="">— Pilih jenjang (opsional)</option>
+                        {levels.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600">Kelas (classLevel)</label>
+                      <input
+                        type="text"
+                        value={form.classLevel}
+                        onChange={(e) => setForm({ ...form, classLevel: e.target.value })}
+                        placeholder="Contoh: 12 IPA"
+                        className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-zinc-600">Bidang / Subject</label>
+                      {(() => {
+                        const byLevel = subjects.filter((s) => {
+                          if (!form.levelId) return true;
+                          return getSubjectLevelId(s) === form.levelId;
+                        });
+                        const availableSubjects = form.levelId && byLevel.length === 0 ? subjects : byLevel;
+                        return (
                       <select
                         value={form.subjectId}
                         onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
                         className="mt-1 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm"
                       >
                         <option value="">— Pilih subject (opsional)</option>
-                        {subjects.map((s) => (
+                        {availableSubjects.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
                           </option>
                         ))}
                       </select>
+                        );
+                      })()}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-zinc-600">Sekolah</label>
