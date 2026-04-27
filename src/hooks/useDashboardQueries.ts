@@ -40,6 +40,7 @@ import {
 } from "@/lib/api";
 import type {
   TrainerCourseCreateRequest,
+  Course,
   CreatePaymentRequest,
   AdminCreatePaymentRequest,
   CreateSubscriptionRequest,
@@ -49,6 +50,7 @@ import type {
   AdminUpdateEnrollmentRequest,
   AdminVerifyOrderRequest,
   AdminUpdatePaymentRequest,
+  User,
 } from "@/lib/api-types";
 
 export const queryKeys = {
@@ -399,9 +401,9 @@ export function useAdminUpdateEnrollment() {
 
 /** Muat user admin untuk modal pembayaran. */
 export function useAdminUsersForPaymentModal(enabled: boolean) {
-  return useQuery({
+  return useQuery<User[], Error>({
     queryKey: ["admin", "users", "payment-modal"],
-    queryFn: adminListUsers,
+    queryFn: () => adminListUsers(),
     enabled,
     staleTime: 30_000,
   });
@@ -409,9 +411,9 @@ export function useAdminUsersForPaymentModal(enabled: boolean) {
 
 /** Muat daftar kelas untuk referensi pembayaran kelas. */
 export function useAdminCoursesForPaymentModal(enabled: boolean) {
-  return useQuery({
+  return useQuery<Course[], Error>({
     queryKey: ["admin", "courses", "payment-modal"],
-    queryFn: adminListCourses,
+    queryFn: () => adminListCourses(),
     enabled,
     staleTime: 30_000,
   });
