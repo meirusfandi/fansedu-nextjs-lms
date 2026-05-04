@@ -317,8 +317,16 @@ async function requestFormData<T>(
   const rawData = await res.json().catch(() => ({}));
   const data = deepToCamelCase(rawData);
   if (!res.ok) {
-    const d = data as { error?: string; message?: string };
-    const err = new Error(d?.error ?? d?.message ?? res.statusText);
+    if (res.status === 401) {
+      scheduleUnauthorizedRedirect();
+    }
+    const d = data as {
+      error?: string | { message?: string };
+      message?: string;
+    };
+    const nestedErrorMessage = d?.error && typeof d.error === "object" ? d.error.message : undefined;
+    const directErrorMessage = typeof d?.error === "string" ? d.error : undefined;
+    const err = new Error(nestedErrorMessage ?? directErrorMessage ?? d?.message ?? res.statusText);
     (err as Error & { status: number }).status = res.status;
     throw err;
   }
@@ -691,12 +699,32 @@ export async function adminListPayments(): Promise<Payment[]> {
 
 /** POST /admin/payments/:id/confirm — konfirmasi pembayaran (admin). */
 export async function adminConfirmPayment(paymentId: string): Promise<Payment> {
-  return request(`/admin/payments/${paymentId}/confirm`, { method: "POST" });
+  try {
+    return await request(`/admin/payments/${paymentId}/confirm`, { method: "POST" });
+  } catch (e) {
+    const status = (e as { status?: number })?.status;
+    if (status !== 404 && status !== 405) throw e;
+    // Fallback endpoint: PUT /admin/payments/:id { status: "paid" }
+    return request(`/admin/payments/${paymentId}`, {
+      method: "PUT",
+      body: { status: "paid" },
+    });
+  }
 }
 
 /** POST /admin/payments/:id/reject — tolak pembayaran (admin). */
 export async function adminRejectPayment(paymentId: string, body?: { reason?: string }): Promise<Payment> {
-  return request(`/admin/payments/${paymentId}/reject`, { method: "POST", body: body ?? {} });
+  try {
+    return await request(`/admin/payments/${paymentId}/reject`, { method: "POST", body: body ?? {} });
+  } catch (e) {
+    const status = (e as { status?: number })?.status;
+    if (status !== 404 && status !== 405) throw e;
+    // Fallback endpoint: PUT /admin/payments/:id { status: "rejected", reason }
+    return request(`/admin/payments/${paymentId}`, {
+      method: "PUT",
+      body: { status: "rejected", reason: body?.reason ?? null },
+    });
+  }
 }
 
 /** Admin mencatat pembayaran atas nama user (mis. siswa + kelas). */
@@ -769,6 +797,19 @@ export async function adminPatchOrderPurchaseMeta(
 ): Promise<Record<string, unknown>> {
   const id = encodeURIComponent(orderId.trim());
   return request(`/admin/orders/${id}/purchase-meta`, { method: "PATCH", body });
+}
+
+/** Ambil detail order admin. GET /admin/orders/:id. 404/405 = null. */
+export async function adminGetOrderDetail(
+  orderId: string
+): Promise<Record<string, unknown> | null> {
+  const id = encodeURIComponent(orderId.trim());
+  try {
+    return await request<Record<string, unknown>>(`/admin/orders/${id}`, { method: "GET" });
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
 }
 
 /** Beri akses kelas ke user tanpa order. */

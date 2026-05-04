@@ -32,11 +32,24 @@ function getPaymentCreatedAt(p: Payment): string | undefined {
 }
 
 function getPaymentUserName(p: Payment): string {
-  return p.userName ?? "–";
+  const raw = p as Record<string, unknown>;
+  return (
+    (typeof p.userName === "string" && p.userName.trim()) ||
+    (typeof raw.payerName === "string" && raw.payerName.trim()) ||
+    (typeof raw.senderName === "string" && raw.senderName.trim()) ||
+    "–"
+  );
 }
 
 function getPaymentUserEmail(p: Payment): string {
-  return p.userEmail ?? p.userId ?? "";
+  const raw = p as Record<string, unknown>;
+  return (
+    (typeof p.userEmail === "string" && p.userEmail.trim()) ||
+    (typeof raw.payerEmail === "string" && raw.payerEmail.trim()) ||
+    (typeof raw.senderEmail === "string" && raw.senderEmail.trim()) ||
+    p.userId ||
+    ""
+  );
 }
 
 function getPaymentOrdererName(p: Payment): string {
@@ -96,7 +109,26 @@ function getPaymentTypeLabel(p: Payment): string {
 }
 
 function getPaymentProofUrl(p: Payment): string | null {
-  return p.proofUrl ?? null;
+  const raw = p as Record<string, unknown>;
+  const direct =
+    p.proofUrl ??
+    (typeof raw.proof_url === "string" ? raw.proof_url : null) ??
+    (typeof raw.paymentProofUrl === "string" ? raw.paymentProofUrl : null) ??
+    (typeof raw.payment_proof_url === "string" ? raw.payment_proof_url : null) ??
+    (typeof raw.transferProofUrl === "string" ? raw.transferProofUrl : null) ??
+    (typeof raw.transfer_proof_url === "string" ? raw.transfer_proof_url : null);
+  if (direct && String(direct).trim() !== "") return String(direct);
+
+  const proofObj = raw.proof && typeof raw.proof === "object" ? (raw.proof as Record<string, unknown>) : null;
+  if (proofObj) {
+    const nested =
+      (typeof proofObj.url === "string" ? proofObj.url : null) ??
+      (typeof proofObj.proofUrl === "string" ? proofObj.proofUrl : null) ??
+      (typeof proofObj.path === "string" ? proofObj.path : null);
+    if (nested && String(nested).trim() !== "") return String(nested);
+  }
+
+  return null;
 }
 
 function isCoursePayment(p: Payment): boolean {

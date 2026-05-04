@@ -1,12 +1,12 @@
 "use client";
 
 import { useAdminPayments } from "@/hooks/useDashboardQueries";
-import { getFriendlyApiErrorMessage } from "@/lib/api";
+import { adminGetOrderDetail, getFriendlyApiErrorMessage } from "@/lib/api";
 import { formatPaymentMoney, paymentStatusLabel } from "@/lib/paymentDisplay";
 import { normalizeUserRoleFromApi } from "@/lib/user-role";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function normalizeAccountType(rawRole: unknown): string {
   const normalized = normalizeUserRoleFromApi(typeof rawRole === "string" ? rawRole : "");
@@ -27,6 +27,26 @@ function paymentTypeLabel(type: unknown): string {
   return "Pembayaran";
 }
 
+function paymentProofUrl(payment: Record<string, unknown>): string | null {
+  const direct =
+    (typeof payment.proofUrl === "string" ? payment.proofUrl : null) ??
+    (typeof payment.proof_url === "string" ? payment.proof_url : null) ??
+    (typeof payment.paymentProofUrl === "string" ? payment.paymentProofUrl : null) ??
+    (typeof payment.payment_proof_url === "string" ? payment.payment_proof_url : null) ??
+    (typeof payment.transferProofUrl === "string" ? payment.transferProofUrl : null) ??
+    (typeof payment.transfer_proof_url === "string" ? payment.transfer_proof_url : null);
+  if (direct && String(direct).trim() !== "") return String(direct);
+  const proofObj = payment.proof && typeof payment.proof === "object" ? (payment.proof as Record<string, unknown>) : null;
+  if (proofObj) {
+    const nested =
+      (typeof proofObj.url === "string" ? proofObj.url : null) ??
+      (typeof proofObj.proofUrl === "string" ? proofObj.proofUrl : null) ??
+      (typeof proofObj.path === "string" ? proofObj.path : null);
+    if (nested && String(nested).trim() !== "") return String(nested);
+  }
+  return null;
+}
+
 function asText(value: unknown): string {
   if (value == null) return "-";
   const s = String(value).trim();
@@ -42,6 +62,26 @@ export default function AdminPaymentDetailPage() {
     () => payments.find((p) => String(p.id) === paymentId) ?? null,
     [payments, paymentId]
   );
+  const [orderDetail, setOrderDetail] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    const orderId = payment?.orderId != null ? String(payment.orderId).trim() : "";
+    if (!orderId) {
+      setOrderDetail(null);
+      return;
+    }
+    let cancelled = false;
+    adminGetOrderDetail(orderId)
+      .then((res) => {
+        if (!cancelled) setOrderDetail(res);
+      })
+      .catch(() => {
+        if (!cancelled) setOrderDetail(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [payment?.orderId]);
 
   if (!paymentId) {
     return (
@@ -81,6 +121,32 @@ export default function AdminPaymentDetailPage() {
         </div>
       ) : (
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          {(() => {
+            const raw = payment as Record<string, unknown>;
+            const ordererName =
+              (typeof raw.userName === "string" && raw.userName.trim()) ||
+              (typeof raw.customerName === "string" && raw.customerName.trim()) ||
+              (typeof raw.orderedByName === "string" && raw.orderedByName.trim()) ||
+              (typeof raw.payerName === "string" && raw.payerName.trim()) ||
+              "-";
+            const ordererEmail =
+              (typeof raw.userEmail === "string" && raw.userEmail.trim()) ||
+              (typeof raw.customerEmail === "string" && raw.customerEmail.trim()) ||
+              (typeof raw.orderedByEmail === "string" && raw.orderedByEmail.trim()) ||
+              (typeof raw.payerEmail === "string" && raw.payerEmail.trim()) ||
+              asText(raw.userId);
+            const payerName =
+              (typeof raw.payerName === "string" && raw.payerName.trim()) ||
+              (typeof raw.senderName === "string" && raw.senderName.trim()) ||
+              ordererName;
+            const payerEmail =
+              (typeof raw.payerEmail === "string" && raw.payerEmail.trim()) ||
+              (typeof raw.senderEmail === "string" && raw.senderEmail.trim()) ||
+              ordererEmail;
+            const proofUrl = paymentProofUrl(raw) ?? (orderDetail ? paymentProofUrl(orderDetail) : null);
+
+            return (
+              <>
           <dl className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">ID transaksi</dt>
@@ -100,11 +166,19 @@ export default function AdminPaymentDetailPage() {
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Pemesan</dt>
-              <dd className="mt-1 text-zinc-900">{asText(payment.userName)}</dd>
+              <dd className="mt-1 text-zinc-900">{ordererName}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email pemesan</dt>
-              <dd className="mt-1 text-zinc-900">{asText(payment.userEmail ?? payment.userId)}</dd>
+              <dd className="mt-1 text-zinc-900">{ordererEmail}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nama pembayar</dt>
+              <dd className="mt-1 text-zinc-900">{payerName}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email pembayar</dt>
+              <dd className="mt-1 text-zinc-900">{payerEmail}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe akun</dt>
@@ -132,10 +206,10 @@ export default function AdminPaymentDetailPage() {
             </div>
           </dl>
 
-          {payment.proofUrl ? (
+          {proofUrl ? (
             <div className="mt-6">
               <a
-                href={String(payment.proofUrl)}
+                href={proofUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-zinc-50"
@@ -151,6 +225,9 @@ export default function AdminPaymentDetailPage() {
               {JSON.stringify(payment, null, 2)}
             </pre>
           </div>
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

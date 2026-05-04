@@ -7,6 +7,26 @@ import { useTrainerPayments } from "@/hooks/useDashboardQueries";
 import { getFriendlyApiErrorMessage } from "@/lib/api";
 import { formatPaymentMoney, paymentStatusLabel } from "@/lib/paymentDisplay";
 
+function getPaymentProofUrl(p: Record<string, unknown>): string | null {
+  const direct =
+    (typeof p.proofUrl === "string" ? p.proofUrl : null) ??
+    (typeof p.proof_url === "string" ? p.proof_url : null) ??
+    (typeof p.paymentProofUrl === "string" ? p.paymentProofUrl : null) ??
+    (typeof p.payment_proof_url === "string" ? p.payment_proof_url : null) ??
+    (typeof p.transferProofUrl === "string" ? p.transferProofUrl : null) ??
+    (typeof p.transfer_proof_url === "string" ? p.transfer_proof_url : null);
+  if (direct && String(direct).trim() !== "") return String(direct);
+  const proofObj = p.proof && typeof p.proof === "object" ? (p.proof as Record<string, unknown>) : null;
+  if (proofObj) {
+    const nested =
+      (typeof proofObj.url === "string" ? proofObj.url : null) ??
+      (typeof proofObj.proofUrl === "string" ? proofObj.proofUrl : null) ??
+      (typeof proofObj.path === "string" ? proofObj.path : null);
+    if (nested && String(nested).trim() !== "") return String(nested);
+  }
+  return null;
+}
+
 export default function GuruPembayaranPage() {
   const { data: payments = [], isLoading, error, refetch } = useTrainerPayments();
   const [page, setPage] = useState(1);
@@ -84,9 +104,9 @@ export default function GuruPembayaranPage() {
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-zinc-700">{paymentStatusLabel(p.status)}</td>
                     <td className="px-4 py-3">
-                      {p.proofUrl ? (
+                      {getPaymentProofUrl(p as unknown as Record<string, unknown>) ? (
                         <a
-                          href={String(p.proofUrl)}
+                          href={String(getPaymentProofUrl(p as unknown as Record<string, unknown>))}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sky-600 hover:underline"

@@ -12,6 +12,10 @@ export default function GuruKelolaSiswaPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [payQuantity, setPayQuantity] = useState(1);
+  const [payProofUrl, setPayProofUrl] = useState("");
+  const [payPayerName, setPayPayerName] = useState("");
+  const [payPayerEmail, setPayPayerEmail] = useState("");
+  const [payPayerPhone, setPayPayerPhone] = useState("");
   const [payLoading, setPayLoading] = useState(false);
   const [addStudentForm, setAddStudentForm] = useState({ name: "", email: "", password: "" });
   const [addStudentLoading, setAddStudentLoading] = useState(false);
@@ -83,7 +87,7 @@ export default function GuruKelolaSiswaPage() {
             <p className="mt-1 text-xs text-zinc-500">
               Setelah pembayaran dikonfirmasi, slot dapat dipakai untuk mendaftarkan siswa.
             </p>
-            <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1">
                 <label htmlFor="pay-qty" className="text-xs font-medium text-zinc-600">Jumlah siswa</label>
                 <input
@@ -96,12 +100,60 @@ export default function GuruKelolaSiswaPage() {
                   className="w-24 rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 />
               </div>
+              <div className="flex flex-col gap-1 sm:col-span-1">
+                <label htmlFor="pay-proof" className="text-xs font-medium text-zinc-600">URL bukti transfer (opsional)</label>
+                <input
+                  id="pay-proof"
+                  type="url"
+                  value={payProofUrl}
+                  onChange={(e) => setPayProofUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="pay-name" className="text-xs font-medium text-zinc-600">Nama pengirim (opsional)</label>
+                <input
+                  id="pay-name"
+                  type="text"
+                  value={payPayerName}
+                  onChange={(e) => setPayPayerName(e.target.value)}
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="pay-email" className="text-xs font-medium text-zinc-600">Email pengirim (opsional)</label>
+                <input
+                  id="pay-email"
+                  type="email"
+                  value={payPayerEmail}
+                  onChange={(e) => setPayPayerEmail(e.target.value)}
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="pay-phone" className="text-xs font-medium text-zinc-600">No HP pengirim (opsional)</label>
+                <input
+                  id="pay-phone"
+                  type="text"
+                  value={payPayerPhone}
+                  onChange={(e) => setPayPayerPhone(e.target.value)}
+                  className="rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="sm:col-span-2">
               <button
                 type="button"
                 disabled={payLoading}
                 onClick={() => {
                   setPayLoading(true);
-                  trainerPaySlots({ quantity: payQuantity })
+                  trainerPaySlots({
+                    quantity: payQuantity,
+                    proofUrl: payProofUrl.trim() || undefined,
+                    payerName: payPayerName.trim() || undefined,
+                    payerEmail: payPayerEmail.trim() || undefined,
+                    payerPhone: payPayerPhone.trim() || undefined,
+                  })
                     .then(() => refetch())
                     .catch(() => {})
                     .finally(() => setPayLoading(false));
@@ -110,6 +162,7 @@ export default function GuruKelolaSiswaPage() {
               >
                 {payLoading ? "Memproses..." : "Bayar untuk slot"}
               </button>
+              </div>
             </div>
           </section>
 

@@ -116,6 +116,14 @@ export interface TrainerStatusResponse {
 export interface TrainerPayRequest {
   /** Jumlah siswa yang dibayar (slot). */
   quantity: number;
+  /** URL/path bukti transfer (opsional). */
+  proofUrl?: string | null;
+  /** Nama pengirim transfer (opsional). */
+  payerName?: string | null;
+  /** Email pengirim transfer (opsional). */
+  payerEmail?: string | null;
+  /** Nomor HP pengirim transfer (opsional). */
+  payerPhone?: string | null;
 }
 
 /** Request tambah siswa oleh guru. POST /trainer/students atau setara. */
