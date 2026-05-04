@@ -172,15 +172,8 @@ export function useAdminLocalClasses() {
         status: input.status,
       });
 
-      // Normalisasi ID dari response (bisa flat atau dibungkus { data: ... })
-      const rawObj = rawCreated as Record<string, unknown>;
-      const createdId = String(
-        rawObj.id ??
-        (rawObj.data && typeof rawObj.data === "object"
-          ? (rawObj.data as Record<string, unknown>).id
-          : undefined) ??
-        ""
-      );
+      // adminCreateCourse sudah mengembalikan Course yang ternormalisasi.
+      const createdId = String(rawCreated.id ?? "");
       if (!createdId) throw new Error("Server tidak mengembalikan ID kelas baru.");
 
       const newClass: AdminClass = {
