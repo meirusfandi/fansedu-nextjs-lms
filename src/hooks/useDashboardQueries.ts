@@ -271,6 +271,10 @@ export function useAdminConfirmPayment() {
       qc.invalidateQueries({ queryKey: queryKeys.payments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.studentDashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.studentCourses });
+      qc.invalidateQueries({ queryKey: queryKeys.studentCoursesBySubject });
+      qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
     },
   });
 }
@@ -360,6 +364,9 @@ export function useAdminVerifyOrder() {
       qc.invalidateQueries({ queryKey: queryKeys.payments });
       qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
+      qc.invalidateQueries({ queryKey: queryKeys.studentDashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.studentCourses });
+      qc.invalidateQueries({ queryKey: queryKeys.studentCoursesBySubject });
     },
   });
 }

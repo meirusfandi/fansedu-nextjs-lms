@@ -1,0 +1,158 @@
+"use client";
+
+import { useAdminPayments } from "@/hooks/useDashboardQueries";
+import { getFriendlyApiErrorMessage } from "@/lib/api";
+import { formatPaymentMoney, paymentStatusLabel } from "@/lib/paymentDisplay";
+import { normalizeUserRoleFromApi } from "@/lib/user-role";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useMemo } from "react";
+
+function normalizeAccountType(rawRole: unknown): string {
+  const normalized = normalizeUserRoleFromApi(typeof rawRole === "string" ? rawRole : "");
+  if (normalized === "student") return "Siswa";
+  if (normalized === "trainer") return "Guru";
+  return "-";
+}
+
+function paymentTypeLabel(type: unknown): string {
+  const t = typeof type === "string" ? type.toLowerCase().trim() : "";
+  if (!t) return "Pembayaran";
+  if (t.includes("course")) return "Pembelian Kelas";
+  if (t.includes("slot")) return "Pembelian Slot";
+  if (t.includes("manual")) return "Pembayaran Manual";
+  if (t.includes("midtrans")) return "Pembayaran Midtrans";
+  if (t.includes("transfer")) return "Transfer Bank";
+  if (t.includes("subscription")) return "Langganan";
+  return "Pembayaran";
+}
+
+function asText(value: unknown): string {
+  if (value == null) return "-";
+  const s = String(value).trim();
+  return s.length > 0 ? s : "-";
+}
+
+export default function AdminPaymentDetailPage() {
+  const params = useParams<{ id: string }>();
+  const paymentId = String(params?.id ?? "").trim();
+
+  const { data: payments = [], isLoading, error } = useAdminPayments();
+  const payment = useMemo(
+    () => payments.find((p) => String(p.id) === paymentId) ?? null,
+    [payments, paymentId]
+  );
+
+  if (!paymentId) {
+    return (
+      <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+        <p className="text-sm text-red-700">ID transaksi tidak valid.</p>
+        <Link href="/admin/payment" className="mt-3 inline-block text-sm text-sky-700 underline">
+          Kembali ke daftar transaksi
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Manage</p>
+          <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Detail transaksi</h1>
+          <p className="mt-1 text-sm text-zinc-500">Ringkasan lengkap data transaksi pembayaran.</p>
+        </div>
+        <Link href="/admin/payment" className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
+          Kembali
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 text-sm text-zinc-500 shadow-sm">
+          Memuat detail transaksi...
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadow-sm">
+          {getFriendlyApiErrorMessage(error)}
+        </div>
+      ) : !payment ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 shadow-sm">
+          Transaksi tidak ditemukan di daftar pembayaran.
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
+          <dl className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">ID transaksi</dt>
+              <dd className="mt-1 break-all font-medium text-zinc-900">{asText(payment.id)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</dt>
+              <dd className="mt-1 text-zinc-900">{paymentStatusLabel(payment.status)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nominal</dt>
+              <dd className="mt-1 text-zinc-900">{formatPaymentMoney(payment)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe pembayaran</dt>
+              <dd className="mt-1 text-zinc-900">{paymentTypeLabel(payment.type)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Pemesan</dt>
+              <dd className="mt-1 text-zinc-900">{asText(payment.userName)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email pemesan</dt>
+              <dd className="mt-1 text-zinc-900">{asText(payment.userEmail ?? payment.userId)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe akun</dt>
+              <dd className="mt-1 text-zinc-900">{normalizeAccountType((payment as Record<string, unknown>).userRole ?? payment.payerRole)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Order ID</dt>
+              <dd className="mt-1 break-all text-zinc-900">{asText(payment.orderId)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Reference ID</dt>
+              <dd className="mt-1 break-all text-zinc-900">{asText(payment.referenceId)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Dibuat</dt>
+              <dd className="mt-1 text-zinc-900">{asText(payment.createdAt)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Purchased At</dt>
+              <dd className="mt-1 text-zinc-900">{asText(payment.purchasedAt)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Paid At</dt>
+              <dd className="mt-1 text-zinc-900">{asText(payment.paidAt)}</dd>
+            </div>
+          </dl>
+
+          {payment.proofUrl ? (
+            <div className="mt-6">
+              <a
+                href={String(payment.proofUrl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-zinc-50"
+              >
+                Buka bukti pembayaran
+              </a>
+            </div>
+          ) : null}
+
+          <div className="mt-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Raw data (debug)</p>
+            <pre className="mt-2 max-h-[360px] overflow-auto rounded-xl bg-zinc-950 p-3 text-xs text-zinc-100">
+              {JSON.stringify(payment, null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -19,6 +19,7 @@ import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/p
 import { normalizeUserRoleFromApi } from "@/lib/user-role";
 import { datetimeLocalToIsoOrNull, isoToDatetimeLocal } from "@/lib/voucher-utils";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 function paymentPurchaseAt(p: Payment): string | undefined {
@@ -287,7 +288,16 @@ export default function AdminPaymentPage() {
   const handleConfirm = async (p: Payment) => {
     if (!confirm("Konfirmasi pembayaran ini? Status akan menjadi disetujui.")) return;
     try {
-      await confirmMutation.mutateAsync(p.id);
+      const orderId = p.orderId != null ? String(p.orderId).trim() : "";
+      if (orderId) {
+        const purchasedAt = paymentPurchaseAt(p);
+        await verifyOrderMutation.mutateAsync({
+          orderId,
+          body: purchasedAt ? { purchasedAt } : {},
+        });
+      } else {
+        await confirmMutation.mutateAsync(p.id);
+      }
     } catch (e) {
       alert(getFriendlyApiErrorMessage(e));
     }
@@ -560,6 +570,12 @@ export default function AdminPaymentPage() {
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <Link
+                          href={`/admin/payment/${encodeURIComponent(String(p.id))}`}
+                          className="mr-2 text-xs font-medium text-zinc-700 hover:underline"
+                        >
+                          Detail
+                        </Link>
                         <button
                           type="button"
                           onClick={() => setEditPayment(p)}
