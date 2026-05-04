@@ -155,6 +155,21 @@ function getBaseUrl(): string {
 
 const BASE = typeof window !== "undefined" ? getBaseUrl() : getBaseUrl();
 
+/**
+ * Konversi path relatif backend (mis. /uploads/...) menjadi URL absolut.
+ * Diperlukan karena proofUrl dari backend adalah path relatif, bukan URL lengkap.
+ */
+export function resolveBackendUrl(path: string): string {
+  if (!path || path.startsWith("http://") || path.startsWith("https://")) return path;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const base = apiUrl
+    ? apiUrl.replace(/\/$/, "")
+    : typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:8080";
+  return base + (path.startsWith("/") ? path : "/" + path);
+}
+
 /** Cegah beberapa redirect bersamaan jika banyak request gagal 401 sekaligus. */
 let unauthorizedRedirectScheduled = false;
 

@@ -13,7 +13,7 @@ import {
   useAdminUpdatePayment,
   useAdminUsersForPaymentModal,
 } from "@/hooks/useDashboardQueries";
-import { adminListCourses, checkoutCreatePaymentSession, getFriendlyApiErrorMessage } from "@/lib/api";
+import { adminListCourses, checkoutCreatePaymentSession, getFriendlyApiErrorMessage, resolveBackendUrl } from "@/lib/api";
 import type { CheckoutPaymentSessionResponse, Payment } from "@/lib/api-types";
 import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/paymentDisplay";
 import { normalizeUserRoleFromApi } from "@/lib/user-role";
@@ -117,7 +117,7 @@ function getPaymentProofUrl(p: Payment): string | null {
     (typeof raw.payment_proof_url === "string" ? raw.payment_proof_url : null) ??
     (typeof raw.transferProofUrl === "string" ? raw.transferProofUrl : null) ??
     (typeof raw.transfer_proof_url === "string" ? raw.transfer_proof_url : null);
-  if (direct && String(direct).trim() !== "") return String(direct);
+  if (direct && String(direct).trim() !== "") return resolveBackendUrl(String(direct));
 
   const proofObj = raw.proof && typeof raw.proof === "object" ? (raw.proof as Record<string, unknown>) : null;
   if (proofObj) {
@@ -125,7 +125,7 @@ function getPaymentProofUrl(p: Payment): string | null {
       (typeof proofObj.url === "string" ? proofObj.url : null) ??
       (typeof proofObj.proofUrl === "string" ? proofObj.proofUrl : null) ??
       (typeof proofObj.path === "string" ? proofObj.path : null);
-    if (nested && String(nested).trim() !== "") return String(nested);
+    if (nested && String(nested).trim() !== "") return resolveBackendUrl(String(nested));
   }
 
   return null;

@@ -1,11 +1,16 @@
 "use client";
 
-import { useAdminPayments } from "@/hooks/useDashboardQueries";
-import { adminGetOrderDetail, getFriendlyApiErrorMessage } from "@/lib/api";
-import { formatPaymentMoney, paymentStatusLabel } from "@/lib/paymentDisplay";
+import {
+  useAdminConfirmPayment,
+  useAdminPayments,
+  useAdminRejectPayment,
+  useAdminVerifyOrder,
+} from "@/hooks/useDashboardQueries";
+import { adminGetOrderDetail, getFriendlyApiErrorMessage, resolveBackendUrl } from "@/lib/api";
+import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/paymentDisplay";
 import { normalizeUserRoleFromApi } from "@/lib/user-role";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 function normalizeAccountType(rawRole: unknown): string {
@@ -35,14 +40,14 @@ function paymentProofUrl(payment: Record<string, unknown>): string | null {
     (typeof payment.payment_proof_url === "string" ? payment.payment_proof_url : null) ??
     (typeof payment.transferProofUrl === "string" ? payment.transferProofUrl : null) ??
     (typeof payment.transfer_proof_url === "string" ? payment.transfer_proof_url : null);
-  if (direct && String(direct).trim() !== "") return String(direct);
+  if (direct && String(direct).trim() !== "") return resolveBackendUrl(String(direct));
   const proofObj = payment.proof && typeof payment.proof === "object" ? (payment.proof as Record<string, unknown>) : null;
   if (proofObj) {
     const nested =
       (typeof proofObj.url === "string" ? proofObj.url : null) ??
       (typeof proofObj.proofUrl === "string" ? proofObj.proofUrl : null) ??
       (typeof proofObj.path === "string" ? proofObj.path : null);
-    if (nested && String(nested).trim() !== "") return String(nested);
+    if (nested && String(nested).trim() !== "") return resolveBackendUrl(String(nested));
   }
   return null;
 }
@@ -53,8 +58,18 @@ function asText(value: unknown): string {
   return s.length > 0 ? s : "-";
 }
 
+function formatDate(value: unknown): string {
+  if (value == null) return "-";
+  const s = String(value).trim();
+  if (!s) return "-";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+}
+
 export default function AdminPaymentDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const paymentId = String(params?.id ?? "").trim();
 
   const { data: payments = [], isLoading, error } = useAdminPayments();
@@ -62,7 +77,13 @@ export default function AdminPaymentDetailPage() {
     () => payments.find((p) => String(p.id) === paymentId) ?? null,
     [payments, paymentId]
   );
+
   const [orderDetail, setOrderDetail] = useState<Record<string, unknown> | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const confirmMutation = useAdminConfirmPayment();
+  const rejectMutation = useAdminRejectPayment();
+  const verifyOrderMutation = useAdminVerifyOrder();
 
   useEffect(() => {
     const orderId = payment?.orderId != null ? String(payment.orderId).trim() : "";
@@ -82,6 +103,40 @@ export default function AdminPaymentDetailPage() {
       cancelled = true;
     };
   }, [payment?.orderId]);
+
+  const handleConfirm = async () => {
+    if (!payment) return;
+    if (!confirm("Konfirmasi pembayaran ini? Status akan menjadi disetujui.")) return;
+    setActionError(null);
+    try {
+      const orderId = payment.orderId != null ? String(payment.orderId).trim() : "";
+      if (orderId) {
+        const purchasedAt = payment.paidAt ?? payment.purchasedAt ?? undefined;
+        await verifyOrderMutation.mutateAsync({
+          orderId,
+          body: purchasedAt ? { purchasedAt: String(purchasedAt) } : {},
+        });
+      } else {
+        await confirmMutation.mutateAsync(payment.id);
+      }
+      router.push("/admin/payment");
+    } catch (e) {
+      setActionError(getFriendlyApiErrorMessage(e));
+    }
+  };
+
+  const handleReject = async () => {
+    if (!payment) return;
+    const reason = window.prompt("Alasan penolakan (opsional). Kosongkan lalu OK untuk menolak tanpa catatan:");
+    if (reason === null) return;
+    setActionError(null);
+    try {
+      await rejectMutation.mutateAsync({ paymentId: payment.id, reason: reason.trim() || undefined });
+      router.push("/admin/payment");
+    } catch (e) {
+      setActionError(getFriendlyApiErrorMessage(e));
+    }
+  };
 
   if (!paymentId) {
     return (
@@ -143,88 +198,129 @@ export default function AdminPaymentDetailPage() {
               (typeof raw.payerEmail === "string" && raw.payerEmail.trim()) ||
               (typeof raw.senderEmail === "string" && raw.senderEmail.trim()) ||
               ordererEmail;
+            const payerPhone =
+              (typeof raw.payerPhone === "string" && raw.payerPhone.trim()) ||
+              (typeof raw.senderPhone === "string" && raw.senderPhone.trim()) ||
+              null;
             const proofUrl = paymentProofUrl(raw) ?? (orderDetail ? paymentProofUrl(orderDetail) : null);
+            const isPending = isPendingStatus(payment.status);
+            const actionBusy = confirmMutation.isPending || rejectMutation.isPending || verifyOrderMutation.isPending;
 
             return (
               <>
-          <dl className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">ID transaksi</dt>
-              <dd className="mt-1 break-all font-medium text-zinc-900">{asText(payment.id)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</dt>
-              <dd className="mt-1 text-zinc-900">{paymentStatusLabel(payment.status)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nominal</dt>
-              <dd className="mt-1 text-zinc-900">{formatPaymentMoney(payment)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe pembayaran</dt>
-              <dd className="mt-1 text-zinc-900">{paymentTypeLabel(payment.type)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Pemesan</dt>
-              <dd className="mt-1 text-zinc-900">{ordererName}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email pemesan</dt>
-              <dd className="mt-1 text-zinc-900">{ordererEmail}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nama pembayar</dt>
-              <dd className="mt-1 text-zinc-900">{payerName}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email pembayar</dt>
-              <dd className="mt-1 text-zinc-900">{payerEmail}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe akun</dt>
-              <dd className="mt-1 text-zinc-900">{normalizeAccountType((payment as Record<string, unknown>).userRole ?? payment.payerRole)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Order ID</dt>
-              <dd className="mt-1 break-all text-zinc-900">{asText(payment.orderId)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Reference ID</dt>
-              <dd className="mt-1 break-all text-zinc-900">{asText(payment.referenceId)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Dibuat</dt>
-              <dd className="mt-1 text-zinc-900">{asText(payment.createdAt)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Purchased At</dt>
-              <dd className="mt-1 text-zinc-900">{asText(payment.purchasedAt)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Paid At</dt>
-              <dd className="mt-1 text-zinc-900">{asText(payment.paidAt)}</dd>
-            </div>
-          </dl>
+                <dl className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">ID transaksi</dt>
+                    <dd className="mt-1 break-all font-medium text-zinc-900">{asText(payment.id)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</dt>
+                    <dd className="mt-1">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        isPending
+                          ? "bg-amber-100 text-amber-900"
+                          : (payment.status ?? "").toLowerCase() === "rejected" || (payment.status ?? "").toLowerCase() === "failed"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-emerald-100 text-emerald-800"
+                      }`}>
+                        {paymentStatusLabel(payment.status)}
+                      </span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nominal</dt>
+                    <dd className="mt-1 text-zinc-900">{formatPaymentMoney(payment)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe pembayaran</dt>
+                    <dd className="mt-1 text-zinc-900">{paymentTypeLabel(payment.type)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Pemesan</dt>
+                    <dd className="mt-1 text-zinc-900">{ordererName}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email pemesan</dt>
+                    <dd className="mt-1 text-zinc-900">{ordererEmail}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Nama pembayar</dt>
+                    <dd className="mt-1 text-zinc-900">{payerName}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Email pembayar</dt>
+                    <dd className="mt-1 text-zinc-900">{payerEmail}</dd>
+                  </div>
+                  {payerPhone ? (
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">No. HP pembayar</dt>
+                      <dd className="mt-1 text-zinc-900">{payerPhone}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe akun</dt>
+                    <dd className="mt-1 text-zinc-900">{normalizeAccountType((payment as Record<string, unknown>).userRole ?? payment.payerRole)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Order ID</dt>
+                    <dd className="mt-1 break-all text-zinc-900">{asText(payment.orderId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Reference ID</dt>
+                    <dd className="mt-1 break-all text-zinc-900">{asText(payment.referenceId)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Dibuat</dt>
+                    <dd className="mt-1 text-zinc-900">{formatDate(payment.createdAt)}</dd>
+                  </div>
+                  {payment.purchasedAt ? (
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tanggal pembelian</dt>
+                      <dd className="mt-1 text-zinc-900">{formatDate(payment.purchasedAt)}</dd>
+                    </div>
+                  ) : null}
+                  {payment.paidAt ? (
+                    <div>
+                      <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Waktu dibayar</dt>
+                      <dd className="mt-1 text-zinc-900">{formatDate(payment.paidAt)}</dd>
+                    </div>
+                  ) : null}
+                </dl>
 
-          {proofUrl ? (
-            <div className="mt-6">
-              <a
-                href={proofUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-zinc-50"
-              >
-                Buka bukti pembayaran
-              </a>
-            </div>
-          ) : null}
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  {proofUrl ? (
+                    <a
+                      href={proofUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-sky-700 hover:bg-zinc-50"
+                    >
+                      Buka bukti pembayaran
+                    </a>
+                  ) : null}
+                  {isPending ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={actionBusy}
+                        onClick={() => void handleConfirm()}
+                        className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {actionBusy ? "Memproses..." : "Setujui pembayaran"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={actionBusy}
+                        onClick={() => void handleReject()}
+                        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Tolak
+                      </button>
+                    </>
+                  ) : null}
+                </div>
 
-          <div className="mt-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Raw data (debug)</p>
-            <pre className="mt-2 max-h-[360px] overflow-auto rounded-xl bg-zinc-950 p-3 text-xs text-zinc-100">
-              {JSON.stringify(payment, null, 2)}
-            </pre>
-          </div>
+                {actionError ? <p className="mt-3 text-sm text-red-700">{actionError}</p> : null}
               </>
             );
           })()}
