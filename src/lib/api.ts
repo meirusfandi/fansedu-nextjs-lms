@@ -99,6 +99,10 @@ import type {
   SubmitAnswerResponse,
   Subscription,
   SetPasswordRequest,
+  AdminAddCourseContentRequest,
+  AdminCourseContent,
+  AdminUpdateCourseContentRequest,
+  AdminUploadCourseMaterialResponse,
 } from "./api-types";
 import { deepToCamelCase } from "./json-case";
 import { normalizeUserRoleFromApi } from "./user-role";
@@ -2880,8 +2884,81 @@ export async function adminDeleteCourse(courseId: string): Promise<void> {
   return request(`/admin/courses/${courseId}`, { method: "DELETE" });
 }
 
-function unwrapApiData<T extends Record<string, unknown>>(raw: unknown): T | null {
-  if (!raw || typeof raw !== "object") return null;
+// --- Course Contents CRUD ---
+
+function extractCourseContentArray(raw: unknown): AdminCourseContent[] {
+  if (Array.isArray(raw)) return raw as AdminCourseContent[];
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    if (Array.isArray(r.data)) return r.data as AdminCourseContent[];
+    if (Array.isArray(r.contents)) return r.contents as AdminCourseContent[];
+    if (Array.isArray(r.items)) return r.items as AdminCourseContent[];
+  }
+  return [];
+}
+
+/** List konten kelas. GET /admin/courses/:id/contents */
+export async function adminListCourseContents(courseId: string): Promise<AdminCourseContent[]> {
+  const cid = encodeURIComponent(courseId);
+  try {
+    const raw = await request<unknown>(`/admin/courses/${cid}/contents`, { method: "GET" });
+    return extractCourseContentArray(raw);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return [];
+    throw e;
+  }
+}
+
+/** Tambah konten ke kelas. POST /admin/courses/:id/contents */
+export async function adminAddCourseContent(
+  courseId: string,
+  body: AdminAddCourseContentRequest
+): Promise<AdminCourseContent> {
+  const cid = encodeURIComponent(courseId);
+  const raw = await request<unknown>(`/admin/courses/${cid}/contents`, { method: "POST", body });
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    const inner = r.data && typeof r.data === "object" ? (r.data as Record<string, unknown>) : r;
+    if (inner.id) return inner as unknown as AdminCourseContent;
+  }
+  return raw as AdminCourseContent;
+}
+
+/** Update konten. PUT /admin/courses/:id/contents/:cid */
+export async function adminUpdateCourseContent(
+  courseId: string,
+  contentId: string,
+  body: AdminUpdateCourseContentRequest
+): Promise<void> {
+  const cid = encodeURIComponent(courseId);
+  const kid = encodeURIComponent(contentId);
+  await request(`/admin/courses/${cid}/contents/${kid}`, { method: "PUT", body });
+}
+
+/** Hapus konten. DELETE /admin/courses/:id/contents/:cid */
+export async function adminDeleteCourseContent(
+  courseId: string,
+  contentId: string
+): Promise<void> {
+  const cid = encodeURIComponent(courseId);
+  const kid = encodeURIComponent(contentId);
+  await request(`/admin/courses/${cid}/contents/${kid}`, { method: "DELETE" });
+}
+
+/** Upload file materi (PDF/DOCX/PPTX). POST /admin/upload/course-material */
+export async function adminUploadCourseMaterial(
+  file: File
+): Promise<AdminUploadCourseMaterialResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const raw = await request<unknown>("/admin/upload/course-material", {
+    method: "POST",
+    body: formData as unknown as Record<string, unknown>,
+  });
+  return raw as AdminUploadCourseMaterialResponse;
+}
+
+function unwrapApiData<T extends Record<string, unknown>>(raw: unknown): T | null {  if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   if (r.data && typeof r.data === "object" && !Array.isArray(r.data)) {
     return r.data as T;

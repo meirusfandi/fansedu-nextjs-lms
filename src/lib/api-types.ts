@@ -438,6 +438,68 @@ export interface AdminCourseLinkedTryoutsRequest {
   linkedTryoutIds: string[];
 }
 
+// --- Course Contents ---
+
+/** Tipe konten kelas. "test" adalah alias backend untuk tryout/quiz inline. */
+export type AdminCourseContentType =
+  | "module"
+  | "article"
+  | "quiz"
+  | "zoom"
+  | "recording"
+  | "test"
+  | string;
+
+/** Satu lampiran file untuk konten tipe module. */
+export interface AdminCourseAttachment {
+  id?: string;
+  type: "pdf" | "docx" | "pptx" | "file" | string;
+  name: string;
+  url: string;
+}
+
+/** Satu konten dalam kelas. GET /admin/courses/:id/contents → items[]. */
+export interface AdminCourseContent {
+  id: string;
+  courseId?: string | null;
+  type: AdminCourseContentType;
+  title: string;
+  description?: string | null;
+  body?: string | null;
+  attachments?: AdminCourseAttachment[] | null;
+  zoomUrl?: string | null;
+  zoomPassword?: string | null;
+  scheduledAt?: string | null;
+  recordingUrl?: string | null;
+  sortOrder?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+/** Body untuk POST /admin/courses/:id/contents */
+export interface AdminAddCourseContentRequest {
+  type: AdminCourseContentType;
+  title: string;
+  description?: string | null;
+  body?: string | null;
+  attachments?: AdminCourseAttachment[] | null;
+  zoomUrl?: string | null;
+  zoomPassword?: string | null;
+  scheduledAt?: string | null;
+  recordingUrl?: string | null;
+  sortOrder?: number | null;
+}
+
+/** Body untuk PUT /admin/courses/:id/contents/:cid (partial update) */
+export type AdminUpdateCourseContentRequest = Partial<AdminAddCourseContentRequest>;
+
+/** Response POST /admin/upload/course-material */
+export interface AdminUploadCourseMaterialResponse {
+  url: string;
+  filename?: string | null;
+  [key: string]: unknown;
+}
+
 /** GET /admin/courses/:id/manage — petunjuk endpoint terkait. */
 export interface AdminCourseManageResponse {
   course?: Course & Record<string, unknown>;
@@ -566,6 +628,8 @@ export interface AdminCreateCourseRequest {
   description?: string | null;
   subjectId?: string | null;
   sortOrder?: number | null;
+  /** Status publikasi kelas: draft | published | archived. */
+  status?: string | null;
   /** Memicu sync program + rebuild journey bila dikombinasikan dengan meetings / pretest / tryout (backend). */
   trackType?: CourseTrackType | null;
   meetings?: CourseMeeting[] | null;

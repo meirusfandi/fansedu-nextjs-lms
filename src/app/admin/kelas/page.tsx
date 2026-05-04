@@ -7,11 +7,11 @@ import {
   emptyClassForm,
   type AdminClass,
   type ClassModule,
-  nowIso,
   statusLabel,
+  statusBadgeClass,
   uid,
 } from "@/features/admin/local-kelas-storage";
-import { useAdminLocalClasses } from "@/features/admin/useAdminLocalClasses";
+import { useAdminLocalClasses, type AddCourseInput } from "@/features/admin/useAdminLocalClasses";
 import {
   adminGetLevelSubjects,
   adminListLevels,
@@ -26,7 +26,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 export default function AdminKelasListPage() {
-  const { classes, setClasses } = useAdminLocalClasses();
+  const { classes, setClasses, loading, saving, apiError, addCourse, updateCourse, deleteCourse } =
+    useAdminLocalClasses();
   const { notice, showSuccess, clearNotice } = useFlashNotice();
   const [trainers, setTrainers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [page, setPage] = useState(1);
@@ -60,17 +61,13 @@ export default function AdminKelasListPage() {
   useEffect(() => {
     adminListUsers()
       .then((users) => {
-        /** Hanya akun pengajar (dashboard trainer): role `trainer` setelah normalisasi API. Role `guru`/`teacher` dari backend ikut dianggap trainer — bukan admin/siswa. */
         const list = (users ?? [])
           .filter((u) => isTrainerAccountRole(u.role))
           .map((u) => ({ id: u.id, name: u.name, email: u.email }))
           .sort((a, b) => a.name.localeCompare(b.name));
         setTrainers(list);
       })
-      .catch((e) => {
-        setError(getFriendlyApiErrorMessage(e));
-        setTrainers([]);
-      });
+      .catch(() => setTrainers([]));
   }, []);
 
   useEffect(() => {
@@ -123,78 +120,58 @@ export default function AdminKelasListPage() {
     setError(null);
   };
 
-  const handleSaveClass = (e: React.FormEvent) => {
+  const handleSaveClass = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!classForm.title.trim()) {
       setError("Judul kelas wajib diisi.");
       return;
     }
-    let savedKind: "add" | "edit" | null = null;
-    if (classModalMode === "add") {
-      const trainer = trainers.find((t) => t.id === classForm.trainerId) ?? null;
-      const level = levels.find((l) => l.id === classForm.levelId) ?? null;
-      const subjects = classForm.levelId ? subjectsByLevel[classForm.levelId] ?? [] : [];
-      const subject = subjects.find((s) => s.id === classForm.subjectId) ?? null;
-      const created: AdminClass = {
-        id: uid("class"),
-        title: classForm.title.trim(),
-        description: classForm.description.trim() || undefined,
-        levelId: classForm.levelId || undefined,
-        levelName: level?.name ?? undefined,
-        subjectId: classForm.subjectId || undefined,
-        subjectName: subject?.name ?? undefined,
-        trainerId: classForm.trainerId || undefined,
-        trainerName: trainer?.name ?? undefined,
-        startDate: classForm.startDate || undefined,
-        endDate: classForm.endDate || undefined,
-        status: classForm.status,
-        modules: [],
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-      };
-      setClasses((prev) => [created, ...prev]);
-      savedKind = "add";
-    } else if (classModalMode === "edit" && editingClassId) {
-      const level = levels.find((l) => l.id === classForm.levelId) ?? null;
-      const subjects = classForm.levelId ? subjectsByLevel[classForm.levelId] ?? [] : [];
-      const subject = subjects.find((s) => s.id === classForm.subjectId) ?? null;
-      setClasses((prev) =>
-        prev.map((c) =>
-          c.id === editingClassId
-            ? {
-                ...c,
-                title: classForm.title.trim(),
-                description: classForm.description.trim() || undefined,
-                levelId: classForm.levelId || undefined,
-                levelName: level?.name ?? undefined,
-                subjectId: classForm.subjectId || undefined,
-                subjectName: subject?.name ?? undefined,
-                trainerId: classForm.trainerId || undefined,
-                trainerName:
-                  (trainers.find((t) => t.id === classForm.trainerId)?.name ?? c.trainerName) || undefined,
-                startDate: classForm.startDate || undefined,
-                endDate: classForm.endDate || undefined,
-                status: classForm.status,
-                updatedAt: nowIso(),
-              }
-            : c
-        )
-      );
-      savedKind = "edit";
+
+    const level = levels.find((l) => l.id === classForm.levelId) ?? null;
+    const subjects = classForm.levelId ? subjectsByLevel[classForm.levelId] ?? [] : [];
+    const subject = subjects.find((s) => s.id === classForm.subjectId) ?? null;
+    const trainer = trainers.find((t) => t.id === classForm.trainerId) ?? null;
+
+    const input: AddCourseInput = {
+      title: classForm.title,
+      description: classForm.description,
+      subjectId: classForm.subjectId,
+      subjectName: subject?.name,
+      levelId: classForm.levelId,
+      levelName: level?.name,
+      trainerId: classForm.trainerId,
+      trainerName: trainer?.name,
+      startDate: classForm.startDate,
+      endDate: classForm.endDate,
+      status: classForm.status,
+    };
+
+    try {
+      if (classModalMode === "add") {
+        await addCourse(input);
+        showSuccess("Kelas berhasil ditambahkan.");
+      } else if (classModalMode === "edit" && editingClassId) {
+        await updateCourse(editingClassId, input);
+        showSuccess("Kelas berhasil diperbarui.");
+      }
+      setClassModalMode(null);
+    } catch (e) {
+      setError(getFriendlyApiErrorMessage(e));
     }
-    setClassModalMode(null);
-    if (savedKind === "add") showSuccess("Kelas berhasil ditambahkan.");
-    else if (savedKind === "edit") showSuccess("Kelas berhasil diperbarui.");
   };
 
-  const handleDeleteClass = (id: string) => {
-    if (!confirm("Hapus kelas ini beserta semua module/quiz/tryout dan materi?")) return;
-    setClasses((prev) => prev.filter((c) => c.id !== id));
-    showSuccess("Kelas berhasil dihapus.");
+  const handleDeleteClass = async (id: string) => {
+    if (!confirm("Hapus kelas ini? Modul dan konten lokal juga akan dihapus.")) return;
+    try {
+      await deleteCourse(id);
+      showSuccess("Kelas berhasil dihapus.");
+    } catch (e) {
+      setError(getFriendlyApiErrorMessage(e));
+    }
   };
 
-  const handleImportOsnPrepClass = () => {
+  const handleImportOsnPrepClass = async () => {
     if (
       !confirm(
         "Buat kelas baru berisi 8 modul materi persiapan OSN-K (Computational Thinking → Strategi ujian)? Kelas lama tidak diubah."
@@ -203,34 +180,70 @@ export default function AdminKelasListPage() {
       return;
     }
     setError(null);
-    const modules: ClassModule[] = OSN_PREP_CURRICULUM_MODULES.map((spec, i) => ({
-      id: uid("mod"),
-      title: spec.title,
-      description: spec.focus,
-      order: i + 1,
-      contents: [
-        {
-          id: uid("content"),
-          type: "lesson" as const,
-          title: "Rencana slide & materi",
-          description: spec.lessonBody,
-          assets: [],
-        },
-      ],
-    }));
-    const created: AdminClass = {
-      id: uid("class"),
-      title: "Persiapan OSN-K (Kurikulum contoh)",
-      description:
-        "Delapan sesi: CT, Himpunan & Boolean, Kombinatorika, Deret & model matematis, Graf & geometri, C++ dasar, Array & rekursi, review tryout & strategi.",
-      status: "draft",
-      modules,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    };
-    setClasses((prev) => [created, ...prev]);
-    showSuccess("Kelas contoh OSN-K berhasil ditambahkan.");
+    try {
+      const modules: ClassModule[] = OSN_PREP_CURRICULUM_MODULES.map((spec, i) => ({
+        id: uid("mod"),
+        title: spec.title,
+        description: spec.focus,
+        order: i + 1,
+        contents: [
+          {
+            id: uid("content"),
+            type: "module" as const,
+            title: "Rencana slide & materi",
+            body: spec.lessonBody,
+            attachments: [],
+          },
+        ],
+      }));
+
+      const newClass = await addCourse({
+        title: "Persiapan OSN-K (Kurikulum contoh)",
+        description:
+          "Delapan sesi: CT, Himpunan & Boolean, Kombinatorika, Deret & model matematis, Graf & geometri, C++ dasar, Array & rekursi, review tryout & strategi.",
+        levelId: "",
+        subjectId: "",
+        trainerId: "",
+        startDate: "",
+        endDate: "",
+        status: "draft",
+      });
+
+      setClasses((prev) =>
+        prev.map((c) => (c.id === newClass.id ? { ...c, modules } : c))
+      );
+      showSuccess("Kelas contoh OSN-K berhasil ditambahkan.");
+    } catch (e) {
+      setError(getFriendlyApiErrorMessage(e));
+    }
   };
+
+  // ------------- Loading skeleton -------------
+  if (loading) {
+    return (
+      <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+        <div className="mb-8">
+          <div className="h-3 w-20 animate-pulse rounded bg-zinc-200" />
+          <div className="mt-2 h-7 w-52 animate-pulse rounded bg-zinc-200" />
+          <div className="mt-2 h-4 w-80 animate-pulse rounded bg-zinc-100" />
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+          <div className="border-b border-zinc-100 px-4 py-3">
+            <div className="h-4 w-24 animate-pulse rounded bg-zinc-200" />
+          </div>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-4 border-b border-zinc-100 px-4 py-3">
+              <div className="flex-1">
+                <div className="h-4 w-48 animate-pulse rounded bg-zinc-200" />
+                <div className="mt-1 h-3 w-32 animate-pulse rounded bg-zinc-100" />
+              </div>
+              <div className="h-4 w-20 animate-pulse rounded bg-zinc-100" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
@@ -241,30 +254,28 @@ export default function AdminKelasListPage() {
             Management Kelas
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Daftar kelas (disimpan di browser). Untuk mengatur <strong>module, konten, dan materi</strong>, buka{" "}
-            <strong>Kelola modul</strong> pada baris kelas. Untuk kelas dari Master Data (API), gunakan{" "}
-            <Link href="/admin/master-data/kelas" className="font-medium text-emerald-700 underline">
-              Master Data → Bidang
-            </Link>
-            . Promo diskon untuk pembelian kelas dikelola di{" "}
+            Metadata kelas disimpan di server. Modul, konten, dan materi disimpan lokal per perangkat.
+            Promo diskon dikelola di{" "}
             <Link href="/admin/vouchers" className="font-medium text-emerald-700 underline">
               Voucher
-            </Link>{" "}
-            dan tidak terikat ke baris kelas lokal di tabel ini.
+            </Link>
+            .
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={handleImportOsnPrepClass}
-            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+            disabled={saving}
+            className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
           >
             Impor materi OSN (8 modul)
           </button>
           <button
             type="button"
             onClick={openAddClass}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800"
+            disabled={saving}
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-50 hover:bg-zinc-800 disabled:opacity-50"
           >
             + Tambah Kelas
           </button>
@@ -273,21 +284,19 @@ export default function AdminKelasListPage() {
 
       {notice && (
         <div className="mb-4">
-          <FlashNoticeBar
-            kind={notice.kind}
-            message={notice.text}
-            onDismiss={clearNotice}
-          />
+          <FlashNoticeBar kind={notice.kind} message={notice.text} onDismiss={clearNotice} />
         </div>
       )}
 
-      {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+      {(error || apiError) && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error ?? apiError}
+        </div>
       )}
 
       {courseVouchers.length > 0 && (
         <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-950">
-          <span className="font-medium">Promo aktif untuk checkout kelas (backend): </span>
+          <span className="font-medium">Promo aktif untuk checkout kelas: </span>
           <span className="font-mono text-xs">
             {courseVouchers.map((v) => `${v.code} (${formatDiscountDisplay(v)})`).join(" · ")}
           </span>
@@ -366,28 +375,34 @@ export default function AdminKelasListPage() {
                         <div>{c.subjectName ?? "-"}</div>
                         <div>{c.levelName ?? "-"}</div>
                       </td>
-                      <td className="px-4 py-3 text-zinc-700">{statusLabel(c.status)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(c.status)}`}>
+                          {statusLabel(c.status)}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <Link
                           href={`/admin/kelas/${encodeURIComponent(c.id)}`}
                           className="inline-flex rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
                         >
-                          Kelola modul
+                          Kelola konten
                         </Link>
-                        <span className="ml-2 text-xs text-zinc-500">({c.modules.length})</span>
+                        <span className="ml-2 text-xs text-zinc-500">({c.modules.length} modul)</span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
                           onClick={() => openEditClass(c)}
-                          className="mr-2 text-xs text-sky-700 hover:underline"
+                          disabled={saving}
+                          className="mr-2 text-xs text-sky-700 hover:underline disabled:opacity-50"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteClass(c.id)}
-                          className="text-xs text-red-600 hover:underline"
+                          disabled={saving}
+                          className="text-xs text-red-600 hover:underline disabled:opacity-50"
                         >
                           Hapus
                         </button>
@@ -408,6 +423,11 @@ export default function AdminKelasListPage() {
             <h3 className="text-lg font-semibold text-zinc-900">
               {classModalMode === "add" ? "Tambah Kelas" : "Edit Kelas"}
             </h3>
+            {error && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <form onSubmit={handleSaveClass} className="mt-4 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-zinc-600">Judul kelas *</label>
@@ -477,12 +497,6 @@ export default function AdminKelasListPage() {
                       </option>
                     ))}
                   </select>
-                  {trainers.length === 0 ? (
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Belum ada akun pengajar yang tercatat (peran trainer / guru / teacher). Periksa Management User atau
-                      sinkronisasi data. Kelas tetap bisa disimpan tanpa pengajar.
-                    </p>
-                  ) : null}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-600">Status</label>
@@ -493,9 +507,9 @@ export default function AdminKelasListPage() {
                     }
                     className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                   >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
-                    <option value="archived">Archived</option>
+                  <option value="draft">Draft</option>
+                    <option value="publish">Published</option>
+                    <option value="active">Aktif</option>
                   </select>
                 </div>
               </div>
@@ -522,12 +536,23 @@ export default function AdminKelasListPage() {
               <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setClassModalMode(null)}
-                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
+                  onClick={() => { setClassModalMode(null); setError(null); }}
+                  disabled={saving}
+                  className="rounded-lg border border-zinc-200 px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
                 >
                   Batal
                 </button>
-                <button type="submit" className="rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800 disabled:opacity-50"
+                >
+                  {saving && (
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  )}
                   Simpan
                 </button>
               </div>
@@ -538,3 +563,4 @@ export default function AdminKelasListPage() {
     </div>
   );
 }
+
