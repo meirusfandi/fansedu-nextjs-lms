@@ -38,8 +38,60 @@ function getPaymentUserEmail(p: Payment): string {
   return p.userEmail ?? p.userId ?? "";
 }
 
-function getPaymentPayerRole(p: Payment): string {
-  return p.payerRole ?? (p.type?.includes("slot") ? "trainer" : "–");
+function getPaymentOrdererName(p: Payment): string {
+  const raw = p as Record<string, unknown>;
+  return (
+    (typeof raw.userName === "string" && raw.userName.trim()) ||
+    (typeof raw.customerName === "string" && raw.customerName.trim()) ||
+    (typeof raw.orderedByName === "string" && raw.orderedByName.trim()) ||
+    getPaymentUserName(p)
+  );
+}
+
+function getPaymentOrdererEmail(p: Payment): string {
+  const raw = p as Record<string, unknown>;
+  return (
+    (typeof raw.userEmail === "string" && raw.userEmail.trim()) ||
+    (typeof raw.customerEmail === "string" && raw.customerEmail.trim()) ||
+    (typeof raw.orderedByEmail === "string" && raw.orderedByEmail.trim()) ||
+    getPaymentUserEmail(p)
+  );
+}
+
+function getPaymentPayerName(p: Payment): string {
+  const raw = p as Record<string, unknown>;
+  return (
+    (typeof raw.payerName === "string" && raw.payerName.trim()) ||
+    (typeof raw.senderName === "string" && raw.senderName.trim()) ||
+    (typeof raw.paidByName === "string" && raw.paidByName.trim()) ||
+    (typeof raw.accountName === "string" && raw.accountName.trim()) ||
+    getPaymentOrdererName(p)
+  );
+}
+
+function getAccountTypeLabel(p: Payment): string {
+  const raw = p as Record<string, unknown>;
+  const source =
+    (typeof raw.userRole === "string" && raw.userRole) ||
+    (typeof raw.role === "string" && raw.role) ||
+    p.payerRole ||
+    "";
+  const normalized = normalizeUserRoleFromApi(source);
+  if (normalized === "student") return "Siswa";
+  if (normalized === "trainer") return "Guru";
+  return "–";
+}
+
+function getPaymentTypeLabel(p: Payment): string {
+  const t = String(p.type ?? "").toLowerCase().trim();
+  if (!t) return "Pembayaran";
+  if (t.includes("course")) return "Pembelian Kelas";
+  if (t.includes("slot")) return "Pembelian Slot";
+  if (t.includes("manual")) return "Pembayaran Manual";
+  if (t.includes("midtrans")) return "Pembayaran Midtrans";
+  if (t.includes("transfer")) return "Transfer Bank";
+  if (t.includes("subscription")) return "Langganan";
+  return "Pembayaran";
 }
 
 function getPaymentProofUrl(p: Payment): string | null {
@@ -423,9 +475,8 @@ export default function AdminPaymentPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
                     Dicatat
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Pembayar
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Pemesan</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">Nama pembayar</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500">
                     Peran
                   </th>
@@ -448,10 +499,15 @@ export default function AdminPaymentPage() {
                   const purchase = paymentPurchaseAt(p);
                   const created = getPaymentCreatedAt(p);
                   const refId = p.referenceId != null ? String(p.referenceId) : "";
+                  const paymentTypeLabel = getPaymentTypeLabel(p);
                   const courseLabel =
                     isCoursePayment(p) && refId
-                      ? courseTitleById.get(refId) ?? `Kelas ${refId.slice(0, 8)}…`
-                      : (p.type ?? "–");
+                      ? courseTitleById.get(refId) ?? "Kelas"
+                      : paymentTypeLabel;
+                  const typeAndClassLabel =
+                    isCoursePayment(p) && refId
+                      ? `${paymentTypeLabel} • ${courseLabel}`
+                      : paymentTypeLabel;
                   return (
                     <tr key={p.id} className="hover:bg-zinc-50/80">
                       <td className="whitespace-nowrap px-4 py-3 text-zinc-600">
@@ -471,17 +527,20 @@ export default function AdminPaymentPage() {
                           : "–"}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-zinc-900">{getPaymentUserName(p)}</div>
-                        <div className="text-xs text-zinc-500">{getPaymentUserEmail(p)}</div>
+                        <div className="font-medium text-zinc-900">{getPaymentOrdererName(p)}</div>
+                        <div className="text-xs text-zinc-500">{getPaymentOrdererEmail(p)}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-zinc-900">{getPaymentPayerName(p)}</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium capitalize text-zinc-700">
-                          {getPaymentPayerRole(p)}
+                          {getAccountTypeLabel(p)}
                         </span>
                       </td>
                       <td className="max-w-[200px] px-4 py-3 text-zinc-600">
-                        <span className="line-clamp-2" title={courseLabel}>
-                          {courseLabel}
+                        <span className="line-clamp-2" title={typeAndClassLabel}>
+                          {typeAndClassLabel}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-zinc-900">
