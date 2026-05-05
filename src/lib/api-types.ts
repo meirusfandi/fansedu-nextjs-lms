@@ -139,6 +139,10 @@ export interface TrainerProfileResponse {
   email?: string;
   /** Info sekolah yang terhubung dengan guru (dari backend). */
   school?: Sekolah | null;
+  /** Preferensi notifikasi (jika backend mengembalikan di GET /trainer/profile). */
+  emailPembayaran?: boolean;
+  emailPengingat?: boolean;
+  notifAktivitasSiswa?: boolean;
 }
 
 /** Request update profil guru. PUT /trainer/profile. */
@@ -146,6 +150,10 @@ export interface TrainerProfileUpdateRequest {
   name?: string;
   /** ID sekolah untuk dikaitkan; string kosong untuk melepas sekolah. */
   schoolId?: string | null;
+  /** Preferensi notifikasi (disimpan di server jika backend mendukung). */
+  emailPembayaran?: boolean;
+  emailPengingat?: boolean;
+  notifAktivitasSiswa?: boolean;
 }
 
 /** Request buat sekolah oleh guru. POST /trainer/schools. */

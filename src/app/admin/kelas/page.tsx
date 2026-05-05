@@ -5,35 +5,33 @@ import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { OSN_PREP_CURRICULUM_MODULES } from "@/data/osn-class-curriculum";
 import {
   emptyClassForm,
-  type AdminClass,
-  type ClassModule,
   statusLabel,
   statusBadgeClass,
-  uid,
+  type ClassStatus,
 } from "@/features/admin/local-kelas-storage";
 import { useAdminLocalClasses, type AddCourseInput } from "@/features/admin/useAdminLocalClasses";
 import {
+  adminAddCourseContent,
   adminGetLevelSubjects,
+  adminGetSubject,
   adminListLevels,
-  adminListUsers,
   adminListVouchers,
   getFriendlyApiErrorMessage,
 } from "@/lib/api";
-import type { AdminVoucher, Level, Subject } from "@/lib/api-types";
+import type { AdminVoucher, Course, Level, Subject } from "@/lib/api-types";
 import { formatDiscountDisplay, isAdminVoucherCurrentlyValid } from "@/lib/voucher-utils";
-import { isTrainerAccountRole } from "@/lib/user-role";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 export default function AdminKelasListPage() {
-  const { classes, setClasses, loading, saving, apiError, addCourse, updateCourse, deleteCourse } =
+  const { classes, loading, saving, apiError, addCourse, updateCourse, deleteCourse, reload } =
     useAdminLocalClasses();
   const { notice, showSuccess, clearNotice } = useFlashNotice();
-  const [trainers, setTrainers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [levels, setLevels] = useState<Level[]>([]);
   const [subjectsByLevel, setSubjectsByLevel] = useState<Record<string, Subject[]>>({});
+  const [subjectById, setSubjectById] = useState<Record<string, Subject>>({});
   const [filterLevelId, setFilterLevelId] = useState("");
   const [filterSubjectId, setFilterSubjectId] = useState("");
 
@@ -53,21 +51,31 @@ export default function AdminKelasListPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     adminListLevels()
-      .then((rows) => setLevels(rows ?? []))
-      .catch(() => setLevels([]));
-  }, []);
-
-  useEffect(() => {
-    adminListUsers()
-      .then((users) => {
-        const list = (users ?? [])
-          .filter((u) => isTrainerAccountRole(u.role))
-          .map((u) => ({ id: u.id, name: u.name, email: u.email }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-        setTrainers(list);
+      .then((lvls) => {
+        if (cancelled) return;
+        setLevels(lvls ?? []);
+        if (!lvls?.length) return;
+        return Promise.all(
+          lvls.map((l) =>
+            adminGetLevelSubjects(l.id).then((rows) => [l.id, rows ?? []] as const)
+          )
+        ).then((entries) => {
+          if (cancelled) return;
+          setSubjectsByLevel((prev) => {
+            const next = { ...prev };
+            for (const [lid, rows] of entries) {
+              next[lid] = rows;
+            }
+            return next;
+          });
+        });
       })
-      .catch(() => setTrainers([]));
+      .catch(() => setLevels([]));
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -78,13 +86,27 @@ export default function AdminKelasListPage() {
       .catch(() => setSubjectsByLevel((prev) => ({ ...prev, [lid]: [] })));
   }, [classForm.levelId, subjectsByLevel]);
 
+  useEffect(() => {
+    const ids = [...new Set(classes.map((c) => c.subjectId).filter(Boolean) as string[])];
+    for (const id of ids) {
+      void adminGetSubject(id).then((s) => {
+        if (s) setSubjectById((prev) => ({ ...prev, [id]: s }));
+      });
+    }
+  }, [classes]);
+
   const filteredClasses = useMemo(() => {
     return classes.filter((c) => {
-      if (filterLevelId && c.levelId !== filterLevelId) return false;
       if (filterSubjectId && c.subjectId !== filterSubjectId) return false;
+      if (filterLevelId) {
+        if (!c.subjectId) return false;
+        const subj = subjectById[c.subjectId];
+        if (subj && subj.levelId !== filterLevelId) return false;
+        if (!subj) return true;
+      }
       return true;
     });
-  }, [classes, filterLevelId, filterSubjectId]);
+  }, [classes, filterLevelId, filterSubjectId, subjectById]);
 
   const paginated = useMemo(
     () => filteredClasses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
@@ -104,16 +126,17 @@ export default function AdminKelasListPage() {
     setError(null);
   };
 
-  const openEditClass = (c: AdminClass) => {
+  const openEditClass = (c: Course) => {
+    const sub = c.subjectId ? subjectById[c.subjectId] : undefined;
     setClassForm({
       title: c.title,
       description: c.description ?? "",
-      levelId: c.levelId ?? "",
+      levelId: sub?.levelId ?? "",
       subjectId: c.subjectId ?? "",
-      trainerId: c.trainerId ?? "",
-      startDate: c.startDate ?? "",
-      endDate: c.endDate ?? "",
-      status: c.status,
+      trainerId: "",
+      startDate: "",
+      endDate: "",
+      status: (String(c.status ?? "draft") as ClassStatus) || "draft",
     });
     setEditingClassId(c.id);
     setClassModalMode("edit");
@@ -128,22 +151,10 @@ export default function AdminKelasListPage() {
       return;
     }
 
-    const level = levels.find((l) => l.id === classForm.levelId) ?? null;
-    const subjects = classForm.levelId ? subjectsByLevel[classForm.levelId] ?? [] : [];
-    const subject = subjects.find((s) => s.id === classForm.subjectId) ?? null;
-    const trainer = trainers.find((t) => t.id === classForm.trainerId) ?? null;
-
     const input: AddCourseInput = {
       title: classForm.title,
       description: classForm.description,
       subjectId: classForm.subjectId,
-      subjectName: subject?.name,
-      levelId: classForm.levelId,
-      levelName: level?.name,
-      trainerId: classForm.trainerId,
-      trainerName: trainer?.name,
-      startDate: classForm.startDate,
-      endDate: classForm.endDate,
       status: classForm.status,
     };
 
@@ -162,7 +173,7 @@ export default function AdminKelasListPage() {
   };
 
   const handleDeleteClass = async (id: string) => {
-    if (!confirm("Hapus kelas ini? Modul dan konten lokal juga akan dihapus.")) return;
+    if (!confirm("Hapus kelas ini beserta konten di server?")) return;
     try {
       await deleteCourse(id);
       showSuccess("Kelas berhasil dihapus.");
@@ -181,37 +192,26 @@ export default function AdminKelasListPage() {
     }
     setError(null);
     try {
-      const modules: ClassModule[] = OSN_PREP_CURRICULUM_MODULES.map((spec, i) => ({
-        id: uid("mod"),
-        title: spec.title,
-        description: spec.focus,
-        order: i + 1,
-        contents: [
-          {
-            id: uid("content"),
-            type: "module" as const,
-            title: "Rencana slide & materi",
-            body: spec.lessonBody,
-            attachments: [],
-          },
-        ],
-      }));
-
       const newClass = await addCourse({
         title: "Persiapan OSN-K (Kurikulum contoh)",
         description:
           "Delapan sesi: CT, Himpunan & Boolean, Kombinatorika, Deret & model matematis, Graf & geometri, C++ dasar, Array & rekursi, review tryout & strategi.",
-        levelId: "",
         subjectId: "",
-        trainerId: "",
-        startDate: "",
-        endDate: "",
         status: "draft",
       });
 
-      setClasses((prev) =>
-        prev.map((c) => (c.id === newClass.id ? { ...c, modules } : c))
-      );
+      let order = 0;
+      for (const spec of OSN_PREP_CURRICULUM_MODULES) {
+        order += 1;
+        await adminAddCourseContent(newClass.id, {
+          type: "module",
+          title: spec.title,
+          description: spec.focus,
+          body: spec.lessonBody,
+          sortOrder: order,
+        });
+      }
+      await reload();
       showSuccess("Kelas contoh OSN-K berhasil ditambahkan.");
     } catch (e) {
       setError(getFriendlyApiErrorMessage(e));
@@ -254,8 +254,7 @@ export default function AdminKelasListPage() {
             Management Kelas
           </h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Metadata kelas disimpan di server. Modul, konten, dan materi disimpan lokal per perangkat.
-            Promo diskon dikelola di{" "}
+            Kelas dan konten materi disimpan di server. Promo diskon dikelola di{" "}
             <Link href="/admin/vouchers" className="font-medium text-emerald-700 underline">
               Voucher
             </Link>
@@ -360,20 +359,27 @@ export default function AdminKelasListPage() {
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Kelas</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Bidang / Jenjang</th>
                     <th className="px-4 py-3 text-left font-medium text-zinc-600">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-zinc-600">Modul</th>
+                    <th className="px-4 py-3 text-left font-medium text-zinc-600">Konten</th>
                     <th className="px-4 py-3 text-right font-medium text-zinc-600">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {paginated.map((c) => (
+                  {paginated.map((c) => {
+                    const sub = c.subjectId ? subjectById[c.subjectId] : undefined;
+                    const levelName = sub?.levelId
+                      ? levels.find((l) => l.id === sub.levelId)?.name ?? "—"
+                      : "—";
+                    return (
                     <tr key={c.id} className="hover:bg-zinc-50/80">
                       <td className="px-4 py-3">
                         <p className="font-medium text-zinc-900">{c.title}</p>
-                        <p className="text-xs text-zinc-500">{c.trainerName ?? "Trainer belum ditentukan"}</p>
+                        <p className="text-xs text-zinc-500">
+                          {sub?.name ?? (c.subjectId ? "Memuat bidang…" : "Tanpa bidang")}
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-xs text-zinc-600">
-                        <div>{c.subjectName ?? "-"}</div>
-                        <div>{c.levelName ?? "-"}</div>
+                        <div>{sub?.name ?? "—"}</div>
+                        <div>{levelName}</div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(c.status)}`}>
@@ -387,7 +393,6 @@ export default function AdminKelasListPage() {
                         >
                           Kelola konten
                         </Link>
-                        <span className="ml-2 text-xs text-zinc-500">({c.modules.length} modul)</span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -408,7 +413,8 @@ export default function AdminKelasListPage() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -482,56 +488,19 @@ export default function AdminKelasListPage() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600">Pengajar (akun trainer)</label>
-                  <select
-                    value={classForm.trainerId}
-                    onChange={(e) => setClassForm((f) => ({ ...f, trainerId: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  >
-                    <option value="">— Pilih trainer (opsional) —</option>
-                    {trainers.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600">Status</label>
-                  <select
-                    value={classForm.status}
-                    onChange={(e) =>
-                      setClassForm((f) => ({ ...f, status: e.target.value as AdminClass["status"] }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  >
+              <div>
+                <label className="block text-xs font-medium text-zinc-600">Status</label>
+                <select
+                  value={classForm.status}
+                  onChange={(e) =>
+                    setClassForm((f) => ({ ...f, status: e.target.value as ClassStatus }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                >
                   <option value="draft">Draft</option>
-                    <option value="publish">Published</option>
-                    <option value="active">Aktif</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600">Mulai</label>
-                  <input
-                    type="date"
-                    value={classForm.startDate}
-                    onChange={(e) => setClassForm((f) => ({ ...f, startDate: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600">Selesai</label>
-                  <input
-                    type="date"
-                    value={classForm.endDate}
-                    onChange={(e) => setClassForm((f) => ({ ...f, endDate: e.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-                  />
-                </div>
+                  <option value="publish">Published</option>
+                  <option value="active">Aktif</option>
+                </select>
               </div>
               <div className="flex justify-end gap-2 pt-3">
                 <button

@@ -41,6 +41,7 @@ import {
 import type {
   TrainerCourseCreateRequest,
   Course,
+  Payment,
   CreatePaymentRequest,
   AdminCreatePaymentRequest,
   CreateSubscriptionRequest,
@@ -72,6 +73,7 @@ export const queryKeys = {
   notifications: ["notifications"] as const,
   payments: ["payments"] as const,
   adminPayments: ["admin", "payments"] as const,
+  adminPaymentDetail: (id: string) => ["admin", "payment", id] as const,
   trainerPayments: ["trainer", "payments"] as const,
   trainerAiSubscription: ["trainer", "ai-subscription"] as const,
 };
@@ -227,6 +229,26 @@ export function useAdminPayments() {
   return useQuery({
     queryKey: queryKeys.adminPayments,
     queryFn: adminListPayments,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Detail satu pembayaran: GET /admin/payments/:id bila tersedia, lalu fallback ke pencarian di daftar.
+ * Menghindari "tidak ditemukan" saat membuka link detail dari notifikasi atau cache daftar kedaluwarsa.
+ */
+export function useAdminPaymentDetail(paymentId: string | undefined) {
+  const id = String(paymentId ?? "").trim();
+  return useQuery({
+    queryKey: queryKeys.adminPaymentDetail(id || "_"),
+    queryFn: async (): Promise<Payment | null> => {
+      if (!id) return null;
+      const direct = await adminGetPayment(id);
+      if (direct) return direct;
+      const all = await adminListPayments();
+      return all.find((p) => String(p.id) === id) ?? null;
+    },
+    enabled: id.length > 0,
   });
 }
 
@@ -268,6 +290,7 @@ export function useAdminConfirmPayment() {
     mutationFn: (paymentId: string) => adminConfirmPayment(paymentId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
       qc.invalidateQueries({ queryKey: queryKeys.payments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
@@ -286,9 +309,11 @@ export function useAdminRejectPayment() {
       adminRejectPayment(paymentId, reason ? { reason } : undefined),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
       qc.invalidateQueries({ queryKey: queryKeys.payments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
+      qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
     },
   });
 }
@@ -300,6 +325,7 @@ export function useAdminCreatePayment() {
     mutationFn: (body: AdminCreatePaymentRequest) => adminCreatePayment(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
       qc.invalidateQueries({ queryKey: queryKeys.payments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
@@ -316,6 +342,7 @@ export function useAdminUpdatePayment() {
       adminUpdatePayment(paymentId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
       qc.invalidateQueries({ queryKey: queryKeys.payments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerStatus });
@@ -330,6 +357,7 @@ export function useAdminCreateManualOrder() {
     mutationFn: (body: AdminManualOrderCreateRequest) => adminCreateManualOrder(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
     },
   });
 }
@@ -350,6 +378,7 @@ export function useAdminUploadOrderPaymentProof() {
     }) => adminUploadOrderPaymentProof(orderId, proofFile, { senderAccountNo, senderName }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
     },
   });
 }
@@ -361,6 +390,7 @@ export function useAdminVerifyOrder() {
       adminVerifyOrder(orderId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
       qc.invalidateQueries({ queryKey: queryKeys.payments });
       qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
       qc.invalidateQueries({ queryKey: queryKeys.trainerPayments });
@@ -378,6 +408,7 @@ export function useAdminPatchOrderPurchaseMeta() {
       adminPatchOrderPurchaseMeta(orderId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.adminPayments });
+      qc.invalidateQueries({ queryKey: ["admin", "payment"] });
       qc.invalidateQueries({ queryKey: queryKeys.studentPayments });
     },
   });

@@ -2,7 +2,7 @@
 
 import {
   useAdminConfirmPayment,
-  useAdminPayments,
+  useAdminPaymentDetail,
   useAdminRejectPayment,
   useAdminVerifyOrder,
 } from "@/hooks/useDashboardQueries";
@@ -11,7 +11,7 @@ import { formatPaymentMoney, isPendingStatus, paymentStatusLabel } from "@/lib/p
 import { normalizeUserRoleFromApi } from "@/lib/user-role";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 function normalizeAccountType(rawRole: unknown): string {
   const normalized = normalizeUserRoleFromApi(typeof rawRole === "string" ? rawRole : "");
@@ -72,11 +72,13 @@ export default function AdminPaymentDetailPage() {
   const router = useRouter();
   const paymentId = String(params?.id ?? "").trim();
 
-  const { data: payments = [], isLoading, error } = useAdminPayments();
-  const payment = useMemo(
-    () => payments.find((p) => String(p.id) === paymentId) ?? null,
-    [payments, paymentId]
-  );
+  const {
+    data: payment,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+  } = useAdminPaymentDetail(paymentId || undefined);
 
   const [orderDetail, setOrderDetail] = useState<Record<string, unknown> | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -119,6 +121,7 @@ export default function AdminPaymentDetailPage() {
       } else {
         await confirmMutation.mutateAsync(payment.id);
       }
+      await refetch();
       router.push("/admin/payment");
     } catch (e) {
       setActionError(getFriendlyApiErrorMessage(e));
@@ -132,6 +135,7 @@ export default function AdminPaymentDetailPage() {
     setActionError(null);
     try {
       await rejectMutation.mutateAsync({ paymentId: payment.id, reason: reason.trim() || undefined });
+      await refetch();
       router.push("/admin/payment");
     } catch (e) {
       setActionError(getFriendlyApiErrorMessage(e));
@@ -155,9 +159,14 @@ export default function AdminPaymentDetailPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Manage</p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Detail transaksi</h1>
-          <p className="mt-1 text-sm text-zinc-500">Ringkasan lengkap data transaksi pembayaran.</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Data dimuat langsung dari API (GET detail atau daftar). Order terkait ditampilkan jika ada.
+          </p>
         </div>
-        <Link href="/admin/payment" className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
+        <Link
+          href="/admin/payment"
+          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+        >
           Kembali
         </Link>
       </div>
@@ -168,11 +177,34 @@ export default function AdminPaymentDetailPage() {
         </div>
       ) : error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadow-sm">
-          {getFriendlyApiErrorMessage(error)}
+          <p>{getFriendlyApiErrorMessage(error)}</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100"
+          >
+            Coba lagi
+          </button>
         </div>
       ) : !payment ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800 shadow-sm">
-          Transaksi tidak ditemukan di daftar pembayaran.
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900 shadow-sm">
+          <p className="font-medium">Transaksi tidak ditemukan.</p>
+          <p className="mt-2 text-xs text-amber-800">
+            ID mungkin salah atau pembayaran sudah dihapus. Periksa daftar pembayaran atau hubungi administrator.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              className="rounded-lg bg-amber-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-900 disabled:opacity-50"
+            >
+              {isFetching ? "Memuat…" : "Muat ulang"}
+            </button>
+            <Link href="/admin/payment" className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100">
+              Ke daftar transaksi
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
@@ -204,7 +236,8 @@ export default function AdminPaymentDetailPage() {
               null;
             const proofUrl = paymentProofUrl(raw) ?? (orderDetail ? paymentProofUrl(orderDetail) : null);
             const isPending = isPendingStatus(payment.status);
-            const actionBusy = confirmMutation.isPending || rejectMutation.isPending || verifyOrderMutation.isPending;
+            const actionBusy =
+              confirmMutation.isPending || rejectMutation.isPending || verifyOrderMutation.isPending;
 
             return (
               <>
@@ -216,13 +249,16 @@ export default function AdminPaymentDetailPage() {
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Status</dt>
                     <dd className="mt-1">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        isPending
-                          ? "bg-amber-100 text-amber-900"
-                          : (payment.status ?? "").toLowerCase() === "rejected" || (payment.status ?? "").toLowerCase() === "failed"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-emerald-100 text-emerald-800"
-                      }`}>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          isPending
+                            ? "bg-amber-100 text-amber-900"
+                            : (payment.status ?? "").toLowerCase() === "rejected" ||
+                                (payment.status ?? "").toLowerCase() === "failed"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
                         {paymentStatusLabel(payment.status)}
                       </span>
                     </dd>
@@ -259,7 +295,9 @@ export default function AdminPaymentDetailPage() {
                   ) : null}
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Tipe akun</dt>
-                    <dd className="mt-1 text-zinc-900">{normalizeAccountType((payment as Record<string, unknown>).userRole ?? payment.payerRole)}</dd>
+                    <dd className="mt-1 text-zinc-900">
+                      {normalizeAccountType((payment as Record<string, unknown>).userRole ?? payment.payerRole)}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Order ID</dt>

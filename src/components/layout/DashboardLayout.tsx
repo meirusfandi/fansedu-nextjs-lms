@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { TopNavbar } from "./TopNavbar";
 
 export interface DashboardLayoutProps {
@@ -20,17 +20,8 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [sidebarHidden, setSidebarHidden] = useState(false);
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem("fansedu_sidebar_hidden");
-    setSidebarHidden(saved === "1");
-  }, []);
-
   const handleToggleSidebar = () => {
-    setSidebarHidden((prev) => {
-      const next = !prev;
-      window.localStorage.setItem("fansedu_sidebar_hidden", next ? "1" : "0");
-      return next;
-    });
+    setSidebarHidden((prev) => !prev);
   };
 
   return (

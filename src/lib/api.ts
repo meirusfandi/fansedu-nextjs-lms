@@ -712,6 +712,37 @@ export async function adminListPayments(): Promise<Payment[]> {
   }
 }
 
+function unwrapSinglePaymentFromGet(raw: unknown): Payment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.id === "string") return o as Payment;
+  const data = o.data;
+  if (data && typeof data === "object" && typeof (data as { id?: unknown }).id === "string") {
+    return data as Payment;
+  }
+  const payment = o.payment;
+  if (payment && typeof payment === "object" && typeof (payment as { id?: unknown }).id === "string") {
+    return payment as Payment;
+  }
+  return null;
+}
+
+/**
+ * Satu pembayaran admin. GET /admin/payments/:id
+ * Jika route tidak ada (404/405), kembalikan null — pemanggil bisa fallback ke adminListPayments.
+ */
+export async function adminGetPayment(paymentId: string): Promise<Payment | null> {
+  const id = encodeURIComponent(paymentId.trim());
+  if (!id) return null;
+  try {
+    const raw = await request<unknown>(`/admin/payments/${id}`, { method: "GET" });
+    return unwrapSinglePaymentFromGet(raw);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return null;
+    throw e;
+  }
+}
+
 /** POST /admin/payments/:id/confirm — konfirmasi pembayaran (admin). */
 export async function adminConfirmPayment(paymentId: string): Promise<Payment> {
   try {
@@ -934,7 +965,41 @@ export async function getTrainerProfile(): Promise<TrainerProfileResponse | null
         alamat: s.alamat != null ? String(s.alamat) : s.address != null ? String(s.address) : null,
       };
     }
-    return { name, email, school };
+    const pickBool = (
+      ...vals: unknown[]
+    ): boolean | undefined => {
+      for (const v of vals) {
+        if (typeof v === "boolean") return v;
+      }
+      return undefined;
+    };
+    const emailPembayaran = pickBool(
+      data.emailPembayaran,
+      raw.emailPembayaran,
+      data.email_pembayaran,
+      data.notificationEmailPembayaran
+    );
+    const emailPengingat = pickBool(
+      data.emailPengingat,
+      raw.emailPengingat,
+      data.email_pengingat,
+      data.notificationEmailPengingat
+    );
+    const notifAktivitasSiswa = pickBool(
+      data.notifAktivitasSiswa,
+      raw.notifAktivitasSiswa,
+      data.notif_aktivitas_siswa,
+      data.notificationAktivitasSiswa
+    );
+
+    return {
+      name,
+      email,
+      school,
+      ...(emailPembayaran !== undefined ? { emailPembayaran } : {}),
+      ...(emailPengingat !== undefined ? { emailPengingat } : {}),
+      ...(notifAktivitasSiswa !== undefined ? { notifAktivitasSiswa } : {}),
+    };
   } catch (e) {
     if (isNotFoundOrMethodNotAllowed(e)) return null;
     throw e;

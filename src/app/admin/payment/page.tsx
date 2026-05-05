@@ -170,6 +170,7 @@ export default function AdminPaymentPage() {
   const [midtransLoading, setMidtransLoading] = useState(false);
   const [midtransError, setMidtransError] = useState<string | null>(null);
   const [midtransResult, setMidtransResult] = useState<CheckoutPaymentSessionResponse | null>(null);
+  const [manualOrderSuccess, setManualOrderSuccess] = useState<string | null>(null);
 
   const { data: modalUsers = [], isLoading: loadingModalUsers } = useAdminUsersForPaymentModal(createOpen);
   const { data: modalCourses = [], isLoading: loadingModalCourses } = useAdminCoursesForPaymentModal(createOpen);
@@ -283,7 +284,13 @@ export default function AdminPaymentPage() {
         });
       }
       setMidtransCheckoutId(orderId);
+      setManualOrderSuccess(
+        verifyImmediately
+          ? `Order ${orderId.slice(0, 8)}… berhasil dibuat dan diverifikasi. Siswa seharusnya sudah terdaftar di kelas.`
+          : `Order ${orderId.slice(0, 8)}… berhasil dibuat (menunggu verifikasi). ID order juga terisi di form Midtrans di bawah.`
+      );
       setCreateOpen(false);
+      await refetch();
     } catch (err) {
       setCreateFormError(getFriendlyApiErrorMessage(err));
     }
@@ -372,6 +379,19 @@ export default function AdminPaymentPage() {
 
   return (
     <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
+      {manualOrderSuccess && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+          <span>{manualOrderSuccess}</span>
+          <button
+            type="button"
+            onClick={() => setManualOrderSuccess(null)}
+            className="text-xs font-medium text-emerald-800 underline"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       <div className="mb-6 md:mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Manage</p>
         <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">Payment &amp; konfirmasi</h1>
@@ -847,10 +867,10 @@ export default function AdminPaymentPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={updateMutation.isPending}
+                  disabled={updateMutation.isPending || patchOrderMetaMutation.isPending}
                   className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
-                  {updateMutation.isPending ? "Menyimpan…" : "Simpan"}
+                  {updateMutation.isPending || patchOrderMetaMutation.isPending ? "Menyimpan…" : "Simpan"}
                 </button>
               </div>
             </form>

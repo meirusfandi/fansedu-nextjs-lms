@@ -7,8 +7,6 @@ import { login as authLogin } from "@/services/auth";
 import { useAuthStore } from "@/store/auth";
 import { getDashboardPathForRole } from "@/hooks/useRedirectByRole";
 
-const REMEMBER_EMAIL_KEY = "fansedu_login_remember_email";
-
 type LoginFormState = { email: string; password: string };
 
 function EyeIcon({ visible }: { visible: boolean }) {
@@ -43,15 +41,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const saved = localStorage.getItem(REMEMBER_EMAIL_KEY);
-    if (saved) {
-      setForm((f) => ({ ...f, email: saved }));
-      setRememberMe(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
     if (p.get("session") === "expired") setSessionExpired(true);
     if (p.get("reason") === "unsupported") {
@@ -71,11 +60,6 @@ export default function LoginPage() {
         { email: form.email, password: form.password },
         rememberMe
       );
-      if (rememberMe && form.email) {
-        localStorage.setItem(REMEMBER_EMAIL_KEY, form.email);
-      } else {
-        localStorage.removeItem(REMEMBER_EMAIL_KEY);
-      }
       const role = useAuthStore.getState().role;
       const byRole = getDashboardPathForRole(role) ?? "/trainer/dashboard";
       const dest = returnPath ?? byRole;
@@ -165,7 +149,7 @@ export default function LoginPage() {
           </div>
           <label className="flex cursor-pointer items-center gap-2">
             <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
-            <span className="text-sm text-zinc-700">Ingat saya</span>
+            <span className="text-sm text-zinc-700">Sesi login lebih lama (cookie, bukan simpan email)</span>
           </label>
           <button
             type="submit"

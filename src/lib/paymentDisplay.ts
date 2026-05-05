@@ -32,5 +32,11 @@ export function paymentStatusLabel(status: string | undefined): string {
 
 export function isPendingStatus(status: string | undefined): boolean {
   const s = (status ?? "").toLowerCase();
-  return s === "pending" || s === "awaiting_verification" || s === "submitted";
+  return (
+    s === "pending" ||
+    s === "awaiting_verification" ||
+    s === "waiting_verification" ||
+    s === "submitted" ||
+    s === "processing"
+  );
 }

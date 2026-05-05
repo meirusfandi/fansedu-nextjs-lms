@@ -6,9 +6,8 @@ import Link from "next/link";
 import { getAuthUserName, changePassword, getTrainerProfile, updateTrainerProfile, adminListSekolah, createTrainerSchool } from "@/lib/api";
 import type { Sekolah } from "@/lib/api-types";
 import {
-  getGuruNotificationPreferences,
-  setGuruNotificationPreferences,
-  resetGuruNotificationPreferences,
+  DEFAULT_GURU_NOTIFICATION_PREFERENCES,
+  notificationPrefsFromProfile,
   type GuruNotificationPreferences,
 } from "@/lib/notification-preferences";
 
@@ -50,22 +49,19 @@ export default function GuruPengaturanPage() {
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
-  const [notifPrefs, setNotifPrefs] = useState<GuruNotificationPreferences>({
-    emailPembayaran: true,
-    emailPengingat: true,
-    notifAktivitasSiswa: false,
-  });
+  const [notifPrefs, setNotifPrefs] = useState<GuruNotificationPreferences>(
+    DEFAULT_GURU_NOTIFICATION_PREFERENCES
+  );
   const [notifSavedMessage, setNotifSavedMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    setNotifPrefs(getGuruNotificationPreferences());
-  }, []);
+  const [notifError, setNotifError] = useState<string | null>(null);
+  const [notifSaving, setNotifSaving] = useState(false);
 
   useEffect(() => {
     getTrainerProfile()
       .then((p) => {
         if (p?.name) setProfileName(p.name);
         else setProfileName(getAuthUserName() ?? "");
+        setNotifPrefs(notificationPrefsFromProfile(p));
         if (p?.school) {
           setSchoolInfo({
             id: p.school.id,
@@ -82,6 +78,7 @@ export default function GuruPengaturanPage() {
       .catch(() => {
         setProfileName(getAuthUserName() ?? "");
         setSchoolInfo(null);
+        setNotifPrefs(DEFAULT_GURU_NOTIFICATION_PREFERENCES);
       })
       .finally(() => setProfileFetched(true));
   }, []);
@@ -100,16 +97,42 @@ export default function GuruPengaturanPage() {
     return () => clearTimeout(t);
   }, [notifSavedMessage]);
 
-  const updateNotif = (update: Partial<GuruNotificationPreferences>) => {
-    setGuruNotificationPreferences(update);
-    setNotifPrefs((p) => ({ ...p, ...update }));
-    setNotifSavedMessage("Preferensi disimpan");
+  const updateNotif = async (update: Partial<GuruNotificationPreferences>) => {
+    const next: GuruNotificationPreferences = { ...notifPrefs, ...update };
+    setNotifSaving(true);
+    setNotifError(null);
+    try {
+      await updateTrainerProfile({
+        emailPembayaran: next.emailPembayaran,
+        emailPengingat: next.emailPengingat,
+        notifAktivitasSiswa: next.notifAktivitasSiswa,
+      });
+      setNotifPrefs(next);
+      setNotifSavedMessage("Preferensi disimpan di server");
+    } catch (err) {
+      setNotifError((err as Error).message || "Gagal menyimpan preferensi.");
+    } finally {
+      setNotifSaving(false);
+    }
   };
 
-  const handleResetNotif = () => {
-    resetGuruNotificationPreferences();
-    setNotifPrefs(getGuruNotificationPreferences());
-    setNotifSavedMessage("Preferensi direset ke default");
+  const handleResetNotif = async () => {
+    const d = DEFAULT_GURU_NOTIFICATION_PREFERENCES;
+    setNotifSaving(true);
+    setNotifError(null);
+    try {
+      await updateTrainerProfile({
+        emailPembayaran: d.emailPembayaran,
+        emailPengingat: d.emailPengingat,
+        notifAktivitasSiswa: d.notifAktivitasSiswa,
+      });
+      setNotifPrefs(d);
+      setNotifSavedMessage("Preferensi direset ke default di server");
+    } catch (err) {
+      setNotifError((err as Error).message || "Gagal mereset preferensi.");
+    } finally {
+      setNotifSaving(false);
+    }
   };
 
   const handleSubmitProfile = async (e: FormEvent) => {
@@ -136,6 +159,7 @@ export default function GuruPengaturanPage() {
     getTrainerProfile()
       .then((p) => {
         if (p?.name) setProfileName(p.name);
+        setNotifPrefs(notificationPrefsFromProfile(p));
         if (p?.school) {
           setSchoolInfo({
             id: p.school.id,
@@ -538,9 +562,15 @@ export default function GuruPengaturanPage() {
         {/* Notifikasi */}
         <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-zinc-800">Notifikasi</h2>
-          <p className="mt-1 text-xs text-zinc-500">Atur preferensi notifikasi. Pengaturan disimpan di perangkat ini.</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Preferensi disimpan ke akun Anda di server (PUT /trainer/profile). Jika backend belum mendukung
+            field ini, toggle dapat gagal — hubungi administrator.
+          </p>
           {notifSavedMessage && (
             <p className="mt-2 text-xs font-medium text-emerald-600" role="status">{notifSavedMessage}</p>
+          )}
+          {notifError && (
+            <p className="mt-2 text-xs font-medium text-red-600" role="alert">{notifError}</p>
           )}
           <ul className="mt-4 space-y-3">
             <li className="flex items-center justify-between gap-4 rounded-lg border border-zinc-100 bg-zinc-50/50 px-4 py-3">
@@ -552,8 +582,9 @@ export default function GuruPengaturanPage() {
                 type="button"
                 role="switch"
                 aria-checked={notifPrefs.emailPembayaran}
-                onClick={() => updateNotif({ emailPembayaran: !notifPrefs.emailPembayaran })}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${
+                disabled={notifSaving}
+                onClick={() => void updateNotif({ emailPembayaran: !notifPrefs.emailPembayaran })}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                   notifPrefs.emailPembayaran ? "bg-sky-600" : "bg-zinc-200"
                 }`}
               >
@@ -574,8 +605,9 @@ export default function GuruPengaturanPage() {
                 type="button"
                 role="switch"
                 aria-checked={notifPrefs.emailPengingat}
-                onClick={() => updateNotif({ emailPengingat: !notifPrefs.emailPengingat })}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${
+                disabled={notifSaving}
+                onClick={() => void updateNotif({ emailPengingat: !notifPrefs.emailPengingat })}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                   notifPrefs.emailPengingat ? "bg-sky-600" : "bg-zinc-200"
                 }`}
               >
@@ -596,8 +628,9 @@ export default function GuruPengaturanPage() {
                 type="button"
                 role="switch"
                 aria-checked={notifPrefs.notifAktivitasSiswa}
-                onClick={() => updateNotif({ notifAktivitasSiswa: !notifPrefs.notifAktivitasSiswa })}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 ${
+                disabled={notifSaving}
+                onClick={() => void updateNotif({ notifAktivitasSiswa: !notifPrefs.notifAktivitasSiswa })}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                   notifPrefs.notifAktivitasSiswa ? "bg-sky-600" : "bg-zinc-200"
                 }`}
               >
@@ -612,8 +645,9 @@ export default function GuruPengaturanPage() {
           </ul>
           <button
             type="button"
-            onClick={handleResetNotif}
-            className="mt-3 text-xs font-medium text-zinc-500 hover:text-zinc-700 underline-offset-2 hover:underline"
+            disabled={notifSaving}
+            onClick={() => void handleResetNotif()}
+            className="mt-3 text-xs font-medium text-zinc-500 hover:text-zinc-700 underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
           >
             Reset ke default
           </button>
