@@ -12,7 +12,7 @@ import {
   type AttachmentType,
   type ClassAttachment,
   type ContentType,
-} from "@/features/admin/local-kelas-storage";
+} from "@/features/admin/kelas-admin-ui";
 import {
   adminAddCourseContent,
   adminDeleteCourseContent,

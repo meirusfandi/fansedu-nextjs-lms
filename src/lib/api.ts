@@ -2419,7 +2419,9 @@ export async function adminGetAllQuestionStats(
 export async function adminCreateCourse(
   body: AdminCreateCourseRequest
 ): Promise<Course> {
-  return request("/admin/courses", { method: "POST", body });
+  const raw = await request<unknown>("/admin/courses", { method: "POST", body });
+  const obj = unwrapApiData<Record<string, unknown>>(raw) ?? (raw as Record<string, unknown>);
+  return normalizeAdminCourseItem(obj);
 }
 
 function normalizeAdminCourseItem(item: unknown): Course {
@@ -2998,11 +3000,13 @@ export async function adminUpdateCourse(
   courseId: string,
   body: Partial<AdminCreateCourseRequest>
 ): Promise<Record<string, never>> {
-  return request(`/admin/courses/${courseId}`, { method: "PUT", body });
+  const id = encodeURIComponent(courseId.trim());
+  return request(`/admin/courses/${id}`, { method: "PUT", body });
 }
 
 export async function adminDeleteCourse(courseId: string): Promise<void> {
-  return request(`/admin/courses/${courseId}`, { method: "DELETE" });
+  const id = encodeURIComponent(courseId.trim());
+  return request(`/admin/courses/${id}`, { method: "DELETE" });
 }
 
 // --- Course Contents CRUD ---
@@ -3129,10 +3133,12 @@ function ensureEightMeetings(meetings: CourseMeeting[]): CourseMeeting[] {
   });
 }
 
-/** Satu course. GET /admin/courses/:courseId */
+/** Satu course. GET /admin/courses/:courseId — dinormalisasi seperti daftar (status, subjectId, …). */
 export async function adminGetCourse(courseId: string): Promise<Course> {
-  const cid = encodeURIComponent(courseId);
-  return request<Course>(`/admin/courses/${cid}`, { method: "GET" });
+  const cid = encodeURIComponent(courseId.trim());
+  const raw = await request<unknown>(`/admin/courses/${cid}`, { method: "GET" });
+  const obj = unwrapApiData<Record<string, unknown>>(raw) ?? (raw as Record<string, unknown>);
+  return normalizeAdminCourseItem(obj);
 }
 
 /** Ringkasan kelola course + relatedEndpoints (getProgram, putProgram, dll.). */

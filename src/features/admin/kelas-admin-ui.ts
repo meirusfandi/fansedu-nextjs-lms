@@ -1,11 +1,37 @@
-/** Model UI untuk konten kelas admin (tanpa penyimpanan browser — data konten dari API). */
+/** Tipe & helper UI admin kelas + konten. Data hanya dari API; tidak ada penyimpanan browser. */
 
 /**
- * Status kelas.
- * Nilai backend: draft | publish | active
- * Nilai lama (backward-compat): published | archived
+ * Status kelas (tampilan & label).
+ * API sering memakai `published`; form memakai `publish` agar singkat.
  */
 export type ClassStatus = "draft" | "publish" | "active" | "published" | "archived";
+
+/** Nilai yang dipakai di <select> modal edit/tambah kelas. */
+export type CourseFormStatus = "draft" | "publish" | "active" | "archived";
+
+/**
+ * Map status dari API / GET course ke nilai form (select).
+ * Menghindari select "kosong" saat API mengembalikan `published`.
+ */
+export function courseStatusFromApi(status: string | null | undefined): CourseFormStatus {
+  const s = String(status ?? "draft").toLowerCase().trim();
+  if (s === "published" || s === "publish") return "publish";
+  if (s === "active") return "active";
+  if (s === "archived") return "archived";
+  return "draft";
+}
+
+/**
+ * Map status form ke nilai yang dikirim ke POST/PUT `/admin/courses`
+ * (backend Go biasanya mengharapkan `published`, bukan `publish`).
+ */
+export function courseStatusToApi(status: string): string {
+  const s = String(status ?? "draft").toLowerCase().trim();
+  if (s === "publish") return "published";
+  if (s === "active") return "active";
+  if (s === "archived") return "archived";
+  return "draft";
+}
 
 /**
  * Tipe konten dalam UI formulir konten kelas.
@@ -110,7 +136,16 @@ export function attachmentTypeLabel(type: AttachmentType | AssetType | string): 
   }
 }
 
-export const emptyClassForm = {
+export const emptyClassForm: {
+  title: string;
+  description: string;
+  levelId: string;
+  subjectId: string;
+  trainerId: string;
+  startDate: string;
+  endDate: string;
+  status: CourseFormStatus;
+} = {
   title: "",
   description: "",
   levelId: "",
@@ -118,7 +153,7 @@ export const emptyClassForm = {
   trainerId: "",
   startDate: "",
   endDate: "",
-  status: "draft" as ClassStatus,
+  status: "draft",
 };
 
 /** Status badge color untuk tampilan list kelas. */

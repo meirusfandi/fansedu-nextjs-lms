@@ -9,7 +9,8 @@ import {
   adminUpdateCourse,
   getFriendlyApiErrorMessage,
 } from "@/lib/api";
-import type { AdminCreateCourseRequest, Course, CoursePublicationStatus } from "@/lib/api-types";
+import { courseStatusToApi, type CourseFormStatus } from "@/features/admin/kelas-admin-ui";
+import type { AdminCreateCourseRequest, Course } from "@/lib/api-types";
 
 // ---------------------------------------------------------------------------
 // Input type untuk create/update (hanya field yang didukung API)
@@ -19,7 +20,7 @@ export type AddCourseInput = {
   title: string;
   description: string;
   subjectId: string;
-  status: CoursePublicationStatus | string;
+  status: CourseFormStatus | string;
 };
 
 export type UseAdminLocalClassesOptions = {
@@ -81,63 +82,50 @@ export function useAdminLocalClasses(options?: UseAdminLocalClassesOptions) {
         title: input.title.trim(),
         description: input.description.trim() || null,
         subjectId: input.subjectId || null,
-        status: input.status,
+        status: courseStatusToApi(String(input.status)),
       };
       const rawCreated = await adminCreateCourse(body);
       const createdId = String(rawCreated.id ?? "");
       if (!createdId) throw new Error("Server tidak mengembalikan ID kelas baru.");
-      setClassesState((prev) => {
-        const exists = prev.some((c) => c.id === createdId);
-        if (exists) {
-          return prev.map((c) => (c.id === createdId ? rawCreated : c));
-        }
-        return [rawCreated, ...prev];
-      });
+      await loadAll();
       return rawCreated;
     } finally {
       setSaving(false);
     }
-  }, []);
+  }, [loadAll]);
 
-  const updateCourse = useCallback(async (courseId: string, input: AddCourseInput): Promise<void> => {
-    setSaving(true);
-    setApiError(null);
-    try {
-      await adminUpdateCourse(courseId, {
-        title: input.title.trim(),
-        description: input.description.trim() || null,
-        subjectId: input.subjectId || null,
-        status: input.status,
-      });
+  const updateCourse = useCallback(
+    async (courseId: string, input: AddCourseInput): Promise<void> => {
+      setSaving(true);
+      setApiError(null);
+      try {
+        await adminUpdateCourse(courseId, {
+          title: input.title.trim(),
+          description: input.description.trim() || null,
+          subjectId: input.subjectId || null,
+          status: courseStatusToApi(String(input.status)),
+        });
+        await loadAll();
+      } finally {
+        setSaving(false);
+      }
+    },
+    [loadAll]
+  );
 
-      setClassesState((prev) =>
-        prev.map((c) =>
-          c.id === courseId
-            ? {
-                ...c,
-                title: input.title.trim(),
-                description: input.description.trim() || null,
-                subjectId: input.subjectId || null,
-                status: input.status,
-              }
-            : c
-        )
-      );
-    } finally {
-      setSaving(false);
-    }
-  }, []);
-
-  const deleteCourse = useCallback(async (courseId: string): Promise<void> => {
-    setSaving(true);
-    setApiError(null);
-    try {
-      await adminDeleteCourse(courseId);
-      setClassesState((prev) => prev.filter((c) => c.id !== courseId));
-    } finally {
-      setSaving(false);
-    }
-  }, []);
+  const deleteCourse = useCallback(
+    async (courseId: string): Promise<void> => {
+      setSaving(true);
+      setApiError(null);
+      try {
+        await adminDeleteCourse(courseId);
+        await loadAll();
+      } finally {
+        setSaving(false);
+      }
+    },
+    [loadAll]
+  );
 
   return {
     classes,

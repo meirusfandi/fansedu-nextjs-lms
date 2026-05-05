@@ -4,11 +4,12 @@ import { FlashNoticeBar, useFlashNotice } from "@/components/FlashNotice";
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { OSN_PREP_CURRICULUM_MODULES } from "@/data/osn-class-curriculum";
 import {
+  courseStatusFromApi,
   emptyClassForm,
   statusLabel,
   statusBadgeClass,
-  type ClassStatus,
-} from "@/features/admin/local-kelas-storage";
+  type CourseFormStatus,
+} from "@/features/admin/kelas-admin-ui";
 import { useAdminLocalClasses, type AddCourseInput } from "@/features/admin/useAdminLocalClasses";
 import {
   adminAddCourseContent,
@@ -136,7 +137,7 @@ export default function AdminKelasListPage() {
       trainerId: "",
       startDate: "",
       endDate: "",
-      status: (String(c.status ?? "draft") as ClassStatus) || "draft",
+      status: courseStatusFromApi(c.status),
     });
     setEditingClassId(c.id);
     setClassModalMode("edit");
@@ -493,13 +494,14 @@ export default function AdminKelasListPage() {
                 <select
                   value={classForm.status}
                   onChange={(e) =>
-                    setClassForm((f) => ({ ...f, status: e.target.value as ClassStatus }))
+                    setClassForm((f) => ({ ...f, status: e.target.value as CourseFormStatus }))
                   }
                   className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                 >
                   <option value="draft">Draft</option>
                   <option value="publish">Published</option>
                   <option value="active">Aktif</option>
+                  <option value="archived">Diarsipkan</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2 pt-3">

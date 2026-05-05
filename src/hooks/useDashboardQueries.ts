@@ -22,6 +22,7 @@ import {
   listPayments,
   createPayment,
   adminListPayments,
+  adminGetPayment,
   adminConfirmPayment,
   adminRejectPayment,
   adminCreatePayment,
