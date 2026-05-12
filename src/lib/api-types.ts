@@ -327,19 +327,42 @@ export interface AttemptReviewItem {
   manualScore?: number | null;
   /** Skor otomatis sebelum override (jika dikembalikan API). */
   autoScore?: number | null;
+  /** Bobot maksimum soal (nilai manual tidak boleh melebihi ini — server memotong). */
+  maxScore?: number | null;
+  /** PG: pilihan siswa & kunci (jika API mengirim). */
+  selectedOption?: string | null;
+  correctOption?: string | null;
 }
 
+/** Response GET/POST …/attempts/:id/review — daftar soal + metadata attempt (opsional). */
 export interface AttemptReviewResponse {
+  attemptId?: string;
+  tryoutId?: string;
+  status?: string | null;
+  submittedAt?: string | null;
+  score?: number | null;
+  maxScore?: number | null;
+  percentile?: number | null;
+  student?: {
+    userId?: string;
+    name?: string;
+    email?: string;
+    [key: string]: unknown;
+  } | null;
   items?: AttemptReviewItem[];
   questions?: AttemptReviewItem[];
+  [key: string]: unknown;
 }
 
-/** Response PUT review per jawaban: score = total attempt setelah recalc. */
+/** Response PUT …/answers/:questionId/review */
 export interface AttemptAnswerReviewSaveResponse {
+  ok?: boolean;
+  attemptId?: string;
+  questionId?: string;
   score?: number | null;
   manualScore?: number | null;
   questionMaxScore?: number | null;
-  manualScoreClamped?: number | null;
+  manualScoreClamped?: boolean | null;
   reviewerComment?: string | null;
   [key: string]: unknown;
 }
@@ -374,6 +397,10 @@ export interface Certificate {
 export interface LeaderboardEntry {
   rank?: number;
   userId?: string;
+  /** Alias userId dari beberapa backend. */
+  studentId?: string;
+  /** Jika ada, dipakai untuk buka review tanpa mengandalkan join ke /students. */
+  attemptId?: string;
   userName?: string;
   name?: string;
   nama?: string;

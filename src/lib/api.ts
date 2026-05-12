@@ -1101,6 +1101,29 @@ export async function listAllTryouts(): Promise<TryoutSession[]> {
   }
 }
 
+/**
+ * Leaderboard tryout untuk admin (Bearer). Fallback ke GET publik `/tryouts/:id/leaderboard`
+ * jika endpoint admin belum ada — agar userId/attemptId selaras dengan data peserta.
+ */
+export async function adminGetTryoutLeaderboard(tryoutId: string): Promise<LeaderboardEntry[]> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  try {
+    const raw = await request<LeaderboardEntry[] | { leaderboard?: LeaderboardEntry[]; data?: LeaderboardEntry[] }>(
+      `/admin/tryouts/${tid}/leaderboard`,
+      { method: "GET" }
+    );
+    const list = Array.isArray(raw)
+      ? raw
+      : (raw as { leaderboard?: LeaderboardEntry[] })?.leaderboard ??
+        (raw as { data?: LeaderboardEntry[] })?.data ??
+        [];
+    return normalizeLeaderboard(list as unknown[]);
+  } catch (e) {
+    if (isNotFoundOrMethodNotAllowed(e)) return getTryoutLeaderboard(tryoutId);
+    throw e;
+  }
+}
+
 export async function getTryout(tryoutId: string): Promise<TryoutSession> {
   const raw = await request<unknown>(`/tryouts/${tryoutId}`, { method: "GET", auth: false });
   return normalizeToTryoutSession(raw);
@@ -1210,11 +1233,50 @@ function normalizeLeaderboard(list: unknown[]): LeaderboardEntry[] {
     const scoreVal = pickLeaderboardScore(o);
     const bestNum =
       o.bestScore != null && Number.isFinite(Number(o.bestScore)) ? Number(o.bestScore) : scoreVal;
+    const nestedUser =
+      o.user && typeof o.user === "object" && !Array.isArray(o.user)
+        ? (o.user as Record<string, unknown>)
+        : null;
+    const userIdResolved = (() => {
+      const pick = (v: unknown) => {
+        if (v == null) return undefined;
+        const s = String(v).trim();
+        return s === "" ? undefined : s;
+      };
+      return (
+        pick(o.userId) ??
+        pick(o.studentId) ??
+        pick(o.studentUserId) ??
+        pick(o.user_id) ??
+        pick(nestedUser?.id) ??
+        pick(nestedUser?.userId)
+      );
+    })();
+    const attemptIdResolved = (() => {
+      const pick = (v: unknown) => {
+        if (v == null) return undefined;
+        const s = String(v).trim();
+        return s === "" ? undefined : s;
+      };
+      const nestedAttempt =
+        o.attempt && typeof o.attempt === "object" && !Array.isArray(o.attempt)
+          ? (o.attempt as Record<string, unknown>)
+          : null;
+      return (
+        pick(o.attemptId) ??
+        pick(o.latestAttemptId) ??
+        pick(o.lastAttemptId) ??
+        pick(nestedAttempt?.id) ??
+        pick(nestedAttempt?.attemptId)
+      );
+    })();
     /** Spread dulu baru field dinormalisasi agar `...o` tidak menimpa score dengan 0 dari API. */
     return {
       ...o,
       rank: Number(o.rank ?? o.urutan ?? index + 1),
-      userId: o.userId != null ? String(o.userId) : undefined,
+      userId: userIdResolved,
+      studentId: o.studentId != null ? String(o.studentId) : userIdResolved,
+      attemptId: attemptIdResolved,
       userName:
         o.userName != null ? String(o.userName) : o.name != null ? String(o.name) : o.nama != null ? String(o.nama) : undefined,
       name: o.name != null ? String(o.name) : o.nama != null ? String(o.nama) : undefined,
@@ -1924,18 +1986,48 @@ function pickOptionalNumber(raw: Record<string, unknown>, camel: string): number
 function normalizeAttemptReviewItem(item: unknown): AttemptReviewItem | null {
   if (!item || typeof item !== "object") return null;
   const r = item as Record<string, unknown>;
-  const qid = r.questionId;
-  if (qid == null || String(qid) === "") return null;
-  const manualScore = pickManualScoreField(r);
+  const nestedQ =
+    r.question && typeof r.question === "object" && !Array.isArray(r.question)
+      ? (r.question as Record<string, unknown>)
+      : null;
+  const qidRaw = r.questionId ?? nestedQ?.id;
+  if (qidRaw == null || String(qidRaw).trim() === "") return null;
   const reviewerRaw = r.reviewerComment;
   const userAns = pickUserAnswerFromReviewRow(r);
   const correctAns = pickCorrectAnswerFromReviewRow(r);
   const isCorrectRaw = r.isCorrect;
   const sortRaw = r.sortOrder;
   const img = r.imageUrl;
+  const autoScore =
+    pickOptionalNumber(r, "autoScore") ?? pickOptionalNumber(r, "scoreGot");
+  const maxScoreRaw =
+    pickOptionalNumber(r, "maxScore") ??
+    pickOptionalNumber(r, "questionMaxScore") ??
+    (nestedQ != null ? pickOptionalNumber(nestedQ, "maxScore") : undefined);
+  const maxScore =
+    maxScoreRaw !== undefined && Number.isFinite(maxScoreRaw) && maxScoreRaw > 0 ? maxScoreRaw : undefined;
+
+  const selectedOptRaw = r.selectedOption != null ? String(r.selectedOption).trim() : "";
+  const correctOptRaw = r.correctOption != null ? String(r.correctOption).trim() : "";
+  const selectedOption = selectedOptRaw !== "" ? selectedOptRaw : null;
+  const correctOption = correctOptRaw !== "" ? correctOptRaw : null;
+  const optionsMatchMcq =
+    selectedOption != null &&
+    correctOption != null &&
+    selectedOption.toUpperCase() === correctOption.toUpperCase();
+  const fullCreditFromMatching =
+    optionsMatchMcq ||
+    isCorrectRaw === true ||
+    (typeof r.autoIsCorrect === "boolean" && r.autoIsCorrect === true);
+
+  let manualScore = pickManualScoreField(r);
+  if (fullCreditFromMatching && manualScore == null && autoScore != null && Number.isFinite(autoScore)) {
+    manualScore = autoScore;
+  }
+
   return {
-    questionId: String(qid),
-    body: String(r.body ?? r.questionBody ?? ""),
+    questionId: String(qidRaw).trim(),
+    body: String(r.body ?? r.questionBody ?? nestedQ?.body ?? ""),
     type: r.type != null ? String(r.type) : undefined,
     options: Array.isArray(r.options)
       ? (r.options as unknown[]).map((x, i) =>
@@ -1951,7 +2043,10 @@ function normalizeAttemptReviewItem(item: unknown): AttemptReviewItem | null {
     imageUrl: img != null ? String(img) : null,
     reviewerComment: reviewerRaw != null ? String(reviewerRaw) : null,
     manualScore,
-    autoScore: pickOptionalNumber(r, "autoScore"),
+    autoScore,
+    maxScore: maxScore ?? null,
+    selectedOption,
+    correctOption,
   };
 }
 
@@ -1959,12 +2054,38 @@ function normalizeAttemptReviewList(items: unknown[]): AttemptReviewItem[] {
   return items.map(normalizeAttemptReviewItem).filter((x): x is AttemptReviewItem => x != null);
 }
 
+function parseAttemptReviewResponseBody(raw: unknown): AttemptReviewItem[] {
+  if (Array.isArray(raw)) return normalizeAttemptReviewList(raw);
+  if (raw && typeof raw === "object") {
+    const o = raw as AttemptReviewResponse;
+    const arr = o.items ?? o.questions ?? [];
+    return Array.isArray(arr) ? normalizeAttemptReviewList(arr) : [];
+  }
+  return [];
+}
+
 async function fetchTryoutAttemptReview(path: string, attemptIdFallback?: string): Promise<AttemptReviewItem[]> {
   try {
     const raw = await request<AttemptReviewResponse | AttemptReviewItem[]>(path, { method: "GET" });
-    const arr = Array.isArray(raw) ? raw : (raw.items ?? raw.questions ?? []);
-    return Array.isArray(arr) ? normalizeAttemptReviewList(arr) : [];
+    return parseAttemptReviewResponseBody(raw);
   } catch (e) {
+    const status = (e as Error & { status?: number }).status;
+    /** Backend baru: POST `{}` sama dengan GET untuk memuat review. */
+    if (status === 405) {
+      try {
+        const raw = await request<AttemptReviewResponse | AttemptReviewItem[]>(path, {
+          method: "POST",
+          body: {},
+        });
+        return parseAttemptReviewResponseBody(raw);
+      } catch (e2) {
+        if (isNotFoundOrMethodNotAllowed(e2) && attemptIdFallback) {
+          return getAttemptReview(attemptIdFallback);
+        }
+        if (isNotFoundOrMethodNotAllowed(e2)) return [];
+        throw e2;
+      }
+    }
     if (isNotFoundOrMethodNotAllowed(e) && attemptIdFallback) {
       return getAttemptReview(attemptIdFallback);
     }
@@ -1973,7 +2094,7 @@ async function fetchTryoutAttemptReview(path: string, attemptIdFallback?: string
   }
 }
 
-/** Kisi review satu attempt (semua soal + jawaban siswa). GET .../attempts/:attemptId/review */
+/** Kisi review satu attempt (semua soal + jawaban siswa). GET …/review; jika 405, POST `{}` (kontrak BE terbaru). */
 export async function adminGetTryoutAttemptReview(
   tryoutId: string,
   attemptId: string
@@ -1981,6 +2102,23 @@ export async function adminGetTryoutAttemptReview(
   const tid = encodeURIComponent(String(tryoutId).trim());
   const aid = encodeURIComponent(String(attemptId).trim());
   return fetchTryoutAttemptReview(`/admin/tryouts/${tid}/attempts/${aid}/review`, attemptId);
+}
+
+/**
+ * Muat review attempt dengan POST `{}` — setara GET di backend terbaru.
+ * Berguna jika proxy/middleware hanya mengizinkan POST.
+ */
+export async function adminPostTryoutAttemptReview(
+  tryoutId: string,
+  attemptId: string
+): Promise<AttemptReviewItem[]> {
+  const tid = encodeURIComponent(String(tryoutId).trim());
+  const aid = encodeURIComponent(String(attemptId).trim());
+  const raw = await request<AttemptReviewResponse | AttemptReviewItem[]>(
+    `/admin/tryouts/${tid}/attempts/${aid}/review`,
+    { method: "POST", body: {} }
+  );
+  return parseAttemptReviewResponseBody(raw);
 }
 
 /** Sama untuk trainer (tryout harus sesuai subjectId user). */
@@ -2053,7 +2191,8 @@ export async function trainerPutTryoutAttemptAnswerReview(
   }
 }
 
-/** Simpan review banyak soal sekaligus (1x request). PUT .../attempts/:attemptId/review */
+/** Simpan review banyak soal sekaligus. PUT …/attempts/:attemptId/review + body `{ answers }`.
+ * Jika backend mengembalikan 405/501, UI (`TryoutAttemptReviewModal`) fallback ke PUT per `questionId`. */
 export async function adminPutTryoutAttemptReviewBatch(
   tryoutId: string,
   attemptId: string,
@@ -3070,17 +3209,42 @@ export async function adminDeleteCourseContent(
   await request(`/admin/courses/${cid}/contents/${kid}`, { method: "DELETE" });
 }
 
+function normalizeCourseMaterialUploadResponse(
+  raw: unknown
+): AdminUploadCourseMaterialResponse {
+  if (!raw || typeof raw !== "object") return { url: "" };
+  const r = raw as Record<string, unknown>;
+  const inner =
+    r.data && typeof r.data === "object" && !Array.isArray(r.data)
+      ? (r.data as Record<string, unknown>)
+      : r;
+  const urlCandidate =
+    typeof inner.url === "string"
+      ? inner.url.trim()
+      : typeof inner.fileUrl === "string"
+        ? inner.fileUrl.trim()
+        : typeof inner.path === "string"
+          ? inner.path.trim()
+          : "";
+  const filename =
+    typeof inner.filename === "string"
+      ? inner.filename
+      : typeof inner.originalName === "string"
+        ? inner.originalName
+        : typeof inner.name === "string"
+          ? inner.name
+          : null;
+  return { url: urlCandidate, filename };
+}
+
 /** Upload file materi (PDF/DOCX/PPTX). POST /admin/upload/course-material */
 export async function adminUploadCourseMaterial(
   file: File
 ): Promise<AdminUploadCourseMaterialResponse> {
   const formData = new FormData();
   formData.append("file", file);
-  const raw = await request<unknown>("/admin/upload/course-material", {
-    method: "POST",
-    body: formData as unknown as Record<string, unknown>,
-  });
-  return raw as AdminUploadCourseMaterialResponse;
+  const raw = await requestFormData<unknown>("/admin/upload/course-material", formData);
+  return normalizeCourseMaterialUploadResponse(raw);
 }
 
 function unwrapApiData<T extends Record<string, unknown>>(raw: unknown): T | null {  if (!raw || typeof raw !== "object") return null;

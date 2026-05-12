@@ -10,7 +10,8 @@ import type {
   TryoutAnswerReviewBatchBody,
   TryoutAttemptAutoGradeBody,
 } from "@/lib/api";
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export type TryoutReviewApiClient = {
   getAttemptReview: (tryoutId: string, attemptId: string) => Promise<AttemptReviewItem[]>;
@@ -59,6 +60,20 @@ export function buildTryoutAnswerReviewBody(
   return body;
 }
 
+/** PG / jawaban cocok kunci: skor manual disamakan dengan autoScore (bobot penuh). */
+function isAutoFullCreditItem(item: AttemptReviewItem): boolean {
+  const sel = (item.selectedOption ?? "").trim();
+  const cor = (item.correctOption ?? "").trim();
+  if (sel !== "" && cor !== "" && sel.toUpperCase() === cor.toUpperCase()) return true;
+  if (item.isCorrect === true) return true;
+  const t = String(item.type ?? "").toLowerCase();
+  const looksMc =
+    t === "multiple_choice" || t.includes("multiple") || t.includes("choice");
+  const ua = (item.userAnswer ?? "").trim();
+  const ca = (item.correctAnswer ?? "").trim();
+  return looksMc && ua !== "" && ca !== "" && ua.toUpperCase() === ca.toUpperCase();
+}
+
 function rowsFromItems(items: AttemptReviewItem[]): Record<string, RowEdit> {
   const out: Record<string, RowEdit> = {};
   items.forEach((item) => {
@@ -83,6 +98,8 @@ type Props = {
   onSaved?: () => void | Promise<void>;
   /** False untuk tryout `gradingMode: manual` — tombol auto-grade disembunyikan. */
   allowAutoGrade?: boolean;
+  /** Link ke halaman ubah bobot soal (mis. admin). Jika tidak diisi, teks bantuan tanpa tautan. */
+  weightsEditorHref?: string;
 };
 
 export function TryoutAttemptReviewModal({
@@ -92,6 +109,7 @@ export function TryoutAttemptReviewModal({
   onClose,
   onSaved,
   allowAutoGrade = true,
+  weightsEditorHref,
 }: Props) {
   const [reviewItems, setReviewItems] = useState<AttemptReviewItem[]>([]);
   const [rowEdits, setRowEdits] = useState<Record<string, RowEdit>>({});
@@ -107,6 +125,13 @@ export function TryoutAttemptReviewModal({
     const s = String(raw).trim();
     return s === "" ? null : s;
   })();
+
+  const totalQuestionWeight = useMemo(() => {
+    return reviewItems.reduce((acc, it) => {
+      const m = it.maxScore;
+      return acc + (typeof m === "number" && Number.isFinite(m) && m > 0 ? m : 0);
+    }, 0);
+  }, [reviewItems]);
 
   useEffect(() => {
     if (!actionNotice) return;
@@ -143,7 +168,7 @@ export function TryoutAttemptReviewModal({
     setReviewSaving(true);
     setReviewError(null);
     try {
-      const answers = reviewItems
+      const answersFromEdits = reviewItems
         .filter((item) => item.questionId)
         .map((item) => {
           const qid = item.questionId as string;
@@ -159,9 +184,51 @@ export function TryoutAttemptReviewModal({
           return { questionId: qid, ...body };
         })
         .filter((x): x is { questionId: string; reviewerComment?: string; manualScore?: number | null } => x != null);
+
+      const merged = new Map<
+        string,
+        { questionId: string; reviewerComment?: string; manualScore?: number | null }
+      >();
+      for (const a of answersFromEdits) merged.set(a.questionId, { ...a });
+
+      for (const it of reviewItems) {
+        if (!it.questionId) continue;
+        if (!isAutoFullCreditItem(it)) continue;
+        if (typeof it.autoScore !== "number" || !Number.isFinite(it.autoScore)) continue;
+        const row = rowEdits[it.questionId];
+        if (row && row.manualScoreStr.trim() === "" && row.initialManual != null) {
+          continue;
+        }
+        const prev = merged.get(it.questionId);
+        if (prev?.manualScore !== undefined) continue;
+        if (prev) merged.set(it.questionId, { ...prev, manualScore: it.autoScore });
+        else merged.set(it.questionId, { questionId: it.questionId, manualScore: it.autoScore });
+      }
+
+      const answers = [...merged.values()].filter(
+        (a) => a.reviewerComment !== undefined || a.manualScore !== undefined
+      );
+
       if (answers.length > 0) {
         if (api.putReviewBatch) {
-          await api.putReviewBatch(tryoutId, attemptId, { answers });
+          try {
+            await api.putReviewBatch(tryoutId, attemptId, { answers });
+          } catch (batchErr) {
+            const st = (batchErr as Error & { status?: number }).status;
+            /** Batch PUT …/review tidak didukung BE → fallback ke PUT per soal (sesuai curl dokumentasi). */
+            if (st === 405 || st === 501) {
+              await Promise.all(
+                answers.map((item) =>
+                  api.putAnswerReview(tryoutId, attemptId, item.questionId, {
+                    reviewerComment: item.reviewerComment,
+                    manualScore: item.manualScore,
+                  })
+                )
+              );
+            } else {
+              throw batchErr;
+            }
+          }
         } else {
           await Promise.all(
             answers.map((item) =>
@@ -244,6 +311,26 @@ export function TryoutAttemptReviewModal({
           <p className="mt-4 text-sm text-zinc-500">Data review kosong.</p>
         ) : (
           <div className="mt-4 space-y-3">
+            {totalQuestionWeight > 0 && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50/90 px-3 py-2 text-[11px] leading-relaxed text-sky-950">
+                <strong>Total bobot soal</strong> pada attempt ini: <strong>{totalQuestionWeight}</strong> poin (jumlah
+                maksimum teoritis jika semua soal dapat nilai penuh).
+                <br />
+                Skor manual per soal <strong>tidak boleh melebihi bobot</strong> soal itu — server akan{" "}
+                <strong>memotong (clamp)</strong>. Contoh: bobot 1 dan Anda isi 4 → dihitung <strong>1</strong> poin;
+                banyak soal bobot 1 bisa menjelaskan total attempt sekitar jumlah soal (mis. 22).
+                <br />
+                Ubah bobot per soal di{" "}
+                {weightsEditorHref ? (
+                  <Link href={weightsEditorHref} className="font-medium underline">
+                    halaman kelola soal
+                  </Link>
+                ) : (
+                  <span className="font-medium">halaman kelola soal tryout</span>
+                )}
+                .
+              </div>
+            )}
             {reviewItems.map((item, idx) => {
               const qid = item.questionId ?? `idx-${idx}`;
               const row =
@@ -281,11 +368,19 @@ export function TryoutAttemptReviewModal({
                   {item.questionId && (
                     <div className="mt-3 space-y-2">
                       <div>
-                        <label className="text-xs font-medium text-zinc-600">Skor manual</label>
+                        <label className="text-xs font-medium text-zinc-600">
+                          Skor manual
+                          {item.maxScore != null && Number.isFinite(item.maxScore) ? (
+                            <span className="font-normal text-zinc-500"> (maks. {item.maxScore} poin)</span>
+                          ) : null}
+                        </label>
                         <input
                           type="number"
                           step="any"
                           min={0}
+                          max={
+                            item.maxScore != null && Number.isFinite(item.maxScore) ? item.maxScore : undefined
+                          }
                           value={row.manualScoreStr}
                           onChange={(e) =>
                             setRowEdits((prev) => ({
@@ -297,12 +392,30 @@ export function TryoutAttemptReviewModal({
                             }))
                           }
                           className="mt-0.5 w-full max-w-[10rem] rounded border border-zinc-200 px-2 py-1 text-sm sm:w-32"
-                          placeholder={allowAutoGrade ? "Kosong = otomatis" : "0 … max skor"}
+                          placeholder={allowAutoGrade ? "Kosong = otomatis" : `0 … ${item.maxScore ?? "bobot"}`}
                         />
+                        {(() => {
+                          const n = parseFloat(row.manualScoreStr);
+                          if (
+                            item.maxScore == null ||
+                            !Number.isFinite(item.maxScore) ||
+                            !Number.isFinite(n) ||
+                            row.manualScoreStr.trim() === ""
+                          ) {
+                            return null;
+                          }
+                          if (n <= item.maxScore) return null;
+                          return (
+                            <p className="mt-1 text-xs text-amber-800">
+                              {n} melebihi bobot {item.maxScore} — nilai yang dihitung untuk soal ini paling besar{" "}
+                              {item.maxScore} poin.
+                            </p>
+                          );
+                        })()}
                         <p className="mt-0.5 text-[11px] text-zinc-400">
                           {allowAutoGrade
                             ? "Isi angka untuk override; kosongkan untuk menghapus override dan kembali ke nilai otomatis."
-                            : "Isi skor per soal (0 … bobot soal). Simpan perubahan review untuk mengirim ke server."}
+                            : "Isi 0 … bobot soal. Nilai di atas bobot akan dipotong oleh server saat menyimpan."}
                         </p>
                       </div>
                       <div>
