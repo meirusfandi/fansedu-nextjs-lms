@@ -10,7 +10,7 @@ export default function AdminBidangRedirectPage() {
   }, [router]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-      <p className="text-sm text-zinc-500">Mengalihkan ke Subject...</p>
+      <p className="text-sm text-zinc-500">Mengalihkan ke master data bidang…</p>
     </div>
   );
 }

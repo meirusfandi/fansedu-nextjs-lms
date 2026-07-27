@@ -48,6 +48,7 @@ export function TrainerDashboardLayout({ children }: { children: React.ReactNode
       title="Trainer Dashboard"
       user={user}
       onLogout={handleLogout}
+      mobileNav={{ sections: trainerSidebarSections, accent: "sky" }}
     >
       {children}
     </DashboardLayout>

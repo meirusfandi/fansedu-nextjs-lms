@@ -181,6 +181,7 @@ export default function TrainerTryoutDetailPage() {
           onSaved={refreshTrainerTryoutFromApi}
           api={tryoutReviewApi}
           allowAutoGrade={tryout?.gradingMode !== "manual"}
+          weightsEditorHref="/trainer/questions"
         />
       )}
     </div>

@@ -22,7 +22,6 @@ import {
   listPayments,
   createPayment,
   adminListPayments,
-  adminGetPayment,
   adminConfirmPayment,
   adminRejectPayment,
   adminCreatePayment,
@@ -235,8 +234,8 @@ export function useAdminPayments() {
 }
 
 /**
- * Detail satu pembayaran: GET /admin/payments/:id bila tersedia, lalu fallback ke pencarian di daftar.
- * Menghindari "tidak ditemukan" saat membuka link detail dari notifikasi atau cache daftar kedaluwarsa.
+ * Detail satu pembayaran dari daftar admin (GET /admin/payments).
+ * Menggunakan pencarian di daftar agar konsisten dengan build dan tidak bergantung pada GET per-id di client bundle.
  */
 export function useAdminPaymentDetail(paymentId: string | undefined) {
   const id = String(paymentId ?? "").trim();
@@ -244,8 +243,6 @@ export function useAdminPaymentDetail(paymentId: string | undefined) {
     queryKey: queryKeys.adminPaymentDetail(id || "_"),
     queryFn: async (): Promise<Payment | null> => {
       if (!id) return null;
-      const direct = await adminGetPayment(id);
-      if (direct) return direct;
       const all = await adminListPayments();
       return all.find((p) => String(p.id) === id) ?? null;
     },

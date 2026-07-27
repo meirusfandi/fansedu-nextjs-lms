@@ -394,7 +394,13 @@ function pickBestScoreValue(candidates: unknown[]): number | undefined {
   if (nums.length === 0) return undefined;
   // Hindari "terjebak" score default 0 bila ada kandidat nilai final > 0.
   const positives = nums.filter((n) => n > 0);
-  if (positives.length > 0) return positives[0];
+  if (positives.length > 0) {
+    // Bila API mengirim beberapa key (attempt.score vs totalScore / finalScore, dll.),
+    // jangan ambil yang pertama saja — bisa skor parsial (mis. 22) vs total benar (mis. 60).
+    return Math.max(...positives);
+  }
+  const zeros = nums.filter((n) => n === 0);
+  if (zeros.length > 0) return 0;
   return nums[0];
 }
 

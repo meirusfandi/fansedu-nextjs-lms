@@ -9,12 +9,12 @@ import {
   adminGetQuestionStats,
   adminGetAllQuestionStats,
   adminGetTryoutStudents,
+  adminGetTryoutLeaderboard,
   adminGetTryoutAttemptReview,
   adminPutTryoutAttemptAnswerReview,
   adminPutTryoutAttemptReviewBatch,
   adminPostTryoutAttemptAutoGrade,
   adminPostTryoutAutoGradeSubmitted,
-  getTryoutLeaderboard,
 } from "@/lib/api";
 import type { AdminTryoutStudent, LeaderboardEntry, Question, TryoutSession } from "@/lib/api-types";
 import Link from "next/link";
@@ -40,6 +40,58 @@ const TYPE_LABEL: Record<string, string> = {
   multiple_choice: "Pilihan ganda",
   true_false: "Benar/Salah",
 };
+
+/** User id stabil untuk join leaderboard ↔ GET /students. */
+function leaderboardEntryUserId(entry: LeaderboardEntry): string {
+  const o = entry as Record<string, unknown>;
+  const direct =
+    entry.userId ??
+    entry.studentId ??
+    (typeof o.studentUserId === "string" ? o.studentUserId : undefined) ??
+    (typeof o.user_id === "string" ? o.user_id : undefined);
+  if (direct != null && String(direct).trim() !== "") return String(direct).trim();
+  const user = o.user;
+  if (user && typeof user === "object" && !Array.isArray(user)) {
+    const u = user as Record<string, unknown>;
+    const id = u.id ?? u.userId;
+    if (id != null && String(id).trim() !== "") return String(id).trim();
+  }
+  return "";
+}
+
+function leaderboardEntryAttemptId(entry: LeaderboardEntry): string {
+  const o = entry as Record<string, unknown>;
+  const v =
+    entry.attemptId ??
+    (typeof o.latestAttemptId === "string" ? o.latestAttemptId : undefined) ??
+    (typeof o.lastAttemptId === "string" ? o.lastAttemptId : undefined);
+  return v != null ? String(v).trim() : "";
+}
+
+/** Satu baris untuk modal review: gabungkan /students + attemptId dari leaderboard bila perlu. */
+function resolveReviewStudent(
+  entry: LeaderboardEntry,
+  students: AdminTryoutStudent[]
+): AdminTryoutStudent | null {
+  const uid = leaderboardEntryUserId(entry);
+  const att = leaderboardEntryAttemptId(entry);
+  const match = uid ? students.find((s) => String(s.userId ?? "").trim() === uid) : undefined;
+  if (match?.attemptId) return match;
+  if (att && uid) {
+    return {
+      userId: uid,
+      attemptId: att,
+      name: match?.name ?? entry.userName ?? entry.name ?? entry.nama,
+      email: match?.email,
+      schoolName: match?.schoolName ?? entry.schoolName,
+      score:
+        typeof match?.score === "number"
+          ? match.score
+          : entry.score ?? entry.skor ?? entry.bestScore,
+    };
+  }
+  return match ?? null;
+}
 
 function formatDate(iso: string) {
   try {
@@ -144,6 +196,7 @@ export default function AdminTryoutDetailPage() {
   const [bulkAutoGradeClearComments, setBulkAutoGradeClearComments] = useState(false);
   const [bulkAutoGradeResult, setBulkAutoGradeResult] = useState<string | null>(null);
   const [refreshingStudents, setRefreshingStudents] = useState(false);
+  const [syncingBoard, setSyncingBoard] = useState(false);
   const [waOpen, setWaOpen] = useState<null | { name: string; score: number; rank: number }>(null);
   const [waPhone, setWaPhone] = useState("");
 
@@ -251,7 +304,7 @@ export default function AdminTryoutDetailPage() {
       const [tryoutRes, questionsRes, leaderboardRes, studentsRes] = await Promise.all([
         adminGetTryout(tryoutId).catch(() => null),
         adminListTryoutQuestions(tryoutId),
-        getTryoutLeaderboard(tryoutId).catch(() => []),
+        adminGetTryoutLeaderboard(tryoutId).catch(() => []),
         adminGetTryoutStudents(tryoutId).catch(() => []),
       ]);
       setTryout(tryoutRes);
@@ -306,13 +359,33 @@ export default function AdminTryoutDetailPage() {
       const [tryoutRes, studentsRes, leaderboardRes] = await Promise.all([
         adminGetTryout(tryoutId).catch(() => null),
         adminGetTryoutStudents(tryoutId).catch(() => []),
-        getTryoutLeaderboard(tryoutId).catch(() => []),
+        adminGetTryoutLeaderboard(tryoutId).catch(() => []),
       ]);
       if (tryoutRes != null) setTryout(tryoutRes);
       setStudents(Array.isArray(studentsRes) ? studentsRes : []);
       setLeaderboard(Array.isArray(leaderboardRes) ? leaderboardRes : []);
     } catch {
       /* pertahankan state yang ada */
+    }
+  }, [tryoutId]);
+
+  /** Sinkronkan saja leaderboard + daftar siswa (tanpa reload soal). */
+  const syncLeaderboardAndStudents = useCallback(async () => {
+    if (!tryoutId) return;
+    setSyncingBoard(true);
+    setError(null);
+    try {
+      const [studentsRes, leaderboardRes] = await Promise.all([
+        adminGetTryoutStudents(tryoutId).catch(() => []),
+        adminGetTryoutLeaderboard(tryoutId).catch(() => []),
+      ]);
+      setStudents(Array.isArray(studentsRes) ? studentsRes : []);
+      setLeaderboard(Array.isArray(leaderboardRes) ? leaderboardRes : []);
+      setBulkAutoGradeResult("Daftar peserta & nilai leaderboard disinkronkan dari server.");
+    } catch (e) {
+      setError((e as Error).message ?? "Gagal menyinkronkan data.");
+    } finally {
+      setSyncingBoard(false);
     }
   }, [tryoutId]);
 
@@ -333,11 +406,11 @@ export default function AdminTryoutDetailPage() {
 
   const runBulkAutoGrade = async () => {
     if (!tryoutId || bulkAutoGradeLoading) return;
-    if (
-      !confirm(
-        "Jalankan auto-grade untuk semua attempt yang sudah submitted pada tryout ini?"
-      )
-    ) {
+    const manual = tryout?.gradingMode === "manual";
+    const confirmMsg = manual
+      ? "Mode penilaian manual: auto-grade akan menghitung ulang jawaban yang bisa dinilai otomatis (mis. pilihan ganda). Soal isian/esai tetap memerlukan review per soal di modal. Lanjutkan untuk semua attempt yang sudah submitted?"
+      : "Jalankan auto-grade untuk semua attempt yang sudah submitted pada tryout ini?";
+    if (!confirm(confirmMsg)) {
       return;
     }
     setBulkAutoGradeLoading(true);
@@ -470,8 +543,10 @@ export default function AdminTryoutDetailPage() {
             </div>
             {tryout.gradingMode === "manual" && (
               <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Tryout ini dinilai manual. Siswa menunggu skor hingga Anda memberi nilai lewat{" "}
-                <strong>Review manual</strong> per peserta. Perintah auto-grade tidak tersedia.
+                Tryout ini memakai <strong>penilaian manual</strong> untuk soal yang perlu dinilai pengajar. Gunakan{" "}
+                <strong>Review manual</strong> per peserta, tombol <strong>Sinkron daftar &amp; nilai</strong> untuk
+                memperbarui data dari server, dan <strong>Auto-grade semua (submitted)</strong> bila ingin menghitung
+                ulang jawaban yang bisa dinilai otomatis (mis. PG).
               </p>
             )}
             {tryout.description && (
@@ -485,18 +560,32 @@ export default function AdminTryoutDetailPage() {
           <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900">
             Leaderboard
           </h2>
-          {tryout && allowAutoGradeUi && (
+          {tryout && (
             <div className="flex flex-col gap-2 border-b border-zinc-100 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-600">
-                <input
-                  type="checkbox"
-                  checked={bulkAutoGradeClearComments}
-                  onChange={(e) => setBulkAutoGradeClearComments(e.target.checked)}
-                  className="rounded border-zinc-300"
-                />
-                Saat auto-grade massal, hapus juga komentar reviewer
-              </label>
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={syncingBoard}
+                  onClick={() => void syncLeaderboardAndStudents()}
+                  className="rounded border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-900 hover:bg-sky-100 disabled:opacity-50"
+                  title="Ambil ulang daftar siswa + leaderboard dari API (memperbaiki tombol Review manual jika attemptId baru tersedia)"
+                >
+                  {syncingBoard ? "Menyinkronkan…" : "Sinkron daftar & nilai"}
+                </button>
+                {bulkAutoGradeResult && (
+                  <span className="text-xs text-emerald-800">{bulkAutoGradeResult}</span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 sm:items-end">
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-600">
+                  <input
+                    type="checkbox"
+                    checked={bulkAutoGradeClearComments}
+                    onChange={(e) => setBulkAutoGradeClearComments(e.target.checked)}
+                    className="rounded border-zinc-300"
+                  />
+                  Saat auto-grade massal, hapus juga komentar reviewer
+                </label>
                 <button
                   type="button"
                   disabled={bulkAutoGradeLoading || leaderboard.length === 0}
@@ -505,16 +594,21 @@ export default function AdminTryoutDetailPage() {
                   title={
                     leaderboard.length === 0
                       ? "Belum ada peserta di leaderboard"
-                      : "Jalankan penilaian otomatis untuk semua attempt submitted"
+                      : allowAutoGradeUi
+                        ? "Jalankan penilaian otomatis untuk semua attempt submitted"
+                        : "Mode manual: hitung ulang jawaban yang bisa dinilai otomatis untuk semua attempt submitted"
                   }
                 >
                   {bulkAutoGradeLoading ? "Memproses..." : "Auto-grade semua (submitted)"}
                 </button>
-                {bulkAutoGradeResult && (
-                  <span className="text-xs text-emerald-800">{bulkAutoGradeResult}</span>
-                )}
               </div>
             </div>
+          )}
+          {tryout && !allowAutoGradeUi && (
+            <p className="border-b border-zinc-100 px-4 py-2 text-[11px] text-zinc-500">
+              Mode manual: auto-grade massal tidak mengganti skor esai; setelah menjalankan, gunakan Review manual
+              untuk soal yang perlu dinilai pengajar.
+            </p>
           )}
           <div className="overflow-x-auto">
             {leaderboard.length === 0 ? (
@@ -532,7 +626,10 @@ export default function AdminTryoutDetailPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {paginatedLeaderboard.map((entry, i) => (
-                    <tr key={entry.userId ?? `${leaderboardPage}-${i}`} className="hover:bg-zinc-50/50">
+                    <tr
+                      key={leaderboardEntryUserId(entry) || `${leaderboardPage}-${i}`}
+                      className="hover:bg-zinc-50/50"
+                    >
                       <td className="px-4 py-2 font-medium text-zinc-900">
                         {entry.rank ?? (leaderboardPage - 1) * PAGE_SIZE + i + 1}
                       </td>
@@ -551,18 +648,20 @@ export default function AdminTryoutDetailPage() {
                           const rank = (entry.rank ?? (leaderboardPage - 1) * PAGE_SIZE + i + 1) as number;
                           const name = String(entry.userName ?? entry.name ?? entry.nama ?? "Siswa");
                           const score = formatScore(entry.score ?? entry.skor ?? entry.bestScore);
-                          const student = entry.userId
-                            ? students.find((s) => String(s.userId ?? "").trim() === String(entry.userId ?? "").trim())
-                            : null;
-                          const canReview = Boolean(student?.attemptId);
+                          const reviewTarget = resolveReviewStudent(entry, students);
+                          const canReview = Boolean(reviewTarget?.attemptId);
                           return (
                             <div className="flex flex-wrap justify-end gap-2">
                               <button
                                 type="button"
                                 disabled={!canReview}
-                                onClick={() => student && setReviewStudent(student)}
+                                onClick={() => reviewTarget && setReviewStudent(reviewTarget)}
                                 className="rounded border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
-                                title={canReview ? "Buka review jawaban attempt" : "Attempt belum ditemukan di list students"}
+                                title={
+                                  canReview
+                                    ? "Buka review jawaban attempt"
+                                    : "Tidak ada attemptId — klik Sinkron daftar & nilai atau pastikan backend mengirim userId + attemptId di leaderboard/students"
+                                }
                               >
                                 Review manual
                               </button>
@@ -679,7 +778,8 @@ export default function AdminTryoutDetailPage() {
           onClose={() => setReviewStudent(null)}
           onSaved={refreshTryoutSummaryFromApi}
           api={tryoutReviewApi}
-          allowAutoGrade={allowAutoGradeUi}
+          allowAutoGrade
+          weightsEditorHref={`/admin/tryouts/${tryoutId}/soal`}
         />
       )}
 

@@ -25,7 +25,7 @@ export default function TrainerDashboardPage() {
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Overview</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-900">Trainer Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-600">Kelola kelas, bank soal, dan kuis.</p>
+        <p className="mt-1 text-sm text-zinc-600">Kelola kelas, bank soal, dan tryout.</p>
       </div>
 
       <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -64,13 +64,13 @@ export default function TrainerDashboardPage() {
               <p className="text-xs text-zinc-500">Kelola soal</p>
             </div>
           </Link>
-          <Link href="/trainer/quizzes" className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/50">
+          <Link href="/trainer/tryouts" className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-sky-200 hover:bg-sky-50/50">
             <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             </span>
             <div>
-              <p className="font-medium text-zinc-900">Kuis</p>
-              <p className="text-xs text-zinc-500">Buat kuis</p>
+              <p className="font-medium text-zinc-900">Tryout</p>
+              <p className="text-xs text-zinc-500">Kelola sesi ujian</p>
             </div>
           </Link>
         </div>

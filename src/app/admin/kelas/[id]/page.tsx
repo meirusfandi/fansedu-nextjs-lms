@@ -21,11 +21,13 @@ import {
   adminUpdateCourseContent,
   adminUploadCourseMaterial,
   getFriendlyApiErrorMessage,
+  resolveBackendUrl,
 } from "@/lib/api";
 import type {
   AdminCourseAttachment,
   AdminCourseContent,
   AdminCourseContentType,
+  AdminUpdateCourseContentRequest,
   Course,
 } from "@/lib/api-types";
 import Link from "next/link";
@@ -81,6 +83,59 @@ function attachmentsToApi(items: ClassAttachment[]): AdminCourseAttachment[] {
     name: a.name,
     url: a.url,
   }));
+}
+
+/** Nilai untuk input `datetime-local` dari respons API (ISO dll.). */
+function scheduledAtForDatetimeLocal(apiValue: string | null | undefined): string {
+  if (apiValue == null || !String(apiValue).trim()) return "";
+  const d = new Date(String(apiValue));
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Kirim jadwal ke API dari isian form datetime-local. */
+function scheduledAtToApi(formValue: string): string | undefined {
+  const s = formValue.trim();
+  if (!s) return undefined;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString();
+  return s;
+}
+
+/**
+ * Payload PUT lengkap dari baris konten saat ini.
+ * Dipakai saat backend mengganti seluruh record (bukan patch), agar lampiran/type tidak hilang.
+ */
+function courseContentRowToFullPutBody(row: AdminCourseContent): AdminUpdateCourseContentRequest {
+  const atts = attachmentsFromApi(row.attachments ?? undefined);
+  const so = row.sortOrder;
+  const sortOrderRaw =
+    typeof so === "number" && Number.isFinite(so)
+      ? so
+      : so != null && String(so).trim() !== ""
+        ? Number(so)
+        : NaN;
+  const sortOrder = Number.isFinite(sortOrderRaw) ? sortOrderRaw : undefined;
+  const sched =
+    row.scheduledAt != null && String(row.scheduledAt).trim()
+      ? (() => {
+          const d = new Date(String(row.scheduledAt));
+          return !Number.isNaN(d.getTime()) ? d.toISOString() : String(row.scheduledAt).trim();
+        })()
+      : undefined;
+  return {
+    type: row.type,
+    title: row.title,
+    description: row.description?.trim() ? row.description : undefined,
+    body: row.body?.trim() ? row.body : undefined,
+    attachments: attachmentsToApi(atts),
+    zoomUrl: row.zoomUrl?.trim() ? row.zoomUrl : undefined,
+    zoomPassword: row.zoomPassword?.trim() ? row.zoomPassword : undefined,
+    scheduledAt: sched,
+    recordingUrl: row.recordingUrl?.trim() ? row.recordingUrl : undefined,
+    sortOrder,
+  };
 }
 
 export default function AdminKelasModulesPage() {
@@ -161,7 +216,7 @@ export default function AdminKelasModulesPage() {
       body: row.body ?? "",
       zoomUrl: row.zoomUrl ?? "",
       zoomPassword: row.zoomPassword ?? "",
-      scheduledAt: row.scheduledAt ?? "",
+      scheduledAt: scheduledAtForDatetimeLocal(row.scheduledAt ?? ""),
       recordingUrl: row.recordingUrl ?? "",
     });
     setContentModalOpen(true);
@@ -174,45 +229,64 @@ export default function AdminKelasModulesPage() {
       setError("Judul konten wajib diisi.");
       return;
     }
+    if (contentForm.type === "zoom" && !contentForm.zoomUrl.trim()) {
+      setError("URL Zoom wajib diisi.");
+      return;
+    }
+    if (contentForm.type === "recording" && !contentForm.recordingUrl.trim()) {
+      setError("URL rekaman wajib diisi.");
+      return;
+    }
 
     setContentSaving(true);
     setError(null);
 
     try {
       const apiType = toApiContentType(contentForm.type);
-      const base = {
+      const patch: AdminUpdateCourseContentRequest = {
         type: apiType,
         title: contentForm.title.trim(),
         description: contentForm.description.trim() || undefined,
         body: contentForm.body.trim() || undefined,
         zoomUrl: contentForm.zoomUrl.trim() || undefined,
         zoomPassword: contentForm.zoomPassword.trim() || undefined,
-        scheduledAt: contentForm.scheduledAt.trim() || undefined,
+        scheduledAt: scheduledAtToApi(contentForm.scheduledAt),
         recordingUrl: contentForm.recordingUrl.trim() || undefined,
       };
 
       if (editingContentId) {
-        await adminUpdateCourseContent(classId, editingContentId, base);
-        showSuccess("Konten berhasil diperbarui.");
+        const row = sortedContents.find((x) => x.id === editingContentId);
+        if (!row) {
+          setError("Konten tidak ditemukan. Muat ulang halaman.");
+        } else {
+          await adminUpdateCourseContent(classId, editingContentId, {
+            ...courseContentRowToFullPutBody(row),
+            ...patch,
+          });
+          showSuccess("Konten berhasil diperbarui.");
+          await loadPage();
+          setContentModalOpen(false);
+          setEditingContentId(null);
+        }
       } else {
         const maxOrder = sortedContents.reduce(
           (m, x) => Math.max(m, Number(x.sortOrder ?? 0)),
           0
         );
         await adminAddCourseContent(classId, {
-          ...base,
+          ...patch,
           sortOrder: maxOrder + 1,
         });
         showSuccess("Konten berhasil ditambahkan.");
+        await loadPage();
+        setContentModalOpen(false);
+        setEditingContentId(null);
       }
-      await loadPage();
-    } catch {
-      setError("Gagal menyimpan konten. Periksa koneksi atau data yang dikirim.");
+    } catch (err) {
+      setError(getFriendlyApiErrorMessage(err));
     }
 
     setContentSaving(false);
-    setContentModalOpen(false);
-    setEditingContentId(null);
   };
 
   const removeContent = async (contentId: string) => {
@@ -221,8 +295,8 @@ export default function AdminKelasModulesPage() {
       await adminDeleteCourseContent(classId, contentId);
       await loadPage();
       showSuccess("Konten berhasil dihapus.");
-    } catch {
-      setError("Gagal menghapus konten di server.");
+    } catch (err) {
+      setError(getFriendlyApiErrorMessage(err));
     }
   };
 
@@ -269,8 +343,8 @@ export default function AdminKelasModulesPage() {
       }));
 
       showSuccess("File berhasil di-upload. Klik Simpan untuk menambahkan lampiran.");
-    } catch {
-      setError("Upload file gagal. Pastikan format file PDF/DOC/PPT didukung.");
+    } catch (err) {
+      setError(getFriendlyApiErrorMessage(err));
     } finally {
       setAttachmentUploading(false);
       e.target.value = "";
@@ -295,7 +369,11 @@ export default function AdminKelasModulesPage() {
     }
 
     const target = sortedContents.find((x) => x.id === targetContentIdForAttachment);
-    const existing = attachmentsFromApi(target?.attachments ?? undefined);
+    if (!target) {
+      setError("Konten tidak ditemukan.");
+      return;
+    }
+    const existing = attachmentsFromApi(target.attachments ?? undefined);
     const newAttachment: ClassAttachment = {
       id: uid("att"),
       type: attachmentForm.type,
@@ -305,29 +383,35 @@ export default function AdminKelasModulesPage() {
 
     try {
       await adminUpdateCourseContent(classId, targetContentIdForAttachment, {
+        ...courseContentRowToFullPutBody(target),
         attachments: attachmentsToApi([...existing, newAttachment]),
       });
       await loadPage();
       setAttachmentModalOpen(false);
       setError(null);
       showSuccess("Lampiran berhasil ditambahkan.");
-    } catch {
-      setError("Gagal menyimpan lampiran.");
+    } catch (err) {
+      setError(getFriendlyApiErrorMessage(err));
     }
   };
 
   const removeAttachment = async (contentId: string, attachmentId: string) => {
     const target = sortedContents.find((x) => x.id === contentId);
-    const existing = attachmentsFromApi(target?.attachments ?? undefined);
+    if (!target) {
+      setError("Konten tidak ditemukan.");
+      return;
+    }
+    const existing = attachmentsFromApi(target.attachments ?? undefined);
     const next = existing.filter((a) => a.id !== attachmentId);
     try {
       await adminUpdateCourseContent(classId, contentId, {
+        ...courseContentRowToFullPutBody(target),
         attachments: attachmentsToApi(next),
       });
       await loadPage();
       showSuccess("Lampiran berhasil dihapus.");
-    } catch {
-      setError("Gagal menghapus lampiran.");
+    } catch (err) {
+      setError(getFriendlyApiErrorMessage(err));
     }
   };
 
@@ -461,11 +545,14 @@ export default function AdminKelasModulesPage() {
                         {ct === "article" && x.body && (
                           <p className="mt-1 line-clamp-2 text-xs text-zinc-600">{x.body}</p>
                         )}
+                        {ct === "quiz" && x.body && (
+                          <p className="mt-1 line-clamp-2 text-xs text-zinc-600">{x.body}</p>
+                        )}
                         {ct === "zoom" && (
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                             {x.zoomUrl && (
                               <a
-                                href={x.zoomUrl}
+                                href={resolveBackendUrl(x.zoomUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-purple-700 underline underline-offset-1 hover:text-purple-900"
@@ -492,7 +579,7 @@ export default function AdminKelasModulesPage() {
                           <div className="mt-1 text-xs">
                             {x.recordingUrl && (
                               <a
-                                href={x.recordingUrl}
+                                href={resolveBackendUrl(x.recordingUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-red-700 underline underline-offset-1 hover:text-red-900"
@@ -514,7 +601,7 @@ export default function AdminKelasModulesPage() {
                                   {attachmentTypeLabel(a.type)}
                                 </span>
                                 <a
-                                  href={a.url}
+                                  href={resolveBackendUrl(a.url)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="max-w-[120px] truncate text-zinc-800 hover:underline"
@@ -597,14 +684,24 @@ export default function AdminKelasModulesPage() {
                 />
               </div>
 
-              {(contentForm.type === "module" || contentForm.type === "article") && (
+              {(contentForm.type === "module" ||
+                contentForm.type === "article" ||
+                contentForm.type === "quiz") && (
                 <div>
-                  <label className="block text-xs font-medium text-zinc-600">Isi / Materi</label>
+                  <label className="block text-xs font-medium text-zinc-600">
+                    {contentForm.type === "quiz"
+                      ? "Deskripsi / petunjuk (opsional)"
+                      : "Isi / Materi"}
+                  </label>
                   <textarea
-                    rows={5}
+                    rows={contentForm.type === "quiz" ? 3 : 5}
                     value={contentForm.body}
                     onChange={(e) => setContentForm((f) => ({ ...f, body: e.target.value }))}
-                    placeholder="Tulis isi materi di sini…"
+                    placeholder={
+                      contentForm.type === "quiz"
+                        ? "Ringkasan atau petunjuk pengerjaan kuis…"
+                        : "Tulis isi materi di sini…"
+                    }
                     className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
                   />
                 </div>
@@ -615,6 +712,7 @@ export default function AdminKelasModulesPage() {
                   <div>
                     <label className="block text-xs font-medium text-zinc-600">URL Meeting Zoom *</label>
                     <input
+                      required
                       value={contentForm.zoomUrl}
                       onChange={(e) => setContentForm((f) => ({ ...f, zoomUrl: e.target.value }))}
                       placeholder="https://zoom.us/j/..."
@@ -650,6 +748,7 @@ export default function AdminKelasModulesPage() {
                 <div>
                   <label className="block text-xs font-medium text-zinc-600">URL Rekaman *</label>
                   <input
+                    required
                     value={contentForm.recordingUrl}
                     onChange={(e) =>
                       setContentForm((f) => ({ ...f, recordingUrl: e.target.value }))

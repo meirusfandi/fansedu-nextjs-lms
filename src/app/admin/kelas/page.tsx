@@ -254,8 +254,12 @@ export default function AdminKelasListPage() {
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-zinc-900 sm:text-2xl">
             Management Kelas
           </h1>
-          <p className="mt-1 text-sm text-zinc-600">
-            Kelas dan konten materi disimpan di server. Promo diskon dikelola di{" "}
+          <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+            Kelas dan konten materi disimpan di server. Atur mapel/jenjang di{" "}
+            <Link href="/admin/master-data/kelas" className="font-medium text-emerald-700 underline">
+              Master data bidang
+            </Link>
+            . Promo checkout di{" "}
             <Link href="/admin/vouchers" className="font-medium text-emerald-700 underline">
               Voucher
             </Link>

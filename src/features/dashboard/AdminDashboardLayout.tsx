@@ -48,6 +48,7 @@ export function AdminDashboardLayout({ children }: { children: React.ReactNode }
       title="Admin Dashboard"
       user={user}
       onLogout={handleLogout}
+      mobileNav={{ sections: adminSidebarSections, accent: "zinc" }}
     >
       {children}
     </DashboardLayout>

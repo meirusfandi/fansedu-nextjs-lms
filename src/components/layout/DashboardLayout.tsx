@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { TopNavbar } from "./TopNavbar";
+import { TopNavbar, type TopNavbarMobileNav } from "./TopNavbar";
 
 export interface DashboardLayoutProps {
   sidebar: React.ReactElement;
@@ -9,6 +9,8 @@ export interface DashboardLayoutProps {
   title?: string;
   user?: { name: string; email?: string } | null;
   onLogout?: () => void;
+  /** Navigasi layar kecil — isi sama dengan sidebar. */
+  mobileNav?: TopNavbarMobileNav;
 }
 
 export function DashboardLayout({
@@ -17,6 +19,7 @@ export function DashboardLayout({
   title = "Dashboard",
   user,
   onLogout,
+  mobileNav,
 }: DashboardLayoutProps) {
   const [sidebarHidden, setSidebarHidden] = useState(false);
 
@@ -34,6 +37,7 @@ export function DashboardLayout({
           onLogout={onLogout}
           sidebarHidden={sidebarHidden}
           onToggleSidebar={handleToggleSidebar}
+          mobileNav={mobileNav}
         />
         <main className="flex-1 p-4 text-zinc-900 md:p-6 [color-scheme:light]">
           {children}

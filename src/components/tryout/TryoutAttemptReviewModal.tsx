@@ -60,6 +60,13 @@ export function buildTryoutAnswerReviewBody(
   return body;
 }
 
+/** Skor yang ditampilkan / dijadikan baseline baris: utamakan autoScore, baru manualScore. */
+export function preferredReviewItemScore(item: AttemptReviewItem): number | null {
+  if (typeof item.autoScore === "number" && Number.isFinite(item.autoScore)) return item.autoScore;
+  if (typeof item.manualScore === "number" && Number.isFinite(item.manualScore)) return item.manualScore;
+  return null;
+}
+
 /** PG / jawaban cocok kunci: skor manual disamakan dengan autoScore (bobot penuh). */
 function isAutoFullCreditItem(item: AttemptReviewItem): boolean {
   const sel = (item.selectedOption ?? "").trim();
@@ -78,7 +85,7 @@ function rowsFromItems(items: AttemptReviewItem[]): Record<string, RowEdit> {
   const out: Record<string, RowEdit> = {};
   items.forEach((item) => {
     if (!item.questionId) return;
-    const initialManual = typeof item.manualScore === "number" ? item.manualScore : null;
+    const initialManual = preferredReviewItemScore(item);
     const ic = item.reviewerComment ?? "";
     out[item.questionId] = {
       comment: ic,
@@ -344,12 +351,27 @@ export function TryoutAttemptReviewModal({
               return (
                 <div key={qid} className="rounded-lg border border-zinc-200 p-3">
                   <p className="text-xs text-zinc-500">Soal #{item.sortOrder ?? idx + 1}</p>
-                  {item.isCorrect !== undefined && (
+                  {(item.isCorrect !== undefined || preferredReviewItemScore(item) != null) && (
                     <p className="text-xs text-zinc-600">
-                      Status otomatis: {item.isCorrect ? "Benar" : "Salah"}
-                      {item.autoScore != null && Number.isFinite(item.autoScore) && (
-                        <span className="ml-1">· Skor otomatis: {item.autoScore}</span>
+                      {item.isCorrect !== undefined && (
+                        <>
+                          Status otomatis: {item.isCorrect ? "Benar" : "Salah"}
+                        </>
                       )}
+                      {(() => {
+                        const pref = preferredReviewItemScore(item);
+                        if (pref == null) return null;
+                        return (
+                          <span className="ml-1">
+                            · Skor: {pref}
+                            {typeof item.autoScore === "number" &&
+                            Number.isFinite(item.autoScore) &&
+                            pref === item.autoScore
+                              ? " (dari penilaian otomatis)"
+                              : null}
+                          </span>
+                        );
+                      })()}
                     </p>
                   )}
                   <div className="mt-1 text-sm text-zinc-900">
@@ -369,7 +391,7 @@ export function TryoutAttemptReviewModal({
                     <div className="mt-3 space-y-2">
                       <div>
                         <label className="text-xs font-medium text-zinc-600">
-                          Skor manual
+                          Skor (override manual)
                           {item.maxScore != null && Number.isFinite(item.maxScore) ? (
                             <span className="font-normal text-zinc-500"> (maks. {item.maxScore} poin)</span>
                           ) : null}
@@ -414,8 +436,8 @@ export function TryoutAttemptReviewModal({
                         })()}
                         <p className="mt-0.5 text-[11px] text-zinc-400">
                           {allowAutoGrade
-                            ? "Isi angka untuk override; kosongkan untuk menghapus override dan kembali ke nilai otomatis."
-                            : "Isi 0 … bobot soal. Nilai di atas bobot akan dipotong oleh server saat menyimpan."}
+                            ? "Nilai default mengikuti skor otomatis (autoScore) jika tersedia. Isi angka untuk override; kosongkan untuk menghapus override."
+                            : "Nilai default mengikuti skor otomatis jika tersedia, lalu skor manual dari server. Isi 0 … bobot soal; di atas bobot akan dipotong saat menyimpan."}
                         </p>
                       </div>
                       <div>

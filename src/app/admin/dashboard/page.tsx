@@ -26,13 +26,15 @@ function formatRelativeDate(iso: string): string {
 
 const quickLinks = [
   { href: "/admin/master-data/setting", label: "Pengaturan sistem", desc: "Key API, Midtrans, env" },
-  { href: "/admin/master-data", label: "Master Data", desc: "Jenjang, bidang, sekolah" },
-  { href: "/admin/users", label: "Management User", desc: "Siswa, pengajar, admin" },
-  { href: "/admin/kelas", label: "Management Kelas", desc: "Kelas dan enrollment" },
-  { href: "/admin/tryouts", label: "Event", desc: "Tryout & ujian" },
-  { href: "/admin/payment", label: "Payment", desc: "Pembayaran & tagihan" },
-  { href: "/admin/landing-packages", label: "Paket landing", desc: "Promo di halaman publik" },
-  { href: "/admin/report", label: "Report", desc: "Laporan & statistik" },
+  { href: "/admin/master-data/kelas", label: "Master data bidang", desc: "Mapel per jenjang" },
+  { href: "/admin/users", label: "Pengguna", desc: "Siswa, pengajar, admin" },
+  { href: "/admin/kelas", label: "Kelas & materi", desc: "Konten modul dan lampiran" },
+  { href: "/admin/tryouts", label: "Event / tryout", desc: "Ujian dan sesi" },
+  { href: "/admin/question-bank", label: "Bank soal", desc: "Impor dan arsip soal" },
+  { href: "/admin/vouchers", label: "Voucher", desc: "Diskon checkout kelas" },
+  { href: "/admin/payment", label: "Pembayaran", desc: "Konfirmasi & tagihan" },
+  { href: "/admin/landing-packages", label: "Paket landing", desc: "Promo halaman publik" },
+  { href: "/admin/report", label: "Laporan", desc: "Statistik platform" },
 ] as const;
 
 const iconUsers = (
