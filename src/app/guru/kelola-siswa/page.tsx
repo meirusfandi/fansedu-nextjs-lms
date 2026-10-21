@@ -2,7 +2,7 @@
 
 import { Pagination, PAGE_SIZE } from "@/components/Pagination";
 import { useEffect, useMemo, useState } from "react";
-import { getTrainerStatus, trainerPaySlots, trainerAddStudent, getFriendlyApiErrorMessage } from "@/lib/api";
+import { getTrainerStatus, trainerPaySlots, trainerAddStudent } from "@/lib/api";
 
 export default function GuruKelolaSiswaPage() {
   const [trainerStatus, setTrainerStatus] = useState<{
@@ -22,17 +22,13 @@ export default function GuruKelolaSiswaPage() {
   const [addStudentError, setAddStudentError] = useState<string | null>(null);
   const [studentPage, setStudentPage] = useState(1);
 
-  const students = trainerStatus?.students ?? [];
+  const students = useMemo(() => trainerStatus?.students ?? [], [trainerStatus?.students]);
+  const maxPage = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
+  const effectivePage = studentPage > maxPage ? 1 : studentPage;
   const paginatedStudents = useMemo(
-    () => students.slice((studentPage - 1) * PAGE_SIZE, studentPage * PAGE_SIZE),
-    [students, studentPage]
+    () => students.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE),
+    [students, effectivePage]
   );
-
-  useEffect(() => {
-    if (students.length > 0 && (studentPage - 1) * PAGE_SIZE >= students.length) {
-      setStudentPage(1);
-    }
-  }, [students.length, studentPage]);
 
   const refetch = () => {
     getTrainerStatus(true).then(setTrainerStatus).catch(() => {});
@@ -245,7 +241,7 @@ export default function GuruKelolaSiswaPage() {
               </ul>
               {students.length > 0 && (
                 <Pagination
-                  currentPage={studentPage}
+                  currentPage={effectivePage}
                   totalItems={students.length}
                   onPageChange={setStudentPage}
                   label="siswa"

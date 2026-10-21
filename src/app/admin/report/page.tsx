@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   aiCreateSubscription,
   aiGenerateQuestions,
@@ -45,7 +45,7 @@ export default function AdminReportPage() {
   const [submittingSub, setSubmittingSub] = useState(false);
   const [subMessage, setSubMessage] = useState("");
 
-  async function loadRanking(limit = rankingLimit) {
+  const loadRanking = useCallback(async (limit = rankingLimit) => {
     setRankingLoading(true);
     setGlobalError("");
     try {
@@ -56,11 +56,11 @@ export default function AdminReportPage() {
     } finally {
       setRankingLoading(false);
     }
-  }
+  }, [rankingLimit]);
 
   useEffect(() => {
     void loadRanking(20);
-  }, []);
+  }, [loadRanking]);
 
   const rankingSummary = useMemo(() => {
     if (rankingRows.length === 0) return { avgScore: 0, avgAcc: 0 };

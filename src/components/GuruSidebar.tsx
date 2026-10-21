@@ -81,7 +81,30 @@ export function GuruSidebar({ currentPath = "", onLogout }: GuruSidebarProps) {
         </div>
       </nav>
 
-      <div className="mt-auto space-y-3 pt-6 text-xs">
+      <div className="mt-4 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-emerald-50 p-3">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-600 text-xs font-bold text-white shadow-sm">
+            TS
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-teal-950">TeachSync Guru</p>
+            <p className="text-[10px] text-teal-700">Jadwal, Siswa & SPP</p>
+          </div>
+        </div>
+        <a
+          href={process.env.NEXT_PUBLIC_TEACHSYNC_URL || "http://localhost:8000"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-teal-700 active:scale-95"
+        >
+          <span>Buka TeachSync</span>
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </div>
+
+      <div className="mt-auto space-y-3 pt-4 text-xs">
         <button
           type="button"
           onClick={onLogout}

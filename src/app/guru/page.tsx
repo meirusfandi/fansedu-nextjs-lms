@@ -8,11 +8,7 @@ export default function GuruDashboardPage() {
   const [status, setStatus] = useState<{ paidSlots: number; registeredStudentsCount: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState("Guru");
-
-  useEffect(() => {
-    setDisplayName(getAuthUserName() ?? "Guru");
-  }, []);
+  const [displayName, setDisplayName] = useState(() => (typeof window !== "undefined" ? getAuthUserName() ?? "Guru" : "Guru"));
 
   useEffect(() => {
     getTrainerStatus()

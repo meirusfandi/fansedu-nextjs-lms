@@ -31,16 +31,12 @@ export default function GuruPembayaranPage() {
   const { data: payments = [], isLoading, error, refetch } = useTrainerPayments();
   const [page, setPage] = useState(1);
 
+  const maxPage = Math.max(1, Math.ceil(payments.length / PAGE_SIZE));
+  const effectivePage = page > maxPage ? 1 : page;
   const paginated = useMemo(
-    () => payments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [payments, page]
+    () => payments.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE),
+    [payments, effectivePage]
   );
-
-  useEffect(() => {
-    if (payments.length > 0 && (page - 1) * PAGE_SIZE >= payments.length) {
-      setPage(1);
-    }
-  }, [payments.length, page]);
 
   return (
     <main className="flex flex-1 flex-col px-4 py-6 sm:px-6 md:px-8 md:py-8">
@@ -125,7 +121,7 @@ export default function GuruPembayaranPage() {
         )}
         {!isLoading && payments.length > 0 && (
           <Pagination
-            currentPage={page}
+            currentPage={effectivePage}
             totalItems={payments.length}
             onPageChange={setPage}
             label="transaksi"

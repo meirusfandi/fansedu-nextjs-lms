@@ -256,7 +256,7 @@ export default function AdminQuestionBankPage() {
         answerKey,
       };
     });
-  }, [paginated, tryoutById, levelById, subjectNameById]);
+  }, [paginated, page, tryoutById, levelById, subjectNameById]);
 
   const oskCoverPills = useMemo(() => {
     const p: string[] = [];
@@ -352,9 +352,9 @@ export default function AdminQuestionBankPage() {
     }
     const title = selectedTryout?.title ?? "Tryout";
     const t = selectedTryout;
-    let levelId = t?.levelId?.trim() || null;
+    const levelId = t?.levelId?.trim() || null;
     let levelName = t?.levelName?.trim() || null;
-    let subjectId = t?.subjectId?.trim() || null;
+    const subjectId = t?.subjectId?.trim() || null;
     let subjectName = t?.subjectName?.trim() || null;
     if (levelId && !levelName) levelName = levelById.get(levelId)?.name ?? null;
     if (subjectId && !subjectName) subjectName = subjectNameById.get(subjectId) ?? null;

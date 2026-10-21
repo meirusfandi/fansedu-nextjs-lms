@@ -17,7 +17,7 @@ export default function TrainerCreateClassPage() {
     try {
       await createCourse.mutateAsync({ title: title.trim(), description: description.trim() || undefined });
       router.push("/trainer/classes");
-    } catch (err) {
+    } catch {
       // Error is shown via createCourse.error or we can set local error state
     }
   };

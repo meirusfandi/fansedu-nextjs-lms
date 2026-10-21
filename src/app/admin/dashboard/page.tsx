@@ -133,26 +133,19 @@ export default function AdminDashboardPage() {
     [data?.tryouts]
   );
 
+  const maxUserPage = Math.max(1, Math.ceil(allUsers.length / PAGE_SIZE));
+  const effectiveUserPage = userPage > maxUserPage ? 1 : userPage;
   const paginatedUsers = useMemo(
-    () => allUsers.slice((userPage - 1) * PAGE_SIZE, userPage * PAGE_SIZE),
-    [allUsers, userPage]
+    () => allUsers.slice((effectiveUserPage - 1) * PAGE_SIZE, effectiveUserPage * PAGE_SIZE),
+    [allUsers, effectiveUserPage]
   );
+
+  const maxTryoutPage = Math.max(1, Math.ceil(sortedTryouts.length / PAGE_SIZE));
+  const effectiveTryoutPage = tryoutPage > maxTryoutPage ? 1 : tryoutPage;
   const paginatedTryouts = useMemo(
-    () => sortedTryouts.slice((tryoutPage - 1) * PAGE_SIZE, tryoutPage * PAGE_SIZE),
-    [sortedTryouts, tryoutPage]
+    () => sortedTryouts.slice((effectiveTryoutPage - 1) * PAGE_SIZE, effectiveTryoutPage * PAGE_SIZE),
+    [sortedTryouts, effectiveTryoutPage]
   );
-
-  useEffect(() => {
-    if (allUsers.length > 0 && (userPage - 1) * PAGE_SIZE >= allUsers.length) {
-      setUserPage(1);
-    }
-  }, [allUsers.length, userPage]);
-
-  useEffect(() => {
-    if (sortedTryouts.length > 0 && (tryoutPage - 1) * PAGE_SIZE >= sortedTryouts.length) {
-      setTryoutPage(1);
-    }
-  }, [sortedTryouts.length, tryoutPage]);
 
   if (error) {
     return (
@@ -289,7 +282,7 @@ export default function AdminDashboardPage() {
           </div>
           {!isLoading && allUsers.length > 0 && (
             <Pagination
-              currentPage={userPage}
+              currentPage={effectiveUserPage}
               totalItems={allUsers.length}
               onPageChange={setUserPage}
               label="user"
@@ -346,7 +339,7 @@ export default function AdminDashboardPage() {
                     ))}
                   </ul>
                   <Pagination
-                    currentPage={tryoutPage}
+                    currentPage={effectiveTryoutPage}
                     totalItems={sortedTryouts.length}
                     onPageChange={setTryoutPage}
                     label="event"

@@ -275,6 +275,8 @@ export default function AdminKelasModulesPage() {
         );
         await adminAddCourseContent(classId, {
           ...patch,
+          type: apiType,
+          title: contentForm.title.trim(),
           sortOrder: maxOrder + 1,
         });
         showSuccess("Konten berhasil ditambahkan.");

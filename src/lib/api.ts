@@ -2011,7 +2011,7 @@ function normalizeAttemptReviewItem(item: unknown): AttemptReviewItem | null {
     pickOptionalNumber(r, "questionMaxScore") ??
     (nestedQ != null ? pickOptionalNumber(nestedQ, "maxScore") : undefined);
   const maxScore =
-    maxScoreRaw !== undefined && Number.isFinite(maxScoreRaw) && maxScoreRaw > 0 ? maxScoreRaw : undefined;
+    maxScoreRaw != null && Number.isFinite(maxScoreRaw) && maxScoreRaw > 0 ? maxScoreRaw : undefined;
 
   const selectedOptRaw = r.selectedOption != null ? String(r.selectedOption).trim() : "";
   const correctOptRaw = r.correctOption != null ? String(r.correctOption).trim() : "";
@@ -2036,7 +2036,7 @@ function normalizeAttemptReviewItem(item: unknown): AttemptReviewItem | null {
     body: String(r.body ?? r.questionBody ?? nestedQ?.body ?? ""),
     type: r.type != null ? String(r.type) : undefined,
     options: Array.isArray(r.options)
-      ? (r.options as unknown[]).map((x, i) =>
+      ? (r.options as unknown[]).map((x) =>
           x && typeof x === "object" && !Array.isArray(x)
             ? String((x as Record<string, unknown>).label ?? (x as Record<string, unknown>).text ?? "")
             : String(x)

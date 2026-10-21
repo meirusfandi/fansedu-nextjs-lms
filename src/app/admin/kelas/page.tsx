@@ -109,16 +109,12 @@ export default function AdminKelasListPage() {
     });
   }, [classes, filterLevelId, filterSubjectId, subjectById]);
 
+  const maxPage = Math.max(1, Math.ceil(filteredClasses.length / PAGE_SIZE));
+  const effectivePage = page > maxPage ? 1 : page;
   const paginated = useMemo(
-    () => filteredClasses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filteredClasses, page]
+    () => filteredClasses.slice((effectivePage - 1) * PAGE_SIZE, effectivePage * PAGE_SIZE),
+    [filteredClasses, effectivePage]
   );
-
-  useEffect(() => {
-    if (filteredClasses.length > 0 && (page - 1) * PAGE_SIZE >= filteredClasses.length) {
-      setPage(1);
-    }
-  }, [filteredClasses.length, page]);
 
   const openAddClass = () => {
     setClassForm(emptyClassForm);

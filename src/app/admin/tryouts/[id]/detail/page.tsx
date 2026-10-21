@@ -601,6 +601,15 @@ export default function AdminTryoutDetailPage() {
                 >
                   {bulkAutoGradeLoading ? "Memproses..." : "Auto-grade semua (submitted)"}
                 </button>
+                <button
+                  type="button"
+                  disabled={refreshingStudents || !tryoutId}
+                  onClick={() => void refreshStudentsScores()}
+                  className="rounded border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                  title="Muat ulang dan sinkronkan data nilai siswa"
+                >
+                  {refreshingStudents ? "Menyinkronkan..." : "Sinkron Nilai"}
+                </button>
               </div>
             </div>
           )}

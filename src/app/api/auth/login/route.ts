@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     });
     const data = await res.json().catch(() => ({}));
     return NextResponse.json(deepToCamelCase(data), { status: res.status });
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       { error: "Gagal menghubungi server." },
       { status: 502 }

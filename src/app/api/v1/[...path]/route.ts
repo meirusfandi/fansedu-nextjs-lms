@@ -7,7 +7,8 @@ const API_BASE =
 
 async function forward(request: NextRequest, pathSegments: string[]) {
   const path = pathSegments.join("/");
-  const url = `${API_BASE.replace(/\/$/, "")}/api/v1/${path}`;
+  const search = request.nextUrl.search;
+  const url = `${API_BASE.replace(/\/$/, "")}/api/v1/${path}${search}`;
   const method = request.method;
 
   const contentType = request.headers.get("content-type") || "application/json";
@@ -46,7 +47,7 @@ async function forward(request: NextRequest, pathSegments: string[]) {
 type RouteParams = { params: Promise<{ path: string[] }> };
 
 /** Tangani preflight OPTIONS agar tidak 405 Method Not Allowed. */
-export async function OPTIONS(_request: NextRequest, _params: RouteParams) {
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
     headers: {

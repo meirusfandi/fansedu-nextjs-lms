@@ -960,7 +960,7 @@ export interface SubmitAnswerResponse {
   explanation?: string | null;
 }
 
-export interface AnalysisRecommendation extends AiQuestionItem {}
+export type AnalysisRecommendation = AiQuestionItem;
 
 export interface AiAnalysisResponse {
   accuracyPercent: number;
