@@ -1,23 +1,28 @@
 /**
  * Auth service: login, register, logout.
- * Delegates to lib/api and syncs with store.
- * Aplikasi web ini hanya untuk Admin & Trainer (bukan siswa).
+ * LMS FansEdu: Khusus untuk SuperAdmin, Siswa, dan Orang Tua.
+ * Akun Guru/Pengajar diarahkan ke portal TeachSync.
  */
 
 import { login as apiLogin, register as apiRegister, logout as apiLogout } from "@/lib/api";
 import { useAuthStore } from "@/store/auth";
 import type { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse, User } from "@/lib/api-types";
 
-/** Normalisasi role dari API ke User["role"]. Menolak siswa untuk login/register di app ini. */
+/** Normalisasi role dari API ke User["role"]. Menolak guru/trainer di LMS (guru diarahkan ke TeachSync). */
 function normalizeRoleFromApi(raw: string | undefined): User["role"] {
-  if (raw === "guru") return "trainer";
-  if (raw === "admin" || raw === "trainer") return raw;
-  if (raw === "student") {
+  const r = (raw ?? "").toLowerCase().trim();
+  if (r === "guru" || r === "trainer" || r === "teacher") {
     throw new Error(
-      "Aplikasi ini hanya untuk Admin dan Trainer. Akun siswa tidak dapat masuk melalui halaman ini."
+      "Akun Anda terdaftar sebagai Guru/Pengajar. Silakan masuk melalui portal TeachSync Guru."
     );
   }
-  throw new Error("Peran akun tidak didukung di aplikasi ini.");
+  if (r === "super_admin" || r === "superadmin") return "super_admin";
+  if (r === "admin") return "admin";
+  if (r === "student" || r === "siswa") return "student";
+  if (r === "parent" || r === "ortu" || r === "orang_tua" || r === "wali") return "parent";
+  
+  // Default fallback jika role belum diset spesifik (biasanya student)
+  return "student";
 }
 
 export async function login(credentials: LoginRequest, rememberMe = false): Promise<LoginResponse> {
@@ -35,9 +40,9 @@ export async function login(credentials: LoginRequest, rememberMe = false): Prom
   return res;
 }
 
-/** Pendaftaran self-service: hanya Trainer (backend memakai alias `guru` jika perlu). */
-export async function register(data: RegisterRequest): Promise<RegisterResponse> {
-  const res = await apiRegister(data);
+/** Pendaftaran self-service di LMS: untuk Siswa atau Orang Tua. */
+export async function register(data: RegisterRequest & { role?: "student" | "parent" }): Promise<RegisterResponse> {
+  const res = await apiRegister(data as RegisterRequest);
   const user = res.user as User & { role?: string; displayName?: string };
   const name = (user.name ?? user.displayName ?? "").trim() || user.email;
   const role = normalizeRoleFromApi(user.role);

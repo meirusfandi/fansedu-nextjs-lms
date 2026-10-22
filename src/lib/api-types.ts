@@ -1,6 +1,6 @@
 /** API types for FansEdu LMS v1 (camelCase JSON — backend Go). */
 
-export type UserRole = "admin" | "student" | "trainer";
+export type UserRole = "admin" | "super_admin" | "student" | "parent" | "trainer" | "guru";
 
 /** Role dari GET /admin/roles */
 export interface Role {

@@ -32,19 +32,18 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Set dari query `?session=expired` setelah token kedaluwarsa (redirect dari api.ts). */
   const [sessionExpired, setSessionExpired] = useState(false);
-  /** Path aman internal dari `?next=` untuk redirect pasca-login. */
   const [returnPath, setReturnPath] = useState<string | null>(null);
-  /** Cookie role siswa / tidak didukung — paksa bersihkan sesi. */
-  const [unsupportedRole, setUnsupportedRole] = useState(false);
+  const [guruNotice, setGuruNotice] = useState(false);
+
+  const teachSyncUrl = process.env.NEXT_PUBLIC_TEACHSYNC_URL || "http://localhost:8000";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const p = new URLSearchParams(window.location.search);
     if (p.get("session") === "expired") setSessionExpired(true);
-    if (p.get("reason") === "unsupported") {
-      setUnsupportedRole(true);
+    if (p.get("reason") === "guru_teachsync") {
+      setGuruNotice(true);
       useAuthStore.getState().clearAuth();
     }
     const next = p.get("next");
@@ -61,7 +60,7 @@ export default function LoginPage() {
         rememberMe
       );
       const role = useAuthStore.getState().role;
-      const byRole = getDashboardPathForRole(role) ?? "/trainer/dashboard";
+      const byRole = getDashboardPathForRole(role) ?? "/student/dashboard";
       const dest = returnPath ?? byRole;
       const forcePassword =
         loginRes.mustSetPassword === true ||
@@ -73,7 +72,8 @@ export default function LoginPage() {
       router.replace(dest);
     } catch (err) {
       const message = (err as Error)?.message ?? "";
-      if (message.includes("Admin dan Trainer")) {
+      if (message.includes("Guru/Pengajar") || message.includes("TeachSync")) {
+        setGuruNotice(true);
         setError(message);
         return;
       }
@@ -85,26 +85,53 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4 text-zinc-900 [color-scheme:light]">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 text-zinc-900 [color-scheme:light]">
       <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Fansedu - Informatic Olympiad Academy</p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-zinc-900">Welcome back</h1>
-          <p className="mt-2 text-sm text-zinc-600">Masuk sebagai Admin atau Trainer.</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-sky-600">FansEdu LMS Ecosystem</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900">Selamat Datang</h1>
+          <p className="mt-1 text-sm text-zinc-500">Portal Siswa, Orang Tua &amp; Tim FansEdu</p>
         </div>
-        {unsupportedRole && !error && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Aplikasi ini hanya untuk Admin dan Trainer. Sesi tidak didukung telah dihapus.
+
+        {guruNotice && (
+          <div className="mb-5 rounded-xl border border-teal-200 bg-teal-50/80 p-4 text-sm text-teal-950">
+            <div className="flex items-start gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-xs font-bold text-white">
+                TS
+              </span>
+              <div className="space-y-1">
+                <p className="font-semibold text-teal-900">Anda adalah Guru / Pengajar?</p>
+                <p className="text-xs leading-relaxed text-teal-800">
+                  Autentikasi dan pengelolaan jadwal, absensi, serta kelas les khusus guru berada di <strong>TeachSync</strong>.
+                </p>
+                <div className="pt-2">
+                  <a
+                    href={`${teachSyncUrl}/login`}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-700 active:scale-95"
+                  >
+                    <span>Masuk ke TeachSync Guru</span>
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         )}
-        {sessionExpired && !error && !unsupportedRole && (
+
+        {sessionExpired && !error && !guruNotice && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Sesi Anda telah berakhir atau token tidak valid. Silakan masuk kembali.
+            Sesi Anda telah berakhir. Silakan masuk kembali.
           </div>
         )}
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+
+        {error && !guruNotice && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
         )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="email" className="block text-sm font-medium text-zinc-800">Email</label>
@@ -116,14 +143,16 @@ export default function LoginPage() {
               autoComplete="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
-              placeholder="you@example.com"
+              className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition placeholder:text-zinc-400 focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-500/10"
+              placeholder="nama@email.com"
             />
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="password" className="block text-sm font-medium text-zinc-800">Password</label>
-              <Link href="/forgot-password" className="text-xs font-medium text-zinc-700 underline-offset-2 hover:underline">Forgot password?</Link>
+              <Link href="/forgot-password" className="text-xs font-medium text-sky-600 underline-offset-2 hover:underline">
+                Lupa password?
+              </Link>
             </div>
             <div className="relative">
               <input
@@ -134,13 +163,13 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-3 pr-10 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-500 focus:border-zinc-900 focus:bg-white focus:ring-2 focus:ring-zinc-900/5"
+                className="block w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-3 pr-10 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-500/10"
                 placeholder="••••••••"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
                 aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
               >
                 <EyeIcon visible={showPassword} />
@@ -148,23 +177,37 @@ export default function LoginPage() {
             </div>
           </div>
           <label className="flex cursor-pointer items-center gap-2">
-            <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900" />
-            <span className="text-sm text-zinc-700">Sesi login lebih lama (cookie, bukan simpan email)</span>
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 text-sky-600 focus:ring-sky-500"
+            />
+            <span className="text-xs text-zinc-600">Ingat sesi saya di perangkat ini</span>
           </label>
           <button
             type="submit"
             disabled={loading}
-            className="flex w-full items-center justify-center rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-zinc-50 shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-700"
+            className="flex w-full items-center justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-400"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Memproses..." : "Masuk ke Akun"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-zinc-600">
-          Trainer baru?{" "}
-          <Link href="/register" className="font-medium text-zinc-900 underline-offset-2 hover:underline">
-            Daftar akun Trainer
-          </Link>
-        </p>
+
+        <div className="mt-6 border-t border-zinc-100 pt-5 text-center text-xs text-zinc-500">
+          <p>
+            Belum punya akun?{" "}
+            <Link href="/register" className="font-semibold text-sky-600 hover:underline">
+              Daftar Siswa atau Orang Tua
+            </Link>
+          </p>
+          <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-zinc-400">
+            <span>Guru bimbingan?</span>
+            <a href={`${teachSyncUrl}/login`} className="font-medium text-teal-700 hover:underline">
+              Portal TeachSync Guru →
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -12,8 +12,8 @@ export type {
   RegisterResponse,
 } from "@/lib/api-types";
 
-/** Role untuk routing aplikasi ini — hanya Admin & Trainer (siswa tidak memakai web ini). */
-export type DashboardRole = "admin" | "trainer";
+/** Role untuk routing LMS FansEdu — SuperAdmin/Admin, Siswa, dan Orang Tua (Guru/Trainer di TeachSync). */
+export type DashboardRole = "admin" | "super_admin" | "student" | "parent";
 
 export interface AuthUser {
   id: string;

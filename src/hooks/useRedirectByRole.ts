@@ -6,11 +6,13 @@ import { useAuth } from "@/hooks/useAuth";
 import type { DashboardRole } from "@/types";
 
 const ROLE_DASHBOARD: Record<DashboardRole, string> = {
+  super_admin: "/admin/dashboard",
   admin: "/admin/dashboard",
-  trainer: "/trainer/dashboard",
+  student: "/student/dashboard",
+  parent: "/parent/dashboard",
 };
 
-/** Hanya admin dan trainer (aplikasi ini tidak memakai dashboard siswa). */
+/** Dashboard path berdasarkan role pengguna (SuperAdmin/Admin, Siswa, Orang Tua). */
 export function getDashboardPathForRole(role: DashboardRole | null): string | null {
   if (!role) return null;
   return ROLE_DASHBOARD[role] ?? null;

@@ -18,14 +18,15 @@ function readTokenFromCookie(): string | null {
 }
 
 function userToAuthUser(u: User): AuthUser {
-  if (u.role !== "admin" && u.role !== "trainer") {
-    throw new Error("Aplikasi ini hanya mendukung akun Admin atau Trainer.");
+  const role = toDashboardRole(u.role);
+  if (!role) {
+    throw new Error("Aplikasi ini hanya mendukung akun Admin, Siswa, atau Orang Tua. Akun Guru menggunakan TeachSync.");
   }
   return {
     id: u.id,
     name: u.name,
     email: u.email,
-    role: u.role,
+    role,
     avatarUrl: u.avatarUrl,
   };
 }
@@ -54,12 +55,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
     let authUser: AuthUser;
     try {
       authUser = userToAuthUser(user);
-    } catch {
+    } catch (err) {
       clearCookieAuth();
       set({ token: null, user: null, role: null, isHydrated: true });
-      throw new Error("Aplikasi ini hanya untuk Admin dan Trainer.");
+      throw err;
     }
-    const roleForCookie = user.role;
+    const roleForCookie = authUser.role;
     const name = user.name;
     setCookieAuth(token, maxAgeSeconds, roleForCookie, name);
     set({
@@ -84,12 +85,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({ token: null, user: null, role: null, isHydrated: true });
       return;
     }
-    if (roleFromCookie !== "admin" && roleFromCookie !== "trainer") {
+    const role = toDashboardRole(roleFromCookie);
+    if (!role) {
       clearCookieAuth();
       set({ token: null, user: null, role: null, isHydrated: true });
       return;
     }
-    const role = roleFromCookie;
     set({
       token,
       user: {
@@ -104,9 +105,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 }));
 
-/** Map string role backend ke DashboardRole (hanya admin | trainer dipakai di app). */
+/** Map string role backend ke DashboardRole (admin | super_admin | student | parent). */
 export function toDashboardRole(backendRole: string): DashboardRole | null {
-  if (backendRole === "admin") return "admin";
-  if (backendRole === "guru" || backendRole === "trainer" || backendRole === "teacher") return "trainer";
+  const r = (backendRole || "").toLowerCase().trim();
+  if (r === "super_admin" || r === "superadmin") return "super_admin";
+  if (r === "admin") return "admin";
+  if (r === "student" || r === "siswa") return "student";
+  if (r === "parent" || r === "ortu" || r === "orang_tua" || r === "wali") return "parent";
   return null;
 }
